@@ -1,0 +1,23 @@
+{
+  "name": "searqon",
+  "version": "1.0.0",
+  "description": "Searqon is a microservice-based web search and extraction engine designed as an open alternative to Tavily.",
+  "keywords": [
+    ""
+  ],
+  "homepage": "https://github.com/Sooriya04/Searqon#readme",
+  "bugs": {
+    "url": "https://github.com/Sooriya04/Searqon/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sooriya04/Searqon.git"
+  },
+  "license": "MIT",
+  "author": "Sooriya",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
