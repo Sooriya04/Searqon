@@ -9,3 +9,7 @@ Added a Reddit search microservice to collect discussion-based signals for Searq
 ## Wikipedia Extractor Microservice
 
 Added a Wikipedia extractor microservice to retrieve full article content for URLs discovered during search. It fetches Wikipedia HTML pages and uses Cheerio to extract the main article body while ignoring non-content elements. The service returns clean, structured content and is scoped solely to extraction, enabling future processing such as sectioning and synthesis.
+
+## GitHub Search with README Support
+
+Updated the GitHub search service to fetch the top 10 matching repositories for a query and include each repository’s `README.md` in the response. Results now return basic repo metadata along with raw README content, providing clearer project context while keeping the service search-focused.
