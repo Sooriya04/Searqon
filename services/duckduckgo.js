@@ -1,22 +1,25 @@
 const cheerio = require("cheerio");
 const httpClient = require("../utils/httpClient");
+const { BROWSER_HEADERS } = require("../utils/browserHeaders");
+const { cleanText, cleanSearchSnippet } = require("../utils/textCleaner");
+const { extractPageContent } = require("../utils/contentExtractor");
 
 const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
 
 function isAdUrl(url) {
-  return url.includes("duckduckgo.com/y.js");
+  return url && url.includes("duckduckgo.com/y.js");
 }
 
-async function searchDuckDuckGo(query) {
+async function fetchSearchResults(query) {
   const response = await httpClient.post(
     DUCKDUCKGO_URL,
     new URLSearchParams({ q: query }).toString(),
     {
       headers: {
+        ...BROWSER_HEADERS,
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "text/html"
       },
-      responseType: "text"
+      responseType: "text",
     }
   );
 
@@ -24,31 +27,90 @@ async function searchDuckDuckGo(query) {
     throw new Error("DuckDuckGo returned no HTML");
   }
 
-  const $ = cheerio.load(response.data);
+  return parseSearchResults(response.data);
+}
+
+
+function parseSearchResults(html) {
+  const $ = cheerio.load(html);
   const results = [];
 
-  $(".result").each((_, el) => {
-    const link = $(el).find(".result__a");
-    const title = link.text();
+  $(".result").each((i, el) => {
+    const $el = $(el);
+    const link = $el.find(".result__a");
+    const title = cleanText(link.text());
     const url = link.attr("href");
-
-    const snippet = $(el)
-      .find(".result__snippet, .result__body")
-      .text()
-      .replace(/\s+/g, " ")
-      .trim();
+    const snippet = cleanText($el.find(".result__snippet").text());
 
     if (title && url && !isAdUrl(url)) {
-      results.push({
-        title: title.trim(),
-        url,
-        snippet,
-        source: "duckduckgo"
-      });
+      results.push({ title, url, snippet });
     }
   });
 
-  return results.slice(0, 10);
+  return results;
+}
+
+
+function buildResult(result, pageData) {
+  if (pageData && pageData.content && pageData.wordCount >= 50) {
+    return {
+      title: pageData.title || result.title,
+      url: result.url,
+      content: pageData.content,
+      score: pageData.score,
+      publishedDate: pageData.publishedDate || null,
+      author: pageData.author || null,
+    };
+  }
+
+  // Fallback to snippet (cleaned)
+  if (result.snippet && result.snippet.length >= 50) {
+    const cleanedSnippet = cleanSearchSnippet(result.snippet);
+    if (cleanedSnippet.length >= 30) {
+      return {
+        title: result.title,
+        url: result.url,
+        content: cleanedSnippet,
+        rawContent: cleanedSnippet,
+        score: 0.5,
+        publishedDate: null,
+        author: null,
+      };
+    }
+  }
+
+  return null;
+}
+
+async function searchDuckDuckGo(query, limit = 5) {
+  const rawResults = await fetchSearchResults(query);
+  const results = [];
+
+  for (const result of rawResults) {
+    if (results.length >= limit) break;
+
+    // Extract full page content only - no snippet fallbacks
+    try {
+      const pageData = await extractPageContent(result.url);
+
+      // Only include results with quality content
+      if (pageData && pageData.content && pageData.wordCount >= 100) {
+        results.push({
+          title: pageData.title || result.title,
+          url: result.url,
+          content: pageData.content,
+          rawContent: pageData.content,
+          score: pageData.score,
+          publishedDate: pageData.publishedDate || null,
+          author: pageData.author || null,
+        });
+      }
+    } catch {
+      // Skip failed extractions - no snippet fallback
+    }
+  }
+
+  return results;
 }
 
 module.exports = { searchDuckDuckGo };

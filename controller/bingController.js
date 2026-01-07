@@ -1,33 +1,33 @@
 /**
- * DuckDuckGo Search Controller
- * Handles search requests and returns Tavily-style responses
+ * Bing Search Controller
+ * Handles Bing search requests and returns Tavily-style responses
  */
 
-const { searchDuckDuckGo } = require("../services/duckduckgo");
+const { searchBing } = require("../services/bing");
 
 /**
- * Handle search request
+ * Handle Bing search request
  * @param {Request} req - Express request
  * @param {Response} res - Express response
  */
-async function searchController(req, res) {
+async function bingController(req, res) {
   const { q, maxResults = 5, includeRawContent = true } = req.body;
 
   // Validate input
   if (!q || typeof q !== "string" || q.trim().length === 0) {
     return res.status(400).json({
-      error: "Invalid request body",
-      message: "`q` must be a non-empty string",
+      error: "Query parameter 'q' is required",
     });
   }
 
   try {
     const startTime = Date.now();
-    const results = await searchDuckDuckGo(q.trim(), maxResults);
+    const results = await searchBing(q.trim(), maxResults);
     const responseTime = Date.now() - startTime;
 
     // Tavily-style response format
     return res.status(200).json({
+      engine: "bing",
       query: q.trim(),
       responseTime,
       results: results.map((r) => ({
@@ -41,13 +41,13 @@ async function searchController(req, res) {
       })),
     });
   } catch (err) {
-    console.error("Search execution failed:", err.message);
+    console.error("Bing search failed:", err.message);
 
     return res.status(500).json({
-      error: "Search failed",
+      error: "Bing search failed",
       reason: err.message,
     });
   }
 }
 
-module.exports = { searchController };
+module.exports = { bingController };
