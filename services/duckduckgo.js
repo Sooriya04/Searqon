@@ -3,6 +3,7 @@ const httpClient = require("../utils/httpClient");
 const { BROWSER_HEADERS } = require("../utils/browserHeaders");
 const { cleanText, cleanSearchSnippet } = require("../utils/textCleaner");
 const { extractPageContent } = require("../utils/contentExtractor");
+const Result = require("../models/result");
 
 const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
 
@@ -30,7 +31,6 @@ async function fetchSearchResults(query) {
   return parseSearchResults(response.data);
 }
 
-
 function parseSearchResults(html) {
   const $ = cheerio.load(html);
   const results = [];
@@ -50,67 +50,80 @@ function parseSearchResults(html) {
   return results;
 }
 
-
-function buildResult(result, pageData) {
-  if (pageData && pageData.content && pageData.wordCount >= 50) {
-    return {
-      title: pageData.title || result.title,
-      url: result.url,
-      content: pageData.content,
-      score: pageData.score,
-      publishedDate: pageData.publishedDate || null,
-      author: pageData.author || null,
-    };
-  }
-
-  // Fallback to snippet (cleaned)
-  if (result.snippet && result.snippet.length >= 50) {
-    const cleanedSnippet = cleanSearchSnippet(result.snippet);
-    if (cleanedSnippet.length >= 30) {
-      return {
-        title: result.title,
-        url: result.url,
-        content: cleanedSnippet,
-        rawContent: cleanedSnippet,
-        score: 0.5,
-        publishedDate: null,
-        author: null,
-      };
-    }
-  }
-
-  return null;
-}
-
 async function searchDuckDuckGo(query, limit = 5) {
+  console.log(`[DuckDuckGo] Searching for: "${query}"`);
+  
   const rawResults = await fetchSearchResults(query);
-  const results = [];
+  const savedResults = [];
 
   for (const result of rawResults) {
-    if (results.length >= limit) break;
+    if (savedResults.length >= limit) break;
 
-    // Extract full page content only - no snippet fallbacks
+    let resultData = null;
+
+    // Try to extract full page content
     try {
+      console.log(`[DuckDuckGo] Extracting content from: ${result.url}`);
       const pageData = await extractPageContent(result.url);
 
-      // Only include results with quality content
-      if (pageData && pageData.content && pageData.wordCount >= 100) {
-        results.push({
+      // Use extracted content if quality is good
+      if (pageData && pageData.content && pageData.wordCount >= 50) {
+        console.log(`[DuckDuckGo] Extracted ${pageData.wordCount} words`);
+        resultData = {
+          query: query,
+          source: "duckduckgo",
           title: pageData.title || result.title,
           url: result.url,
           content: pageData.content,
           rawContent: pageData.content,
           score: pageData.score,
+          wordCount: pageData.wordCount,
           publishedDate: pageData.publishedDate || null,
           author: pageData.author || null,
-        });
+        };
       }
-    } catch {
-      // Skip failed extractions - no snippet fallback
+    } catch (err) {
+      console.log(`[DuckDuckGo] Extraction failed: ${err.message}`);
+    }
+
+    // FALLBACK: Use snippet if extraction failed
+    if (!resultData && result.snippet && result.snippet.length >= 30) {
+      const cleanedSnippet = cleanSearchSnippet(result.snippet);
+      if (cleanedSnippet.length >= 30) {
+        console.log(`[DuckDuckGo] Using snippet for ${result.url}`);
+        resultData = {
+          query: query,
+          source: "duckduckgo",
+          title: result.title,
+          url: result.url,
+          content: cleanedSnippet,
+          rawContent: cleanedSnippet,
+          score: 0.5,
+          wordCount: cleanedSnippet.split(/\s+/).length,
+        };
+      }
+    }
+
+    // Save to MongoDB if we have valid data
+    if (resultData) {
+      const savedResult = new Result(resultData);
+      await savedResult.save();
+      console.log(`[DuckDuckGo] Saved result to database`);
+
+      savedResults.push({
+        query: resultData.query,
+        source: resultData.source,
+        title: resultData.title,
+        url: resultData.url,
+        content: resultData.content,
+        wordCount: resultData.wordCount,
+        score: resultData.score,
+      });
     }
   }
 
-  return results;
+  console.log(`[DuckDuckGo] Returning ${savedResults.length} results`);
+  return savedResults;
 }
 
 module.exports = { searchDuckDuckGo };

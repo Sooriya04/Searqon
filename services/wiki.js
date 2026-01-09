@@ -1,29 +1,129 @@
-const WIKI_EXTRACT_URL =
-  "https://en.wikipedia.org/api/rest_v1/page/html";
+const cheerio = require("cheerio");
+const axios = require("axios");
+const { cleanText } = require("../utils/textCleaner");
+const Result = require("../models/result");
 
-async function wikiSearch(title, limit = 5) {
-  const url = `${WIKI_SEARCH_URL}?q=${encodeURIComponent(query)}&limit=${limit}`;
+const WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php";
+const WIKI_EXTRACT_URL = "https://en.wikipedia.org/api/rest_v1/page/html";
 
-  const response = await fetch(url, {
+/**
+ * Search Wikipedia to find the correct article title
+ * @param {string} query - Search query
+ * @returns {Promise<string|null>} Best matching article title
+ */
+async function searchWikiTitle(query) {
+  try {
+    const response = await axios.get(WIKI_SEARCH_API, {
+      params: {
+        action: "opensearch",
+        search: query,
+        limit: 1,
+        format: "json",
+      },
+      headers: {
+        "User-Agent": "SearqonBot/1.0",
+      },
+    });
+
+    const titles = response.data[1];
+    return titles && titles.length > 0 ? titles[0] : null;
+  } catch (err) {
+    console.error(`[Wiki] Search failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Extract content from Wikipedia page
+ * @param {string} title - Wikipedia article title
+ * @returns {Promise<Object>} Article content
+ */
+async function extractWikiContent(title) {
+  const url = `${WIKI_EXTRACT_URL}/${encodeURIComponent(title)}`;
+
+  const response = await axios.get(url, {
     headers: {
-      "User-Agent": "SearqonBot/1.0"
+      "User-Agent": "SearqonBot/1.0",
+    },
+    timeout: 10000,
+  });
+
+  const html = response.data;
+
+  // Parse HTML with cheerio
+  const $ = cheerio.load(html);
+
+  // Remove unwanted elements
+  $("script, style, nav, footer, .mw-editsection, .reference, sup, .infobox, .navbox, .sidebar").remove();
+
+  // Extract paragraphs
+  const paragraphs = [];
+  $("p").each((i, el) => {
+    const text = cleanText($(el).text());
+    if (text && text.length > 20) {
+      paragraphs.push(text);
     }
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to extract Wikipedia page");
-  }
-
-  const html = await response.text();
+  // Join paragraphs with double newlines
+  const content = paragraphs.join("\n\n");
 
   return {
     title,
+    content,
+    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+    wordCount: content.split(/\s+/).length,
+  };
+}
+
+/**
+ * Search Wikipedia and extract article content
+ * @param {string} query - Search query
+ * @returns {Promise<Object>} Wikipedia article data
+ */
+async function wikiSearch(query) {
+  console.log(`[Wiki] Searching for: "${query}"`);
+
+  // First, find the correct article title
+  const title = await searchWikiTitle(query);
+
+  if (!title) {
+    throw new Error(`No Wikipedia article found for "${query}"`);
+  }
+
+  console.log(`[Wiki] Found article: "${title}"`);
+
+  // Extract content from the article
+  const extracted = await extractWikiContent(title);
+
+  console.log(`[Wiki] Extracted ${extracted.wordCount} words from "${title}"`);
+
+  // Save to MongoDB
+  const result = new Result({
+    query: query,
     source: "wikipedia",
-    content_html: html,
-    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`
+    title: extracted.title,
+    url: extracted.url,
+    content: extracted.content,
+    rawContent: extracted.content,
+    wordCount: extracted.wordCount,
+    score: 0.9,
+  });
+
+  await result.save();
+  console.log(`[Wiki] Saved result to database`);
+
+  return {
+    query: query,
+    source: "wikipedia",
+    title: result.title,
+    url: result.url,
+    content: result.content,
+    wordCount: result.wordCount,
+    score: result.score,
   };
 }
 
 module.exports = {
-  wikiSearch
+  wikiSearch,
 };
