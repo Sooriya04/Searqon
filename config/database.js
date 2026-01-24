@@ -8,12 +8,7 @@ const connectDB = async () => {
       throw new Error("MONGODB_URI not found in .env file");
     }
 
-    console.log("Attempting to connect to MongoDB Atlas...");
-    
-    await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
-    });
-    
+    await mongoose.connect(mongoURI);
     console.log("MongoDB connected successfully");
   } catch (err) {
     console.error("MongoDB connection failed:", err.message);
