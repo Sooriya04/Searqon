@@ -1,15 +1,6 @@
-/**
- * DuckDuckGo Search Controller
- * Handles search requests and returns Tavily-style responses
- */
 
 const { searchDuckDuckGo } = require("../services/duckduckgo");
 
-/**
- * Handle search request
- * @param {Request} req - Express request
- * @param {Response} res - Express response
- */
 async function searchController(req, res) {
   const { q, maxResults = 5, includeRawContent = true } = req.body;
 
