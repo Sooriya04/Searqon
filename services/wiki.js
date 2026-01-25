@@ -6,11 +6,7 @@ const Result = require("../models/result");
 const WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php";
 const WIKI_EXTRACT_URL = "https://en.wikipedia.org/api/rest_v1/page/html";
 
-/**
- * Search Wikipedia to find the correct article title
- * @param {string} query - Search query
- * @returns {Promise<string|null>} Best matching article title
- */
+
 async function searchWikiTitle(query) {
   try {
     const response = await axios.get(WIKI_SEARCH_API, {
@@ -33,11 +29,7 @@ async function searchWikiTitle(query) {
   }
 }
 
-/**
- * Extract content from Wikipedia page
- * @param {string} title - Wikipedia article title
- * @returns {Promise<Object>} Article content
- */
+
 async function extractWikiContent(title) {
   const url = `${WIKI_EXTRACT_URL}/${encodeURIComponent(title)}`;
 
@@ -76,11 +68,7 @@ async function extractWikiContent(title) {
   };
 }
 
-/**
- * Search Wikipedia and extract article content
- * @param {string} query - Search query
- * @returns {Promise<Object>} Wikipedia article data
- */
+
 async function wikiSearch(query) {
   console.log(`[Wiki] Searching for: "${query}"`);
 
