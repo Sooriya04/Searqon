@@ -1,3 +1,5 @@
+const DatabaseClient = require("../database/client");
+
 const GITHUB_SEARCH_URL = "https://api.github.com/search/repositories";
 const GITHUB_REPO_URL = "https://api.github.com/repos";
 
@@ -36,26 +38,60 @@ async function fetchReadme(owner, repo) {
   return response.text();
 }
 
-async function searchWithReadmes(query) {
-  const repos = await githubSearch(query, 10);
+async function searchWithReadmes(query, limit = 10) {
+  console.log(`[GitHub] Searching for: "${query}"`);
+  
+  const repos = await githubSearch(query, limit);
+  const savedResults = [];
 
-  const results = await Promise.all(
-    repos.map(async repo => {
-      const readme = await fetchReadme(repo.owner.login, repo.name);
+  for (const repo of repos) {
+    const readme = await fetchReadme(repo.owner.login, repo.name);
+    const content = readme || repo.description || "";
 
-      return {
+    // Only save repos with meaningful content
+    if (content.length >= 20) {
+      const resultData = {
+        query: query,
+        source: "github",
+        title: repo.full_name,
+        url: repo.html_url,
+        content: content,
+        score: Math.min(repo.stargazers_count / 10000, 1), // Normalize score
+        wordCount: content.split(/\s+/).length,
+        author: repo.owner.login,
+        publishedDate: repo.created_at,
+        metadata: {
+          stars: repo.stargazers_count,
+          forks: repo.forks_count,
+          language: repo.language,
+          watchers: repo.watchers_count,
+          open_issues: repo.open_issues_count,
+          description: repo.description || ""
+        }
+      };
+
+      // Save to database microservice
+      await DatabaseClient.saveResult(resultData);
+      console.log(`[GitHub] Saved result to database: ${repo.full_name}`);
+
+      savedResults.push({
+        query: resultData.query,
+        source: resultData.source,
         name: repo.full_name,
+        title: resultData.title,
+        url: resultData.url,
         description: repo.description || "",
         stars: repo.stargazers_count,
         forks: repo.forks_count,
         language: repo.language,
-        url: repo.html_url,
-        readme: readme || ""
-      };
-    })
-  );
+        readme: readme || "",
+        wordCount: resultData.wordCount
+      });
+    }
+  }
 
-  return results;
+  console.log(`[GitHub] Returning ${savedResults.length} results`);
+  return savedResults;
 }
 
 module.exports = {

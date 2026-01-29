@@ -20,7 +20,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "npx nodemon server.js"
+    "dev": "npx nodemon server.js",
+    "db": "node database/server.js",
+    "db:dev": "npx nodemon database/server.js"
   },
   "dependencies": {
     "axios": "^1.13.3",

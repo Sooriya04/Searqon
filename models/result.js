@@ -10,7 +10,7 @@ const resultSchema = new mongoose.Schema(
     source: {
       type: String,
       required: true,
-      enum: ["duckduckgo", "wikipedia", "reddit", "github"],
+      index: true,
     },
     title: {
       type: String,
@@ -23,9 +23,6 @@ const resultSchema = new mongoose.Schema(
     content: {
       type: String,
       required: true,
-    },
-    rawContent: {
-      type: String,
     },
     score: {
       type: Number,

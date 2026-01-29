@@ -18,7 +18,4 @@ Updated the GitHub search service to fetch the top 10 matching repositories for 
 
 Implemented Bing and DuckDuckGo search scraping to discover URLs, followed by full webpage crawling and plain-text extraction using Cheerio. Added a hardened HTTP client to handle bot responses and improve Bing reliability. All non-content elements (scripts, nav, ads) are removed, and main article content is extracted with safe fallbacks, returning clean, engine-agnostic text for downstream processing.
 
-## MongoDB Integration & Service Enhancements
-
-Implemented MongoDB storage with centralized Result model for all search results, storing query, source, title, URL, content, and metadata. Enhanced Wikipedia service with OpenSearch API for fuzzy title matching and clean paragraph extraction. Improved content extraction with better error handling, snippet fallbacks for failed crawls, and reduced quality threshold to 50 words. Removed Bing service due to anti-bot protection. All services now save to MongoDB and return consistent JSON format across engines.
 

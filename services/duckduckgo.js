@@ -3,7 +3,7 @@ const httpClient = require("../utils/httpClient");
 const { BROWSER_HEADERS } = require("../utils/browserHeaders");
 const { cleanText, cleanSearchSnippet } = require("../utils/textCleaner");
 const { extractPageContent } = require("../utils/contentExtractor");
-const Result = require("../models/result");
+const DatabaseClient = require("../database/client");
 
 const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
 
@@ -75,11 +75,14 @@ async function searchDuckDuckGo(query, limit = 5) {
           title: pageData.title || result.title,
           url: result.url,
           content: pageData.content,
-          rawContent: pageData.content,
-          score: pageData.score,
+          score: pageData.score || 0.7,
           wordCount: pageData.wordCount,
           publishedDate: pageData.publishedDate || null,
           author: pageData.author || null,
+          metadata: {
+            snippet: result.snippet || "",
+            extraction_method: "full_page"
+          }
         };
       }
     } catch (err) {
@@ -97,17 +100,19 @@ async function searchDuckDuckGo(query, limit = 5) {
           title: result.title,
           url: result.url,
           content: cleanedSnippet,
-          rawContent: cleanedSnippet,
           score: 0.5,
           wordCount: cleanedSnippet.split(/\s+/).length,
+          metadata: {
+            snippet: result.snippet,
+            extraction_method: "snippet_only"
+          }
         };
       }
     }
 
-    // Save to MongoDB if we have valid data
+    // Save to database microservice if we have valid data
     if (resultData) {
-      const savedResult = new Result(resultData);
-      await savedResult.save();
+      await DatabaseClient.saveResult(resultData);
       console.log(`[DuckDuckGo] Saved result to database`);
 
       savedResults.push({

@@ -1,6 +1,7 @@
 const cheerio = require("cheerio");
 const httpClient = require("../utils/httpClient");
 const { cleanText } = require("../utils/textCleaner");
+const DatabaseClient = require("../database/client");
 
 /**
  * Fetch and extract content from a URL
@@ -38,11 +39,13 @@ async function fetchPageContent(url) {
   }
 }
 
-async function searchHNByQuery(query) {
+async function searchHNByQuery(query, limit = 10) {
+  console.log(`[HackerNews] Searching for: "${query}"`);
+  
   // Use the Algolia HN Search API which returns JSON directly
   const searchUrl = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(
     query
-  )}&tags=story&hitsPerPage=10`;
+  )}&tags=story&hitsPerPage=${limit}`;
 
   const response = await httpClient.get(searchUrl, {
     headers: {
@@ -50,7 +53,7 @@ async function searchHNByQuery(query) {
     }
   });
 
-  const results = [];
+  const savedResults = [];
 
   if (response.data && response.data.hits) {
     // Fetch content for all URLs in parallel
@@ -61,13 +64,37 @@ async function searchHNByQuery(query) {
       // Fetch actual page content
       const content = await fetchPageContent(url);
 
-      if (title) {
-        return {
-          title,
-          url,
-          content,
-          points: hit.points || 0,
+      if (title && content && content !== "Content could not be fetched") {
+        const resultData = {
+          query: query,
+          source: "hackernews",
+          title: title,
+          url: url,
+          content: content,
+          score: Math.min((hit.points || 0) / 500, 1), // Normalize score to 0-1 range
+          wordCount: content.split(/\s+/).length,
           author: hit.author || "unknown",
+          publishedDate: hit.created_at || null,
+          metadata: {
+            points: hit.points || 0,
+            num_comments: hit.num_comments || 0,
+            story_id: hit.objectID
+          }
+        };
+
+        // Save to database microservice
+        await DatabaseClient.saveResult(resultData);
+        console.log(`[HackerNews] Saved result to database: ${title}`);
+
+        return {
+          query: resultData.query,
+          source: resultData.source,
+          title: resultData.title,
+          url: resultData.url,
+          content: resultData.content,
+          points: hit.points || 0,
+          author: resultData.author,
+          wordCount: resultData.wordCount,
           created_at: hit.created_at || null
         };
       }
@@ -75,10 +102,11 @@ async function searchHNByQuery(query) {
     });
 
     const fetchedResults = await Promise.all(contentPromises);
-    results.push(...fetchedResults.filter(r => r !== null));
+    savedResults.push(...fetchedResults.filter(r => r !== null));
   }
 
-  return results;
+  console.log(`[HackerNews] Returning ${savedResults.length} results`);
+  return savedResults;
 }
 
 module.exports = {

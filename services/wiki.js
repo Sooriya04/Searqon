@@ -1,7 +1,7 @@
 const cheerio = require("cheerio");
 const axios = require("axios");
 const { cleanText } = require("../utils/textCleaner");
-const Result = require("../models/result");
+const DatabaseClient = require("../database/client");
 
 const WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php";
 const WIKI_EXTRACT_URL = "https://en.wikipedia.org/api/rest_v1/page/html";
@@ -86,29 +86,32 @@ async function wikiSearch(query) {
 
   console.log(`[Wiki] Extracted ${extracted.wordCount} words from "${title}"`);
 
-  // Save to MongoDB
-  const result = new Result({
+  // Save to database microservice
+  const resultData = {
     query: query,
     source: "wikipedia",
     title: extracted.title,
     url: extracted.url,
     content: extracted.content,
-    rawContent: extracted.content,
     wordCount: extracted.wordCount,
     score: 0.9,
-  });
+    metadata: {
+      article_title: extracted.title,
+      extraction_method: "wikipedia_api"
+    }
+  };
 
-  await result.save();
+  await DatabaseClient.saveResult(resultData);
   console.log(`[Wiki] Saved result to database`);
 
   return {
     query: query,
     source: "wikipedia",
-    title: result.title,
-    url: result.url,
-    content: result.content,
-    wordCount: result.wordCount,
-    score: result.score,
+    title: resultData.title,
+    url: resultData.url,
+    content: resultData.content,
+    wordCount: resultData.wordCount,
+    score: resultData.score,
   };
 }
 
