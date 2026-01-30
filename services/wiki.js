@@ -1,7 +1,7 @@
 const cheerio = require("cheerio");
 const axios = require("axios");
 const { cleanText } = require("../utils/textCleaner");
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 const WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php";
 const WIKI_EXTRACT_URL = "https://en.wikipedia.org/api/rest_v1/page/html";

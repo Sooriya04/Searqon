@@ -1,4 +1,4 @@
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 const GITHUB_SEARCH_URL = "https://api.github.com/search/repositories";
 const GITHUB_REPO_URL = "https://api.github.com/repos";

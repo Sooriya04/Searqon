@@ -1,6 +1,6 @@
 const axios = require("axios");
 const xml2js = require("xml2js");
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 const ARXIV_API = "http://export.arxiv.org/api/query";
 

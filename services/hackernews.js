@@ -1,7 +1,7 @@
 const cheerio = require("cheerio");
 const httpClient = require("../utils/httpClient");
 const { cleanText } = require("../utils/textCleaner");
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 /**
  * Fetch and extract content from a URL

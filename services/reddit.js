@@ -1,4 +1,4 @@
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 const REDDIT_SEARCH_URL = "https://www.reddit.com/search.json";
 

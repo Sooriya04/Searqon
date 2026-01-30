@@ -3,7 +3,7 @@ const httpClient = require("../utils/httpClient");
 const { BROWSER_HEADERS } = require("../utils/browserHeaders");
 const { cleanText, cleanSearchSnippet } = require("../utils/textCleaner");
 const { extractPageContent } = require("../utils/contentExtractor");
-const DatabaseClient = require("../database/client");
+const DatabaseClient = require("../connection/client");
 
 const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
 
