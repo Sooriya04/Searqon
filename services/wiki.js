@@ -1,23 +1,19 @@
-const cheerio = require("cheerio");
-const axios = require("axios");
-const { cleanText } = require("../utils/textCleaner");
-const DatabaseClient = require("../connection/client");
-
-const WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php";
-const WIKI_EXTRACT_URL = "https://en.wikipedia.org/api/rest_v1/page/html";
-
+const ScrapUrl = require('../scrapper/ScrapUrl');
+const axios = require('axios'); // Used for Opensearch API
+const WIKI_SEARCH_API = 'https://en.wikipedia.org/w/api.php';
+const WIKI_EXTRACT_URL = 'https://en.wikipedia.org/api/rest_v1/page/html';
 
 async function searchWikiTitle(query) {
   try {
     const response = await axios.get(WIKI_SEARCH_API, {
       params: {
-        action: "opensearch",
+        action: 'opensearch',
         search: query,
         limit: 1,
-        format: "json",
+        format: 'json',
       },
       headers: {
-        "User-Agent": "SearqonBot/1.0",
+        'User-Agent': 'SearqonBot/1.0',
       },
     });
 
@@ -29,45 +25,7 @@ async function searchWikiTitle(query) {
   }
 }
 
-
-async function extractWikiContent(title) {
-  const url = `${WIKI_EXTRACT_URL}/${encodeURIComponent(title)}`;
-
-  const response = await axios.get(url, {
-    headers: {
-      "User-Agent": "SearqonBot/1.0",
-    },
-    timeout: 10000,
-  });
-
-  const html = response.data;
-
-  // Parse HTML with cheerio
-  const $ = cheerio.load(html);
-
-  // Remove unwanted elements
-  $("script, style, nav, footer, .mw-editsection, .reference, sup, .infobox, .navbox, .sidebar").remove();
-
-  // Extract paragraphs
-  const paragraphs = [];
-  $("p").each((i, el) => {
-    const text = cleanText($(el).text());
-    if (text && text.length > 20) {
-      paragraphs.push(text);
-    }
-  });
-
-  // Join paragraphs with double newlines
-  const content = paragraphs.join("\n\n");
-
-  return {
-    title,
-    content,
-    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-    wordCount: content.split(/\s+/).length,
-  };
-}
-
+// extractWikiContent removed - using ScrapUrl instead
 
 async function wikiSearch(query) {
   console.log(`[Wiki] Searching for: "${query}"`);
@@ -81,32 +39,31 @@ async function wikiSearch(query) {
 
   console.log(`[Wiki] Found article: "${title}"`);
 
-  // Extract content from the article
-  const extracted = await extractWikiContent(title);
+  // Extract content from the article using Scrapper
+  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
+  console.log(`[Wiki] Scraping: ${url}`);
 
-  console.log(`[Wiki] Extracted ${extracted.wordCount} words from "${title}"`);
+  const extracted = await ScrapUrl(url);
+
+  console.log(`[Wiki] Scraped ${extracted.wordCount} words from "${title}"`);
 
   // Save to database microservice
   const resultData = {
     query: query,
-    source: "wikipedia",
-    title: extracted.title,
-    url: extracted.url,
-    content: extracted.content,
-    wordCount: extracted.wordCount,
+    source: 'wikipedia',
+    title: extracted.title || title,
+    url: extracted.url || url,
+    content: extracted.content || 'Content extraction failed',
+    wordCount: extracted.wordCount || 0,
     score: 0.9,
     metadata: {
-      article_title: extracted.title,
-      extraction_method: "wikipedia_api"
-    }
+      article_title: title,
+      extraction_method: 'worker_pool_scraper',
+    },
   };
-
-  await DatabaseClient.saveResult(resultData);
-  console.log(`[Wiki] Saved result to database`);
-
   return {
     query: query,
-    source: "wikipedia",
+    source: 'wikipedia',
     title: resultData.title,
     url: resultData.url,
     content: resultData.content,

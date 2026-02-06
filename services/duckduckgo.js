@@ -1,14 +1,13 @@
-const cheerio = require("cheerio");
-const httpClient = require("../utils/httpClient");
-const { BROWSER_HEADERS } = require("../utils/browserHeaders");
-const { cleanText, cleanSearchSnippet } = require("../utils/textCleaner");
-const { extractPageContent } = require("../utils/contentExtractor");
-const DatabaseClient = require("../connection/client");
+const cheerio = require('cheerio');
+const httpClient = require('../utils/httpClient');
+const { BROWSER_HEADERS } = require('../utils/browserHeaders');
+const { cleanText, cleanSearchSnippet } = require('../utils/textCleaner');
+const ScrapUrl = require('../scrapper/ScrapUrl');
 
-const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
+const DUCKDUCKGO_URL = 'https://html.duckduckgo.com/html/';
 
 function isAdUrl(url) {
-  return url && url.includes("duckduckgo.com/y.js");
+  return url && url.includes('duckduckgo.com/y.js');
 }
 
 async function fetchSearchResults(query) {
@@ -18,14 +17,14 @@ async function fetchSearchResults(query) {
     {
       headers: {
         ...BROWSER_HEADERS,
-        "Content-Type": "application/x-www-form-urlencoded",
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      responseType: "text",
-    }
+      responseType: 'text',
+    },
   );
 
-  if (!response || typeof response.data !== "string") {
-    throw new Error("DuckDuckGo returned no HTML");
+  if (!response || typeof response.data !== 'string') {
+    throw new Error('DuckDuckGo returned no HTML');
   }
 
   return parseSearchResults(response.data);
@@ -35,12 +34,12 @@ function parseSearchResults(html) {
   const $ = cheerio.load(html);
   const results = [];
 
-  $(".result").each((i, el) => {
+  $('.result').each((i, el) => {
     const $el = $(el);
-    const link = $el.find(".result__a");
+    const link = $el.find('.result__a');
     const title = cleanText(link.text());
-    const url = link.attr("href");
-    const snippet = cleanText($el.find(".result__snippet").text());
+    const url = link.attr('href');
+    const snippet = cleanText($el.find('.result__snippet').text());
 
     if (title && url && !isAdUrl(url)) {
       results.push({ title, url, snippet });
@@ -52,7 +51,7 @@ function parseSearchResults(html) {
 
 async function searchDuckDuckGo(query, limit = 5) {
   console.log(`[DuckDuckGo] Searching for: "${query}"`);
-  
+
   const rawResults = await fetchSearchResults(query);
   const savedResults = [];
 
@@ -61,32 +60,32 @@ async function searchDuckDuckGo(query, limit = 5) {
 
     let resultData = null;
 
-    // Try to extract full page content
+    // Try to extract full page content via Scrapper
     try {
-      console.log(`[DuckDuckGo] Extracting content from: ${result.url}`);
-      const pageData = await extractPageContent(result.url);
+      console.log(`[DuckDuckGo] Scraping content from: ${result.url}`);
+      const pageData = await ScrapUrl(result.url);
 
       // Use extracted content if quality is good
       if (pageData && pageData.content && pageData.wordCount >= 50) {
-        console.log(`[DuckDuckGo] Extracted ${pageData.wordCount} words`);
+        console.log(`[DuckDuckGo] Scraped ${pageData.wordCount} words`);
         resultData = {
           query: query,
-          source: "duckduckgo",
+          source: 'duckduckgo',
           title: pageData.title || result.title,
           url: result.url,
           content: pageData.content,
-          score: pageData.score || 0.7,
+          score: 0.7, // Default score for scraped content
           wordCount: pageData.wordCount,
-          publishedDate: pageData.publishedDate || null,
-          author: pageData.author || null,
+          publishedDate: null, // Scrapper might not return this yet
+          author: null,
           metadata: {
-            snippet: result.snippet || "",
-            extraction_method: "full_page"
-          }
+            snippet: result.snippet || '',
+            extraction_method: 'worker_pool_scraper',
+          },
         };
       }
     } catch (err) {
-      console.log(`[DuckDuckGo] Extraction failed: ${err.message}`);
+      console.log(`[DuckDuckGo] Scraping failed: ${err.message}`);
     }
 
     // FALLBACK: Use snippet if extraction failed
@@ -96,7 +95,7 @@ async function searchDuckDuckGo(query, limit = 5) {
         console.log(`[DuckDuckGo] Using snippet for ${result.url}`);
         resultData = {
           query: query,
-          source: "duckduckgo",
+          source: 'duckduckgo',
           title: result.title,
           url: result.url,
           content: cleanedSnippet,
@@ -104,30 +103,12 @@ async function searchDuckDuckGo(query, limit = 5) {
           wordCount: cleanedSnippet.split(/\s+/).length,
           metadata: {
             snippet: result.snippet,
-            extraction_method: "snippet_only"
-          }
+            extraction_method: 'snippet_only',
+          },
         };
       }
     }
-
-    // Save to database microservice if we have valid data
-    if (resultData) {
-      await DatabaseClient.saveResult(resultData);
-      console.log(`[DuckDuckGo] Saved result to database`);
-
-      savedResults.push({
-        query: resultData.query,
-        source: resultData.source,
-        title: resultData.title,
-        url: resultData.url,
-        content: resultData.content,
-        wordCount: resultData.wordCount,
-        score: resultData.score,
-      });
-    }
   }
-
-  console.log(`[DuckDuckGo] Returning ${savedResults.length} results`);
   return savedResults;
 }
 

@@ -1,14 +1,12 @@
-const axios = require("axios");
-const xml2js = require("xml2js");
-const DatabaseClient = require("../connection/client");
-
-const ARXIV_API = "http://export.arxiv.org/api/query";
+const axios = require('axios');
+const xml2js = require('xml2js');
+const ARXIV_API = 'http://export.arxiv.org/api/query';
 
 async function searchArxiv(query, limit = 10) {
   console.log(`[Arxiv] Searching for: "${query}"`);
-  
-  if (!query || typeof query !== "string") {
-    throw new Error("Valid query is required");
+
+  if (!query || typeof query !== 'string') {
+    throw new Error('Valid query is required');
   }
 
   const response = await axios.get(ARXIV_API, {
@@ -16,13 +14,13 @@ async function searchArxiv(query, limit = 10) {
       search_query: `all:${query}`,
       start: 0,
       max_results: limit,
-      sortBy: "relevance",
-      sortOrder: "descending"
-    }
+      sortBy: 'relevance',
+      sortOrder: 'descending',
+    },
   });
 
   const parsed = await xml2js.parseStringPromise(response.data, {
-    explicitArray: false
+    explicitArray: false,
   });
 
   const entries = parsed.feed?.entry || [];
@@ -34,7 +32,7 @@ async function searchArxiv(query, limit = 10) {
     const summary = item.summary?.trim();
     const authors = item.author
       ? Array.isArray(item.author)
-        ? item.author.map(a => a.name)
+        ? item.author.map((a) => a.name)
         : [item.author.name]
       : [];
 
@@ -42,25 +40,27 @@ async function searchArxiv(query, limit = 10) {
     if (title && summary && summary.length >= 50) {
       const resultData = {
         query: query,
-        source: "arxiv",
+        source: 'arxiv',
         title: title,
         url: item.id,
         content: summary,
         score: 0.8, // Arxiv papers are generally high quality
         wordCount: summary.split(/\s+/).length,
-        author: authors.length > 0 ? authors[0] : "unknown",
+        author: authors.length > 0 ? authors[0] : 'unknown',
         publishedDate: item.published,
         metadata: {
           authors: authors,
           updated: item.updated,
-          categories: item.category ? (Array.isArray(item.category) ? item.category.map(c => c.$.term) : [item.category.$.term]) : [],
-          arxiv_id: item.id
-        }
+          categories: item.category
+            ? Array.isArray(item.category)
+              ? item.category.map((c) => c.$.term)
+              : [item.category.$.term]
+            : [],
+          arxiv_id: item.id,
+        },
       };
 
       // Save to database microservice
-      await DatabaseClient.saveResult(resultData);
-      console.log(`[Arxiv] Saved result to database: ${title}`);
 
       savedResults.push({
         query: resultData.query,
@@ -71,7 +71,7 @@ async function searchArxiv(query, limit = 10) {
         published: item.published,
         updated: item.updated,
         link: item.id,
-        wordCount: resultData.wordCount
+        wordCount: resultData.wordCount,
       });
     }
   }
