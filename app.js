@@ -6,10 +6,14 @@ const github = require('./routes/github');
 const hackernew = require('./routes/hackernew');
 const arixv = require('./routes/arxiv');
 const pubmed = require('./routes/pubmed');
-
+const openAlex = require("./routes/openalex")
 const app = express();
 
 app.use(express.json());
+
+app.get("/", (req, res) => {
+    res.send("SEARQON is running")
+})
 
 app.use('/api', searchRoutes);
 app.use('/api', reddit);
@@ -18,5 +22,6 @@ app.use('/api', github);
 app.use('/api', hackernew);
 app.use('/api', arixv);
 app.use('/api', pubmed);
+app.use("/api", openAlex);
 
 module.exports = app;
