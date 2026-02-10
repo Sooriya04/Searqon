@@ -23,3 +23,7 @@ Implemented Bing and DuckDuckGo search scraping to discover URLs, followed by fu
 ### ISSUSE 15 : centralize all scraping into worker-pool Scrapper module
 
 Refactored the application’s scraping architecture by consolidating all web extraction logic into a centralized, worker-pool-based Scrapper module. Updated DuckDuckGo, HackerNews, Wikipedia, PubMed, and Reddit services to delegate scraping to this system, eliminating duplicated, service-specific implementations (e.g., direct Cheerio usage) and enforcing a standardized output format. Enhanced the Reddit scraper with browser-grade headers to bypass API blocking and expanded extraction to include full HTML bodies and external link metadata, enabling richer and more reliable content ingestion across the platform.
+
+### ISSUSE 16 : OpenAlex Search & URL Discovery
+
+Implemented OpenAlex search scraping to discover academic work URLs without relying on API keys. Added HTML-based query handling to extract canonical work links, enabling downstream crawling via the existing scraper pool. The service returns URL-only results, deferring full content extraction to the unified scraping pipeline. This extends academic coverage beyond Semantic Scholar while preserving a clean separation between discovery and extraction layers.
