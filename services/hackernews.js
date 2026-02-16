@@ -1,31 +1,28 @@
 const ScrapUrl = require('../scrapper/ScrapUrl');
-const httpClient = require('../utils/httpClient');
-/**
- * Fetch and extract content from a URL
- * @param {string} url - URL to fetch
- * @returns {Promise<string>} Extracted text content
- */
-// fetchPageContent removed - using ScrapUrl instead
 
 async function searchHNByQuery(query, limit = 10) {
   console.log(`[HackerNews] Searching for: "${query}"`);
-
-  // Use the Algolia HN Search API which returns JSON directly
   const searchUrl = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(
     query,
   )}&tags=story&hitsPerPage=${limit}`;
 
-  const response = await httpClient.get(searchUrl, {
+  const response = await fetch(searchUrl, {
     headers: {
       Accept: 'application/json',
+      'User-Agent': 'SearqonBot/1.0',
     },
   });
 
+  if (!response.ok) {
+    throw new Error(`HackerNews API returned ${response.status}`);
+  }
+
+  const data = await response.json();
   const savedResults = [];
 
-  if (response.data && response.data.hits) {
+  if (data && data.hits) {
     // Fetch content for all URLs in parallel
-    const contentPromises = response.data.hits.map(async (hit) => {
+    const contentPromises = data.hits.map(async (hit) => {
       const title = hit.title || '';
       const url =
         hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;

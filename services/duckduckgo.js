@@ -74,9 +74,9 @@ async function searchDuckDuckGo(query, limit = 5) {
           title: pageData.title || result.title,
           url: result.url,
           content: pageData.content,
-          score: 0.7, // Default score for scraped content
+          score: 0.7,
           wordCount: pageData.wordCount,
-          publishedDate: null, // Scrapper might not return this yet
+          publishedDate: null,
           author: null,
           metadata: {
             snippet: result.snippet || '',
@@ -108,7 +108,14 @@ async function searchDuckDuckGo(query, limit = 5) {
         };
       }
     }
+
+    // Push result if we got one
+    if (resultData) {
+      savedResults.push(resultData);
+    }
   }
+
+  console.log(`[DuckDuckGo] Returning ${savedResults.length} results`);
   return savedResults;
 }
 

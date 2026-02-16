@@ -27,3 +27,8 @@ Refactored the application’s scraping architecture by consolidating all web ex
 ### ISSUSE 16 : OpenAlex Search & URL Discovery
 
 Implemented OpenAlex search scraping to discover academic work URLs without relying on API keys. Added HTML-based query handling to extract canonical work links, enabling downstream crawling via the existing scraper pool. The service returns URL-only results, deferring full content extraction to the unified scraping pipeline. This extends academic coverage beyond Semantic Scholar while preserving a clean separation between discovery and extraction layers.
+
+
+### ISSUSE 17 : add persistent thread pool and undici connection pooling for high-performance scraping
+
+implement high-performance scraping engine with persistent thread pool and connection pooling — refactor the scraper architecture by replacing the previous BullMQ-based synchronous worker model with a persistent worker_threads pool to eliminate per-request thread spawn overhead and enable zero-latency CPU parsing, introduce undici.Pool for true keep-alive connection reuse and optimized network throughput, create a centralized ScrapUrl module to serve as the direct bridge between services and the scraping engine, resolve functional issues including missing result pushes in DuckDuckGo and API integration inconsistencies in HackerNews and Wiki, and improve overall performance by auto-scaling concurrency based on available CPU cores (N-1) to maximize parallelism while maintaining system stability

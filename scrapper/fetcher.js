@@ -1,77 +1,51 @@
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
+const { Pool } = require("undici");
 
-const DEFAULT_USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const DEFAULT_TIMEOUT_MS = 15000;
+// Connection pool cache — reuse connections per origin
+const pools = new Map();
 
-function fetchUrl(url, options = {}) {
-  return new Promise((resolve, reject) => {
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(url);
-    } catch (e) {
-      return reject(new Error(`Invalid URL: ${url}`));
+function getPool(origin) {
+    if (!pools.has(origin)) {
+        pools.set(origin, new Pool(origin, {
+            connections: 10,         // Max concurrent connections per host
+            pipelining: 1,
+            keepAliveTimeout: 30000, // 30s keep-alive
+            keepAliveMaxTimeout: 60000,
+        }));
     }
-
-    const lib = parsedUrl.protocol === 'https:' ? https : http;
-    const requestOptions = {
-      method: 'GET',
-      headers: {
-        'User-Agent': options.userAgent || DEFAULT_USER_AGENT,
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.8',
-      },
-      timeout: options.timeout || DEFAULT_TIMEOUT_MS,
-    };
-
-    const req = lib.request(url, requestOptions, (res) => {
-      // Handle redirects (basic implementation)
-      if (
-        res.statusCode >= 300 &&
-        res.statusCode < 400 &&
-        res.headers.location
-      ) {
-        // Warning: minimal recursion protection here. You might want to add a loop limit.
-        return fetchUrl(res.headers.location, options)
-          .then(resolve)
-          .catch(reject);
-      }
-
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        return reject(new Error(`Status Code: ${res.statusCode}`));
-      }
-
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        resolve({
-          url: url, // or res.responseUrl if available/tracked
-          html: data,
-          status: res.statusCode,
-          contentType: res.headers['content-type'],
-        });
-      });
-    });
-
-    req.on('error', (err) => {
-      reject(err);
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Request Timeout'));
-    });
-
-    req.end();
-  });
+    return pools.get(origin);
 }
 
-module.exports = {
-  fetchUrl,
-};
+/**
+ * Fetch a URL using undici connection pooling
+ * @param {string} url - URL to fetch
+ * @param {number} timeout - Request timeout in ms (default 15000)
+ * @returns {Promise<string>} HTML content
+ */
+async function fetchUrl(url, timeout = 15000) {
+    const parsed = new URL(url);
+    const pool = getPool(parsed.origin);
+
+    const { body, statusCode } = await pool.request({
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers: {
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/121.0 Safari/537.36 SearqonBot/1.0',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'en-US,en;q=0.9',
+        },
+        maxRedirections: 5,
+        headersTimeout: timeout,
+        bodyTimeout: timeout,
+    });
+
+    if (statusCode < 200 || statusCode >= 300) {
+        // Drain the body to avoid memory leaks
+        await body.dump();
+        throw new Error(`HTTP ${statusCode} for ${url}`);
+    }
+
+    return await body.text();
+}
+
+module.exports = { fetchUrl };

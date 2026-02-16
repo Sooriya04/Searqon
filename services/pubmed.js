@@ -5,22 +5,10 @@ const { cleanText } = require('../utils/textCleaner');
 
 const PUBMED_BASE_URL = 'https://pubmed.ncbi.nlm.nih.gov';
 
-/**
- * Extract PMID from a PubMed URL
- */
 function extractPMID(url) {
   const match = url.match(/\/(\d+)\/?$/);
   return match ? match[1] : null;
 }
-
-// fetchAbstract removed
-
-/**
- * Search PubMed for articles matching the query
- * @param {string} query - Search query
- * @param {number} limit - Maximum number of results to return
- * @returns {Promise<Object>} Search results with title, abstract, url only
- */
 async function searchPubMed(query, limit = 10) {
   if (!query) {
     throw new Error('Query is required');
@@ -60,8 +48,6 @@ async function searchPubMed(query, limit = 10) {
     console.log(
       `[PubMed] Found ${basicResults.length} results, fetching abstracts...`,
     );
-
-    // Fetch abstract for each article
     const results = [];
     for (const basic of basicResults) {
       let abstract = '';
