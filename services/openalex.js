@@ -36,13 +36,13 @@ async function searchOpenAlex(query, limit = 10) {
     for (const p of papers) {
       const title = p.display_name || '';
 
-      // Try multiple URL sources
-      const url =
-        p.primary_location?.landing_page_url ||
-        p.best_oa_location?.landing_page_url ||
-        p.doi ||
-        (p.locations?.length > 0 ? p.locations[0]?.landing_page_url : null) ||
-        null;
+      // Try multiple URL sources — prefer open access URLs (less likely to 403)
+      const oaLandingPage = p.best_oa_location?.landing_page_url || p.best_oa_location?.pdf_url;
+      const primaryLandingPage = p.primary_location?.landing_page_url;
+      const anyLocationUrl = p.locations?.find(l => l.landing_page_url)?.landing_page_url || null;
+      const doi = p.doi || null;
+
+      const url = oaLandingPage || primaryLandingPage || anyLocationUrl || doi || null;
 
       if (title && url) {
         basicResults.push({ title, url });
