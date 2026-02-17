@@ -8,6 +8,7 @@ const arixv = require('./routes/arxiv');
 const pubmed = require('./routes/pubmed');
 const openAlex = require("./routes/openalex")
 const doaj = require("./routes/doaj");
+const medrxiv = require("./routes/medrxiv");
 const app = express();
 
 app.use(express.json());
@@ -25,5 +26,6 @@ app.use('/api', arixv);
 app.use('/api', pubmed);
 app.use("/api", openAlex);
 app.use("/api", doaj);
+app.use("/api", medrxiv);
 
 module.exports = app;

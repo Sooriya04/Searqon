@@ -40,3 +40,7 @@ The redirect error was resolved by replacing the undici Pool.request()–based f
 ### ISSUSE 19 : implemented DOAJ search with text sanitization
 
 The DOAJ integration was completed successfully, and results are now returned in the unified Searqon schema. During testing, minor formatting artifacts such as `\r`, `\n`, `\t`, and unnecessary whitespace were detected in certain metadata fields. A lightweight sanitization step was implemented to remove these control characters and normalize spacing before returning results. This ensures clean, consistent text output and prevents formatting noise from affecting indexing, word count calculations, or downstream processing.
+
+### ISSUE 20: Implemented medRxiv service
+
+The medRxiv service layer was implemented and integrated into the Searqon pipeline, responsible for constructing the search URL, invoking the centralized scraping engine, and returning results in the unified schema. A configurable limit parameter was introduced to control the number of similar results returned per request, with validation and normalization enforcing a safe range (minimum 5, maximum 10) and a default fallback of 5 when unspecified or invalid. This ensures predictable payload size, consistent response behavior, and improved stability for downstream aggregation and processing without modifying the underlying scraping infrastructure.

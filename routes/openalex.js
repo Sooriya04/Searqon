@@ -1,4 +1,4 @@
-const { openAlexController } = require("../controller/openalex")
+const { openAlexController } = require("../controller/openAlexController")
 
 const router = require("express").Router()
 
