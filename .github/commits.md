@@ -36,3 +36,7 @@ implement high-performance scraping engine with persistent thread pool and conne
 ### ISSUSE 18 : replace undici Pool with native fetch; prefer OA URLs
 
 The redirect error was resolved by replacing the undici Pool.request()–based fetcher with Node.js’s built-in fetch() API, which natively follows redirects and avoids deprecated options such as maxRedirections removed in newer undici versions. After this fix, DOI redirects function correctly; however, 403 responses from publisher sites (e.g., Taylor & Francis) are not code defects but the result of publisher-side bot detection. To address this at an architectural level, the fetcher now uses more realistic browser headers, and the OpenAlex service prioritizes open-access URLs (including OA PDFs) over DOI or publisher links. This ensures reliable, legal scraping by favoring publicly accessible sources and treating paywalled publisher URLs as a last-resort metadata reference rather than primary scrape targets.
+
+### ISSUSE 19 : implemented DOAJ search with text sanitization
+
+The DOAJ integration was completed successfully, and results are now returned in the unified Searqon schema. During testing, minor formatting artifacts such as `\r`, `\n`, `\t`, and unnecessary whitespace were detected in certain metadata fields. A lightweight sanitization step was implemented to remove these control characters and normalize spacing before returning results. This ensures clean, consistent text output and prevents formatting noise from affecting indexing, word count calculations, or downstream processing.

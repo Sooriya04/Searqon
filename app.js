@@ -7,6 +7,7 @@ const hackernew = require('./routes/hackernew');
 const arixv = require('./routes/arxiv');
 const pubmed = require('./routes/pubmed');
 const openAlex = require("./routes/openalex")
+const doaj = require("./routes/doaj");
 const app = express();
 
 app.use(express.json());
@@ -23,5 +24,6 @@ app.use('/api', hackernew);
 app.use('/api', arixv);
 app.use('/api', pubmed);
 app.use("/api", openAlex);
+app.use("/api", doaj);
 
 module.exports = app;

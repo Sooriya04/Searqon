@@ -1,5 +1,7 @@
 const axios = require('axios');
 const xml2js = require('xml2js');
+const ScrapUrl = require('../scrapper/ScrapUrl');
+
 const ARXIV_API = 'http://export.arxiv.org/api/query';
 
 async function searchArxiv(query, limit = 10) {
@@ -36,42 +38,36 @@ async function searchArxiv(query, limit = 10) {
         : [item.author.name]
       : [];
 
-    // Only save papers with meaningful content
+    // Get the abstract page URL for scraping
+    const arxivUrl = item.id; // e.g. http://arxiv.org/abs/2301.12345v1
+
     if (title && summary && summary.length >= 50) {
-      const resultData = {
+      let content = summary;
+
+      // Try to scrape the full arxiv page for richer content
+      if (arxivUrl) {
+        try {
+          console.log(`[Arxiv] Scraping: ${arxivUrl}`);
+          const scraped = await ScrapUrl(arxivUrl);
+          if (scraped && scraped.content && scraped.content.length > summary.length) {
+            content = scraped.content;
+          }
+        } catch (e) {
+          console.log(`[Arxiv] Scraping failed for ${arxivUrl}: ${e.message}`);
+        }
+      }
+
+      savedResults.push({
         query: query,
         source: 'arxiv',
         title: title,
-        url: item.id,
-        content: summary,
-        score: 0.8, // Arxiv papers are generally high quality
-        wordCount: summary.split(/\s+/).length,
-        author: authors.length > 0 ? authors[0] : 'unknown',
-        publishedDate: item.published,
-        metadata: {
-          authors: authors,
-          updated: item.updated,
-          categories: item.category
-            ? Array.isArray(item.category)
-              ? item.category.map((c) => c.$.term)
-              : [item.category.$.term]
-            : [],
-          arxiv_id: item.id,
-        },
-      };
-
-      // Save to database microservice
-
-      savedResults.push({
-        query: resultData.query,
-        source: resultData.source,
-        title: resultData.title,
         summary: summary,
+        content: content,
         authors: authors,
         published: item.published,
         updated: item.updated,
-        link: item.id,
-        wordCount: resultData.wordCount,
+        link: arxivUrl,
+        wordCount: content.split(/\s+/).length,
       });
     }
   }

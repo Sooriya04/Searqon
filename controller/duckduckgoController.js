@@ -16,8 +16,7 @@ async function searchController(req, res) {
     const startTime = Date.now();
     const results = await searchDuckDuckGo(q.trim(), maxResults);
     const responseTime = Date.now() - startTime;
-
-    // Tavily-style response format
+    
     return res.status(200).json({
       query: q.trim(),
       responseTime,

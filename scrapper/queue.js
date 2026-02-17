@@ -13,12 +13,10 @@ connection.on('error', (err) => {
     console.error('[Redis] Connection error:', err.message);
 });
 
-// creates BullMQ queue
 const scrapeQueue = new Queue('scrapeQueue', {
     connection: connection
 });
 
-// Redis is used internally by BullMQ
 module.exports = {
     scrapeQueue, connection
 };
