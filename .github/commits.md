@@ -48,3 +48,7 @@ The medRxiv service layer was implemented and integrated into the Searqon pipeli
 ### ISSUE 21: Implemented Unified Search Controller
 
 The unified search controller was implemented to orchestrate concurrent queries across ten distinct search services, including arXiv, PubMed, and OpenAlex. By utilizing `Promise.allSettled`, the architecture ensures system resilience, allowing successful retrieval of partial results even if individual upstream providers fail or timeout. A normalization layer was introduced to standardize diverse response structures into a consistent schema, while a customizable limit parameter controls the volume of aggregated data. This enhancement provides a single, robust entry point for comprehensive academic and web search results without compromising performance.
+
+
+### ISSUE 22: Enhanced Text Cleaning for Arxiv and Reddit Services
+The Arxiv and Reddit search services were updated to utilize a centralized cleanText utility, addressing data quality issues such as extraneous whitespace, tab characters, and newline inconsistencies. This enhancement ensures that titles, summaries, and scraped content are sanitized before being returned, providing a cleaner and more readable output structure for the unified search controller. This standardization improves the overall data integrity of the aggregated results without altering the underlying extraction logic

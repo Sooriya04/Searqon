@@ -1,5 +1,6 @@
 const { BROWSER_HEADERS } = require('../utils/browserHeaders');
 const ScrapUrl = require('../scrapper/ScrapUrl');
+const { cleanText } = require('../utils/textCleaner');
 
 const REDDIT_SEARCH_URL = 'https://www.reddit.com/search.json';
 
@@ -28,7 +29,10 @@ async function reddit(query, limit = 10) {
         if (data.data && data.data.children) {
             for (const post of data.data.children) {
                 const postData = post.data;
-                let content = postData.selftext || postData.title || '';
+                const resultTitle = cleanText(postData.title);
+                const rawContent = postData.selftext || postData.title || '';
+                let content = cleanText(rawContent);
+
                 const isExternalLink =
                     !postData.is_self && postData.url && !postData.url.includes('reddit.com');
 
@@ -37,7 +41,7 @@ async function reddit(query, limit = 10) {
                     try {
                         const scraped = await ScrapUrl(postData.url);
                         if (scraped && scraped.content) {
-                            content += '\n\n' + scraped.content;
+                            content += '\n\n' + cleanText(scraped.content);
                         }
                     } catch (e) {
                         // Ignore scraping errors
@@ -49,7 +53,7 @@ async function reddit(query, limit = 10) {
                     const resultData = {
                         query: query,
                         source: 'reddit',
-                        title: postData.title,
+                        title: resultTitle,
                         url: `https://reddit.com${postData.permalink}`,
                         content: content,
                         score: (postData.score || 0) / 1000,

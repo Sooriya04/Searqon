@@ -1,6 +1,7 @@
 const axios = require('axios');
 const xml2js = require('xml2js');
 const ScrapUrl = require('../scrapper/ScrapUrl');
+const { cleanText } = require('../utils/textCleaner');
 
 const ARXIV_API = 'http://export.arxiv.org/api/query';
 
@@ -30,8 +31,8 @@ async function searchArxiv(query, limit = 10) {
     const savedResults = [];
 
     for (const item of list) {
-        const title = item.title?.trim();
-        const summary = item.summary?.trim();
+        const title = cleanText(item.title);
+        const summary = cleanText(item.summary);
         const authors = item.author
             ? Array.isArray(item.author)
                 ? item.author.map((a) => a.name)
@@ -50,7 +51,7 @@ async function searchArxiv(query, limit = 10) {
                     console.log(`[Arxiv] Scraping: ${arxivUrl}`);
                     const scraped = await ScrapUrl(arxivUrl);
                     if (scraped && scraped.content && scraped.content.length > summary.length) {
-                        content = scraped.content;
+                        content = cleanText(scraped.content);
                     }
                 } catch (e) {
                     console.log(`[Arxiv] Scraping failed for ${arxivUrl}: ${e.message}`);
