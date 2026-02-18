@@ -44,6 +44,7 @@ async function searchMedRxiv(query, limit = 5) {
 
             let content = summary;
 
+            // Always scrape content
             if (articleUrl) {
                 try {
                     console.log(`[MedRxiv] Scraping: ${articleUrl}`);

@@ -60,35 +60,37 @@ async function searchDuckDuckGo(query, limit = 5) {
 
     let resultData = null;
 
-    // Try to extract full page content via Scrapper
-    try {
-      console.log(`[DuckDuckGo] Scraping content from: ${result.url}`);
-      const pageData = await ScrapUrl(result.url);
+    // Always scrape deep content
+    if (result.url) {
+      try {
+        console.log(`[DuckDuckGo] Scraping content from: ${result.url}`);
+        const pageData = await ScrapUrl(result.url);
 
-      // Use extracted content if quality is good
-      if (pageData && pageData.content && pageData.wordCount >= 50) {
-        console.log(`[DuckDuckGo] Scraped ${pageData.wordCount} words`);
-        resultData = {
-          query: query,
-          source: 'duckduckgo',
-          title: pageData.title || result.title,
-          url: result.url,
-          content: pageData.content,
-          score: 0.7,
-          wordCount: pageData.wordCount,
-          publishedDate: null,
-          author: null,
-          metadata: {
-            snippet: result.snippet || '',
-            extraction_method: 'worker_pool_scraper',
-          },
-        };
+        // Use extracted content if quality is good
+        if (pageData && pageData.content && pageData.wordCount >= 50) {
+          console.log(`[DuckDuckGo] Scraped ${pageData.wordCount} words`);
+          resultData = {
+            query: query,
+            source: 'duckduckgo',
+            title: pageData.title || result.title,
+            url: result.url,
+            content: pageData.content,
+            score: 0.7,
+            wordCount: pageData.wordCount,
+            publishedDate: null,
+            author: null,
+            metadata: {
+              snippet: result.snippet || '',
+              extraction_method: 'worker_pool_scraper',
+            },
+          };
+        }
+      } catch (e) {
+        console.log(`[DuckDuckGo] Scraping failed: ${e.message}`);
       }
-    } catch (err) {
-      console.log(`[DuckDuckGo] Scraping failed: ${err.message}`);
     }
 
-    // FALLBACK: Use snippet if extraction failed
+    // Fallback: use snippet if scraping failed or returned poor content
     if (!resultData && result.snippet && result.snippet.length >= 30) {
       const cleanedSnippet = cleanSearchSnippet(result.snippet);
       if (cleanedSnippet.length >= 30) {

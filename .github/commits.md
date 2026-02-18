@@ -44,3 +44,7 @@ The DOAJ integration was completed successfully, and results are now returned in
 ### ISSUE 20: Implemented medRxiv service
 
 The medRxiv service layer was implemented and integrated into the Searqon pipeline, responsible for constructing the search URL, invoking the centralized scraping engine, and returning results in the unified schema. A configurable limit parameter was introduced to control the number of similar results returned per request, with validation and normalization enforcing a safe range (minimum 5, maximum 10) and a default fallback of 5 when unspecified or invalid. This ensures predictable payload size, consistent response behavior, and improved stability for downstream aggregation and processing without modifying the underlying scraping infrastructure.
+
+### ISSUE 21: Implemented Unified Search Controller
+
+The unified search controller was implemented to orchestrate concurrent queries across ten distinct search services, including arXiv, PubMed, and OpenAlex. By utilizing `Promise.allSettled`, the architecture ensures system resilience, allowing successful retrieval of partial results even if individual upstream providers fail or timeout. A normalization layer was introduced to standardize diverse response structures into a consistent schema, while a customizable limit parameter controls the volume of aggregated data. This enhancement provides a single, robust entry point for comprehensive academic and web search results without compromising performance.

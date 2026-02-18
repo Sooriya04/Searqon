@@ -1,77 +1,74 @@
 const ScrapUrl = require('../scrapper/ScrapUrl');
 const axios = require('axios'); // Used for Opensearch API
 const WIKI_SEARCH_API = 'https://en.wikipedia.org/w/api.php';
-const WIKI_EXTRACT_URL = 'https://en.wikipedia.org/api/rest_v1/page/html';
 
 async function searchWikiTitle(query) {
-  try {
-    const response = await axios.get(WIKI_SEARCH_API, {
-      params: {
-        action: 'opensearch',
-        search: query,
-        limit: 1,
-        format: 'json',
-      },
-      headers: {
-        'User-Agent': 'SearqonBot/1.0',
-      },
-    });
+    try {
+        const response = await axios.get(WIKI_SEARCH_API, {
+            params: {
+                action: 'opensearch',
+                search: query,
+                limit: 1,
+                format: 'json',
+            },
+            headers: {
+                'User-Agent': 'SearqonBot/1.0',
+            },
+        });
 
-    const titles = response.data[1];
-    return titles && titles.length > 0 ? titles[0] : null;
-  } catch (err) {
-    console.error(`[Wiki] Search failed: ${err.message}`);
-    return null;
-  }
+        const titles = response.data[1];
+        return titles && titles.length > 0 ? titles[0] : null;
+    } catch (err) {
+        console.error(`[Wiki] Search failed: ${err.message}`);
+        return null;
+    }
 }
 
-// extractWikiContent removed - using ScrapUrl instead
-
 async function wikiSearch(query) {
-  console.log(`[Wiki] Searching for: "${query}"`);
+    console.log(`[Wiki] Searching for: "${query}"`);
 
-  // First, find the correct article title
-  const title = await searchWikiTitle(query);
+    // First, find the correct article title
+    const title = await searchWikiTitle(query);
 
-  if (!title) {
-    throw new Error(`No Wikipedia article found for "${query}"`);
-  }
+    if (!title) {
+        throw new Error(`No Wikipedia article found for "${query}"`);
+    }
 
-  console.log(`[Wiki] Found article: "${title}"`);
+    console.log(`[Wiki] Found article: "${title}"`);
 
-  // Extract content from the article using Scrapper
-  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
-  console.log(`[Wiki] Scraping: ${url}`);
+    // Extract content from the article using Scrapper (Always scrape)
+    const url = `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}`;
+    let extracted = { title, url, content: '', wordCount: 0 };
 
-  const extracted = await ScrapUrl(url);
+    console.log(`[Wiki] Scraping: ${url}`);
+    extracted = await ScrapUrl(url);
+    console.log(`[Wiki] Scraped ${extracted.wordCount} words from "${title}"`);
 
-  console.log(`[Wiki] Scraped ${extracted.wordCount} words from "${title}"`);
-
-  // Save to database microservice
-  const resultData = {
-    query: query,
-    source: 'wikipedia',
-    title: extracted.title || title,
-    url: extracted.url || url,
-    content: extracted.content || 'Content extraction failed',
-    wordCount: extracted.wordCount || 0,
-    score: 0.9,
-    metadata: {
-      article_title: title,
-      extraction_method: 'worker_pool_scraper',
-    },
-  };
-  return {
-    query: query,
-    source: 'wikipedia',
-    title: resultData.title,
-    url: resultData.url,
-    content: resultData.content,
-    wordCount: resultData.wordCount,
-    score: resultData.score,
-  };
+    // Save to database microservice
+    const resultData = {
+        query: query,
+        source: 'wikipedia',
+        title: extracted.title || title,
+        url: extracted.url || url,
+        content: extracted.content || 'Content extraction failed',
+        wordCount: extracted.wordCount || 0,
+        score: 0.9,
+        metadata: {
+            article_title: title,
+            extraction_method: 'worker_pool_scraper',
+        },
+    };
+    return {
+        query: query,
+        source: 'wikipedia',
+        title: resultData.title,
+        url: resultData.url,
+        content: resultData.content,
+        wordCount: resultData.wordCount,
+        score: resultData.score,
+    };
 }
 
 module.exports = {
-  wikiSearch,
+    wikiSearch,
 };
