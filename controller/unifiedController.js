@@ -9,6 +9,7 @@ const { wikiSearch } = require("../services/wiki");
 const { searchWithReadmes } = require("../services/github");
 const { reddit } = require("../services/reddit");
 const { searchWeb } = require("../services/web");
+const { searchGeeksForGeeks } = require("../services/geeksforgeeks");
 
 // All sources with their search functions and labels
 const SOURCES = [
@@ -23,6 +24,7 @@ const SOURCES = [
     { name: "wikipedia", fn: (q) => wikiSearch(q) },
     { name: "github", fn: (q, l) => searchWithReadmes(q, l) },
     { name: "reddit", fn: (q, l) => reddit(q, l) },
+    { name: "geeksforgeeks", fn: (q, l) => searchGeeksForGeeks(q, l) },
 ];
 
 
