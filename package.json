@@ -25,18 +25,14 @@
     "db:dev": "npx nodemon database/server.js"
   },
   "dependencies": {
-    "@mozilla/readability": "^0.6.0",
     "axios": "^1.13.3",
-    "bullmq": "^5.69.3",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "ioredis": "^5.9.3",
-    "linkedom": "^0.18.12",
     "mongoose": "^9.1.2",
-    "p-limit": "^7.3.0",
-    "pdfjs-dist": "^3.11.174",
-    "undici": "^7.22.0",
+    "puppeteer": "^24.37.4",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "winston": "^3.19.0",
     "xml2js": "^0.6.2"
   },

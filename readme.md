@@ -62,10 +62,10 @@ Coordinates the entire pipeline, deciding which services to call and in what ord
 Fetches URLs from multiple search providers (Bing, DuckDuckGo, Reddit).
 
 ### Crawl Service
-Loads webpages using Playwright, executing JavaScript for modern, dynamic websites.
+Loads webpages using Puppeteer with stealth plugins to handle dynamic JavaScript-heavy sites and evade simple bot detection.
 
 ### Extract Service
-Parses HTML using Cheerio and extracts structured, readable text content.
+Extracts structured, readable text content while preserving document structure (paragraphs, headers) and cleaning up noise.
 
 ### Rank Service
 Uses embedding models to measure semantic relevance and filter low-quality content.
@@ -77,8 +77,8 @@ Uses an LLM to generate final answers with enforced citations for transparency.
 
 **Backend**
 - Node.js & Express.js
-- Playwright (browser automation)
-- Cheerio (HTML parsing)
+- **Puppeteer** (browser automation & scraping)
+- **puppeteer-extra** (stealth mode plugin)
 - Ollama (embeddings & LLMs)
 - Docker & Docker Compose
 
@@ -100,8 +100,10 @@ Searqon is designed for:
 
 **What's Working:**
 - Single-query web search with citation-backed answers
-- Multi-source crawling and extraction
+- **Direct URL Scraping** via the new `web` service
+- Multi-source crawling and extraction with **Puppeteer** (stealth mode)
 - Semantic ranking and content filtering
+- **Performance Timing**: Detailed duration logs for scraping and overall search
 
 **What's Coming:**
 - LangGraph-based orchestrator for agent-like behavior

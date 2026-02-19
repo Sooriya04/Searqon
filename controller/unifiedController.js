@@ -8,9 +8,11 @@ const { searchHNByQuery } = require("../services/hackernews");
 const { wikiSearch } = require("../services/wiki");
 const { searchWithReadmes } = require("../services/github");
 const { reddit } = require("../services/reddit");
+const { searchWeb } = require("../services/web");
 
 // All sources with their search functions and labels
 const SOURCES = [
+    { name: "web", fn: (q, l) => searchWeb(q, l) },
     { name: "arxiv", fn: (q, l) => searchArxiv(q, l) },
     { name: "doaj", fn: (q, l) => searchDOAJ(q, l) },
     { name: "medrxiv", fn: (q, l) => searchMedRxiv(q, l) },
@@ -54,6 +56,7 @@ exports.unifiedSearchPost = async (req, res) => {
 
         const maxResults = limit ? parseInt(limit, 10) : 5;
 
+        const startTime = Date.now();
         console.log(`[Unified] Search: "${query}" | Limit: ${maxResults}`);
 
         // Fire all searches concurrently
@@ -93,10 +96,18 @@ exports.unifiedSearchPost = async (req, res) => {
         const successCount = Object.values(sources).filter((s) => s.status === "ok").length;
         const failedCount = Object.values(sources).filter((s) => s.status === "failed").length;
 
-        console.log(`[Unified] Done — ${successCount} sources ok, ${failedCount} failed, ${totalResults} total results`);
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        console.log(`[Unified] Done — ${successCount} sources ok, ${failedCount} failed, ${totalResults} total results (Duration: ${duration}ms)`);
 
         res.json({
             success: true,
+            timing: {
+                startTime: new Date(startTime).toISOString(),
+                endTime: new Date(endTime).toISOString(),
+                duration: `${duration}ms`
+            },
             query,
             totalResults,
             sourcesQueried: SOURCES.length,

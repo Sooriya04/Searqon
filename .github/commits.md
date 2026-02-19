@@ -52,3 +52,8 @@ The unified search controller was implemented to orchestrate concurrent queries 
 
 ### ISSUE 22: Enhanced Text Cleaning for Arxiv and Reddit Services
 The Arxiv and Reddit search services were updated to utilize a centralized cleanText utility, addressing data quality issues such as extraneous whitespace, tab characters, and newline inconsistencies. This enhancement ensures that titles, summaries, and scraped content are sanitized before being returned, providing a cleaner and more readable output structure for the unified search controller. This standardization improves the overall data integrity of the aggregated results without altering the underlying extraction logic
+
+### ISSUE 23: Migration to Puppeteer-based Scraping Architecture
+The scraping mechanism has been completely re-architected to use Puppeteer, replacing the previous fetch + worker_threads implementation. This migration enables the system to handle dynamic JavaScript-heavy websites, bypass simple bot protections via puppeteer-extra-plugin-stealth, and manage concurrency more effectively through a dedicated Limiter utility. Additionally, a new web service was introduced to allow direct URL scraping, and precise timing logs (start, end, duration) were added to the scraper output for better observability. These changes significantly enhance the robustness and capabilities of the extraction engine while maintaining the existing unified search interface.
+
+
