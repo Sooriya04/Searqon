@@ -1,20 +1,12 @@
+const config = require('./configLoader');
+
 class Limiter {
-    /**
-     * @param {number} concurrency - Max active concurrent jobs
-     * @param {number} queueLimit - Max jobs in queue before rejecting
-     */
-    constructor(concurrency = 3, queueLimit = 10) {
+    constructor(concurrency = 10, queueLimit = 25) {
         this.concurrency = concurrency;
         this.queueLimit = queueLimit;
         this.active = 0;
         this.queue = [];
     }
-
-    /**
-     * Execute a function with concurrency control
-     * @param {Function} fn - Async function to execute
-     * @returns {Promise<any>}
-     */
     async add(fn) {
         if (this.active >= this.concurrency) {
             if (this.queue.length >= this.queueLimit) {
@@ -39,8 +31,8 @@ class Limiter {
     }
 }
 
-// Default to safe limits for a single instance
+// Default to settings from settings.yaml
 module.exports = new Limiter(
-    parseInt(process.env.MAX_CONCURRENT_SESSIONS || 3, 10),
-    parseInt(process.env.QUEUE_LENGTH || 15, 10)
+    config.concurrency.max_active_sessions,
+    config.concurrency.queue_limit
 );

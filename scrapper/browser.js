@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const config = require('../utils/configLoader');
 
 puppeteer.use(StealthPlugin());
 
@@ -9,7 +10,7 @@ async function getBrowser() {
     if (!browserInstance || !browserInstance.isConnected()) {
         console.log('[Browser] Launching new browser instance...');
         browserInstance = await puppeteer.launch({
-            headless: "new",
+            headless: config.browser.headless,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -17,9 +18,8 @@ async function getBrowser() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                // '--single-process', // Often causes issues in some envs, use with caution
                 '--disable-gpu',
-                '--window-size=1920,1080'
+                `--window-size=${config.browser.window_size}`
             ]
         });
 

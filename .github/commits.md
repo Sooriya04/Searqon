@@ -60,3 +60,9 @@ The scraping mechanism has been completely re-architected to use Puppeteer, repl
 ### ISSUE 24: Implemented GeeksforGeeks Federated Service
 
 The GeeksforGeeks service was integrated into the Searqon pipeline as a federated search module using DuckDuckGo query augmentation (<query> geeksforgeeks) rather than directly accessing restricted endpoints. Results are filtered to retain only geeksforgeeks.org URLs, with a fallback to the site: operator when necessary, and mapped into the unified schema with a normalized "geeksforgeeks" source tag. A dedicated content sanitization layer removes UI noise and footer artifacts to ensure clean, relevant output, while configurable result limiting and strict controller-level validation maintain predictable payload size, stable aggregation behavior, and consistency with existing service implementations.
+
+
+### ISSUE 25: Implemented Performance Optimizations and Centralized Configuration
+
+The Searqon scraper pipeline was optimized to resolve execution bottlenecks by transitioning from sequential to parallel service-level scraping using Promise.all across eight federated modules (Reddit, OpenAlex, DuckDuckGo, Arxiv, MedRxiv, PubMed, DOAJ, and GitHub). A centralized configuration layer was introduced via settings.yaml and configLoader.js, allowing for dynamic adjustment of browser parameters, resource-blocking rules, and concurrency limits without additional code changes. This upgrade increased the global concurrency threshold from 3 to 10 active sessions via Limiter.js, significantly improving throughput and reducing aggregation latency. Furthermore, the system's stability was bolstered by resolving critical import regressions and correcting service remapping logic to ensure consistent, filtered result output across the unified schema.
+

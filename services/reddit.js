@@ -36,53 +36,47 @@ async function reddit(query, limit = 10) {
                 const isExternalLink =
                     !postData.is_self && postData.url && !postData.url.includes('reddit.com');
 
-                // If it's an external link, try to scrape it (Always)
-                if (isExternalLink) {
-                    try {
-                        const scraped = await ScrapUrl(postData.url);
-                        if (scraped && scraped.content) {
-                            content += '\n\n' + cleanText(scraped.content);
-                        }
-                    } catch (e) {
-                        // Ignore scraping errors
-                    }
-                }
-
-                // Only save posts with meaningful content
-                if (content.length >= 10) {
-                    const resultData = {
-                        query: query,
-                        source: 'reddit',
-                        title: resultTitle,
-                        url: `https://reddit.com${postData.permalink}`,
-                        content: content,
-                        score: (postData.score || 0) / 1000,
-                        wordCount: content.split(/\s+/).length,
-                        author: postData.author || 'unknown',
-                        publishedDate: new Date(postData.created_utc * 1000).toISOString(),
-                        body_html: postData.selftext_html || '',
-                        metadata: {
-                            subreddit: postData.subreddit,
-                            upvotes: postData.ups,
-                            comments: postData.num_comments,
-                            awards: postData.total_awards_received || 0,
-                        },
-                    };
-                    savedResults.push({
-                        query: resultData.query,
-                        source: resultData.source,
-                        title: resultData.title,
-                        url: resultData.url,
-                        content: resultData.content, // Includes selftext + scraped external content
-                        body_html: resultData.body_html,
+                savedResults.push({
+                    query: query,
+                    source: 'reddit',
+                    title: resultTitle,
+                    url: `https://reddit.com${postData.permalink}`,
+                    originalContent: content,
+                    externalUrl: isExternalLink ? postData.url : null,
+                    score: (postData.score || 0) / 1000,
+                    wordCount: content.split(/\s+/).length,
+                    author: postData.author || 'unknown',
+                    publishedDate: new Date(postData.created_utc * 1000).toISOString(),
+                    body_html: postData.selftext_html || '',
+                    metadata: {
                         subreddit: postData.subreddit,
-                        score: resultData.score,
-                        author: resultData.author,
-                        wordCount: resultData.wordCount,
-                    });
-                }
+                        upvotes: postData.ups,
+                        comments: postData.num_comments,
+                        awards: postData.total_awards_received || 0,
+                    },
+                });
             }
         }
+
+        // Parallel scrape external links
+        console.log(`[Reddit] Scrapping ${savedResults.filter(r => r.externalUrl).length} external links in parallel...`);
+        await Promise.all(savedResults.map(async (result) => {
+            if (result.externalUrl) {
+                try {
+                    const scraped = await ScrapUrl(result.externalUrl);
+                    if (scraped && scraped.content) {
+                        result.content = result.originalContent + '\n\n' + cleanText(scraped.content);
+                        result.wordCount = result.content.split(/\s+/).length;
+                    }
+                } catch (e) {
+                    result.content = result.originalContent;
+                }
+            } else {
+                result.content = result.originalContent;
+            }
+            delete result.originalContent;
+            delete result.externalUrl;
+        }));
 
         console.log(`[Reddit] Returning ${savedResults.length} results`);
         return savedResults;

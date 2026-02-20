@@ -28,33 +28,13 @@ async function searchDOAJ(query, limit = 5) {
         });
 
         const results = response.data?.results || [];
-        const savedResults = [];
-
-        for (const item of results) {
+        const savedResults = await Promise.all(results.map(async (item) => {
             const bib = item.bibjson || {};
-
             const title = bib.title?.trim();
-            const publisherName = typeof bib.publisher === 'object'
-                ? bib.publisher?.name || ''
-                : bib.publisher || '';
-            const subjects = bib.subject
-                ? bib.subject.map((s) => s.term).filter(Boolean)
-                : [];
+            const publisherName = typeof bib.publisher === 'object' ? bib.publisher?.name || '' : bib.publisher || '';
+            const subjects = bib.subject ? bib.subject.map((s) => s.term).filter(Boolean) : [];
+            const country = (typeof bib.publisher === 'object' ? bib.publisher?.country : bib.country) || '';
 
-            const country = (typeof bib.publisher === 'object'
-                ? bib.publisher?.country
-                : bib.country) || '';
-
-            const issns = [];
-            if (bib.pissn) issns.push(bib.pissn);
-            if (bib.eissn) issns.push(bib.eissn);
-            if (bib.identifier && Array.isArray(bib.identifier)) {
-                bib.identifier
-                    .filter((id) => id.type === 'pissn' || id.type === 'eissn')
-                    .forEach((id) => { if (id.id && !issns.includes(id.id)) issns.push(id.id); });
-            }
-
-            // Try homepage link, then ref link, then construct DOAJ page URL
             const journalUrl =
                 bib.ref?.journal ||
                 bib.link?.find((l) => l.type === 'homepage')?.url ||
@@ -62,25 +42,19 @@ async function searchDOAJ(query, limit = 5) {
                 (item.id ? `https://doaj.org/toc/${item.id}` : null);
 
             const summary = `Publisher: ${publisherName}. Country: ${country}. Subjects: ${subjects.join(', ')}`;
-
             let content = summary;
 
-            // Always scrape content
             if (journalUrl) {
                 try {
-                    console.log(`[DOAJ] Scraping: ${journalUrl}`);
                     const scraped = await ScrapUrl(journalUrl);
-
                     if (scraped && scraped.content && scraped.content.length > summary.length) {
                         content = cleanText(scraped.content);
                     }
-                } catch (e) {
-                    console.log(`[DOAJ] Scraping failed for ${journalUrl}: ${e.message}`);
-                }
+                } catch (e) { }
             }
 
             if (title) {
-                savedResults.push({
+                return {
                     query: query,
                     source: 'doaj',
                     title: title,
@@ -88,12 +62,15 @@ async function searchDOAJ(query, limit = 5) {
                     content: content,
                     link: journalUrl,
                     wordCount: content.split(/\s+/).length,
-                });
+                };
             }
-        }
+            return null;
+        }));
 
-        console.log(`[DOAJ] Returning ${savedResults.length} results`);
-        return savedResults;
+        const filteredResults = savedResults.filter(r => r !== null);
+
+        console.log(`[DOAJ] Returning ${filteredResults.length} results`);
+        return filteredResults;
 
     } catch (error) {
         console.error(`[DOAJ] API Error: ${error.message}`);

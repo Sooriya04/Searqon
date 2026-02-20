@@ -1,5 +1,6 @@
 const { getBrowser } = require("./browser");
 const limiter = require("../utils/Limiter");
+const config = require('../utils/configLoader');
 
 async function ScrapUrl(url, options = {}) {
     return limiter.add(async () => {
@@ -12,14 +13,14 @@ async function ScrapUrl(url, options = {}) {
         try {
             await page.setRequestInterception(true);
             page.on('request', (req) => {
-                if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+                if (config.scraping.block_resources.includes(req.resourceType())) {
                     req.abort();
                 } else {
                     req.continue();
                 }
             });
 
-            const timeout = options.timeout || 15000;
+            const timeout = options.timeout || config.browser.timeout;
 
             // Navigate
             await page.goto(url, {

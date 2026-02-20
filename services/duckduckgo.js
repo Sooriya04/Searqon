@@ -53,22 +53,14 @@ async function searchDuckDuckGo(query, limit = 5) {
   console.log(`[DuckDuckGo] Searching for: "${query}"`);
 
   const rawResults = await fetchSearchResults(query);
-  const savedResults = [];
-
-  for (const result of rawResults) {
-    if (savedResults.length >= limit) break;
-
+  console.log(`[DuckDuckGo] Scraping ${rawResults.slice(0, limit).length} results in parallel...`);
+  const savedResults = await Promise.all(rawResults.slice(0, limit).map(async (result) => {
     let resultData = null;
 
-    // Always scrape deep content
     if (result.url) {
       try {
-        console.log(`[DuckDuckGo] Scraping content from: ${result.url}`);
         const pageData = await ScrapUrl(result.url);
-
-        // Use extracted content if quality is good
         if (pageData && pageData.content && pageData.wordCount >= 50) {
-          console.log(`[DuckDuckGo] Scraped ${pageData.wordCount} words`);
           resultData = {
             query: query,
             source: 'duckduckgo',
@@ -77,8 +69,6 @@ async function searchDuckDuckGo(query, limit = 5) {
             content: pageData.content,
             score: 0.7,
             wordCount: pageData.wordCount,
-            publishedDate: null,
-            author: null,
             metadata: {
               snippet: result.snippet || '',
               extraction_method: 'worker_pool_scraper',
@@ -86,39 +76,32 @@ async function searchDuckDuckGo(query, limit = 5) {
           };
         }
       } catch (e) {
-        console.log(`[DuckDuckGo] Scraping failed: ${e.message}`);
+        // Silently fail scraping
       }
     }
 
-    // Fallback: use snippet if scraping failed or returned poor content
     if (!resultData && result.snippet && result.snippet.length >= 30) {
       const cleanedSnippet = cleanSearchSnippet(result.snippet);
-      if (cleanedSnippet.length >= 30) {
-        console.log(`[DuckDuckGo] Using snippet for ${result.url}`);
-        resultData = {
-          query: query,
-          source: 'duckduckgo',
-          title: result.title,
-          url: result.url,
-          content: cleanedSnippet,
-          score: 0.5,
-          wordCount: cleanedSnippet.split(/\s+/).length,
-          metadata: {
-            snippet: result.snippet,
-            extraction_method: 'snippet_only',
-          },
-        };
-      }
+      resultData = {
+        query: query,
+        source: 'duckduckgo',
+        title: result.title,
+        url: result.url,
+        content: cleanedSnippet,
+        score: 0.5,
+        wordCount: cleanedSnippet.split(/\s+/).length,
+        metadata: {
+          snippet: result.snippet,
+          extraction_method: 'snippet_only',
+        },
+      };
     }
+    return resultData;
+  }));
 
-    // Push result if we got one
-    if (resultData) {
-      savedResults.push(resultData);
-    }
-  }
-
-  console.log(`[DuckDuckGo] Returning ${savedResults.length} results`);
-  return savedResults;
+  const filteredResults = savedResults.filter(r => r !== null);
+  console.log(`[DuckDuckGo] Returning ${filteredResults.length} results`);
+  return filteredResults;
 }
 
 module.exports = { searchDuckDuckGo };

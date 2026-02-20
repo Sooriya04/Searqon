@@ -33,9 +33,7 @@ async function searchMedRxiv(query, limit = 5) {
         });
 
         const results = response.data?.resultList?.result || [];
-        const savedResults = [];
-
-        for (const item of results) {
+        const savedResults = await Promise.all(results.map(async (item) => {
             const title = cleanText(item.title || '');
             const summary = cleanText(item.abstractText || '');
             const articleUrl = item.doi
@@ -43,23 +41,17 @@ async function searchMedRxiv(query, limit = 5) {
                 : item.fullTextUrlList?.fullTextUrl?.[0]?.url || null;
 
             let content = summary;
-
-            // Always scrape content
             if (articleUrl) {
                 try {
-                    console.log(`[MedRxiv] Scraping: ${articleUrl}`);
                     const scraped = await ScrapUrl(articleUrl);
-
                     if (scraped && scraped.content && scraped.content.length > summary.length) {
                         content = cleanText(scraped.content);
                     }
-                } catch (e) {
-                    console.log(`[MedRxiv] Scraping failed for ${articleUrl}: ${e.message}`);
-                }
+                } catch (e) { }
             }
 
             if (title) {
-                savedResults.push({
+                return {
                     query: query,
                     source: 'medrxiv',
                     title: title,
@@ -67,12 +59,14 @@ async function searchMedRxiv(query, limit = 5) {
                     content: content,
                     link: articleUrl,
                     wordCount: content.split(/\s+/).length,
-                });
+                };
             }
-        }
+            return null;
+        }));
 
-        console.log(`[MedRxiv] Returning ${savedResults.length} results`);
-        return savedResults;
+        const filteredResults = savedResults.filter(r => r !== null);
+        console.log(`[MedRxiv] Returning ${filteredResults.length} results`);
+        return filteredResults;
 
     } catch (error) {
         console.error(`[MedRxiv] API Error: ${error.message}`);

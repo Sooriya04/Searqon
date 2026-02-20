@@ -28,9 +28,8 @@ async function searchArxiv(query, limit = 10) {
 
     const entries = parsed.feed?.entry || [];
     const list = Array.isArray(entries) ? entries : [entries];
-    const savedResults = [];
-
-    for (const item of list) {
+    // Scrape each arxiv page for content in parallel
+    const savedResults = await Promise.all(list.map(async (item) => {
         const title = cleanText(item.title);
         const summary = cleanText(item.summary);
         const authors = item.author
@@ -38,27 +37,19 @@ async function searchArxiv(query, limit = 10) {
                 ? item.author.map((a) => a.name)
                 : [item.author.name]
             : [];
-
-        // Get the abstract page URL for scraping
-        const arxivUrl = item.id; // e.g. http://arxiv.org/abs/2301.12345v1
+        const arxivUrl = item.id;
 
         if (title && summary && summary.length >= 50) {
             let content = summary;
-
-            // Try to scrape the full arxiv page for richer content
             if (arxivUrl) {
                 try {
-                    console.log(`[Arxiv] Scraping: ${arxivUrl}`);
                     const scraped = await ScrapUrl(arxivUrl);
                     if (scraped && scraped.content && scraped.content.length > summary.length) {
                         content = cleanText(scraped.content);
                     }
-                } catch (e) {
-                    console.log(`[Arxiv] Scraping failed for ${arxivUrl}: ${e.message}`);
-                }
+                } catch (e) { }
             }
-
-            savedResults.push({
+            return {
                 query: query,
                 source: 'arxiv',
                 title: title,
@@ -69,12 +60,14 @@ async function searchArxiv(query, limit = 10) {
                 updated: item.updated,
                 link: arxivUrl,
                 wordCount: content.split(/\s+/).length,
-            });
+            };
         }
-    }
+        return null;
+    }));
 
-    console.log(`[Arxiv] Returning ${savedResults.length} results`);
-    return savedResults;
+    const filteredResults = savedResults.filter(r => r !== null);
+    console.log(`[Arxiv] Returning ${filteredResults.length} results`);
+    return filteredResults;
 }
 
 module.exports = { searchArxiv };

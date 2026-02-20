@@ -48,27 +48,20 @@ async function searchPubMed(query, limit = 10) {
         console.log(
             `[PubMed] Found ${basicResults.length} results, fetching abstracts...`,
         );
-        const results = [];
-        for (const basic of basicResults) {
+        const results = await Promise.all(basicResults.map(async (basic) => {
             let abstract = '';
-
             try {
                 const scrapeResult = await ScrapUrl(basic.url);
                 abstract = scrapeResult.content || '';
             } catch (e) {
-                console.error(
-                    `[PubMed] Scraping failed for ${basic.url}: ${e.message}`,
-                );
+                console.error(`[PubMed] Scraping failed for ${basic.url}: ${e.message}`);
             }
-
-            const result = {
+            return {
                 title: basic.title,
                 abstract,
                 url: basic.url,
             };
-
-            results.push(result);
-        }
+        }));
         return {
             query,
             source: 'pubmed',

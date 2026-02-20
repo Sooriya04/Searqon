@@ -25,29 +25,21 @@ async function searchWithReadmes(query, limit = 10) {
 
     try {
         const repos = await githubSearch(query, limit);
-        const savedResults = [];
-
-        for (const repo of repos) {
+        const savedResults = await Promise.all(repos.map(async (repo) => {
             let content = '';
-
-            // Always scrape the repo page for rich content
             try {
-                console.log(`[GitHub] Scraping: ${repo.html_url}`);
                 const scraped = await ScrapUrl(repo.html_url);
                 if (scraped && scraped.content) {
                     content = scraped.content;
                 }
-            } catch (e) {
-                console.log(`[GitHub] Scraping failed for ${repo.html_url}: ${e.message}`);
-            }
+            } catch (e) { }
 
-            // Fallback
             if (!content || content.length < 20) {
                 content = repo.description || '';
             }
 
             if (content.length >= 5 || repo.description) {
-                savedResults.push({
+                return {
                     query: query,
                     source: 'github',
                     name: repo.full_name,
@@ -61,12 +53,15 @@ async function searchWithReadmes(query, limit = 10) {
                     score: Math.min(repo.stargazers_count / 10000, 1),
                     wordCount: content.split(/\s+/).length,
                     author: repo.owner.login,
-                });
+                };
             }
-        }
+            return null;
+        }));
 
-        console.log(`[GitHub] Returning ${savedResults.length} results`);
-        return savedResults;
+        const filteredResults = savedResults.filter(r => r !== null);
+
+        console.log(`[GitHub] Returning ${filteredResults.length} results`);
+        return filteredResults;
     } catch (error) {
         console.error(`[GitHub] Search failed: ${error.message}`);
         return [];
