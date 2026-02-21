@@ -19,8 +19,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
-    "dev": "npx nodemon server.js",
+    "start": "npx concurrently \"node server.js\" \"cd crawler && .venv/bin/python server.py\"",
+    "dev": "npx concurrently \"npx nodemon server.js\" \"cd crawler && .venv/bin/python server.py\"",
     "db": "node database/server.js",
     "db:dev": "npx nodemon database/server.js"
   },
@@ -38,6 +38,7 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.11"
   }
 }

@@ -6,8 +6,8 @@ browser:
   timeout: 15000
 
 concurrency:
-  max_active_sessions: 10
-  queue_limit: 25
+  max_active_sessions: 20
+  queue_limit: 50
 
 scraping:
   block_resources: ["image", "stylesheet", "font", "media"]

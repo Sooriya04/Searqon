@@ -22,94 +22,27 @@ Most AI search APIs operate as black boxes:
 
 Searqon processes web searches through five core stages:
 
-1. **Search** — Queries multiple sources (Bing, DuckDuckGo, Reddit) and collects relevant URLs
-2. **Crawl** — Loads webpages using real browsers to handle JavaScript-heavy sites
-3. **Extract** — Removes noise (ads, navigation, scripts) and extracts clean, readable content
-4. **Rank** — Uses semantic embeddings to filter and prioritize the most relevant information
-5. **Synthesize** — Generates concise, citation-backed answers using an LLM
+1. **Search** — Queries multiple sources (Bing, DuckDuckGo, Reddit) and collects relevant URLs.
+2. **Crawl** — Fetches webpage content efficiently using a specialized Python-based crawler.
+3. **Extract** — Removes noise (ads, navigation, scripts) and extracts clean, readable text.
+4. **Rank** — Uses semantic embeddings to prioritize the most relevant information.
+5. **Synthesize** — Generates concise, citation-backed answers using an LLM.
 
 ## Architecture
 
-Searqon uses a **microservice architecture** where each service has a single, well-defined responsibility:
-
-```
-Client Request
-      ↓
-  API Gateway
-      ↓
-  Orchestrator
-      ↓
-  ┌───┴───┬─────────┬─────────┬──────────┐
-  ↓       ↓         ↓         ↓          ↓
-Search  Crawl   Extract    Rank    Synthesis
-```
-
-This design makes the system:
-- **Scalable** — Services can be scaled independently
-- **Maintainable** — Each service can be updated without affecting others
-- **Extensible** — New features can be added without rewriting core logic
-- **Testable** — Services can be tested in isolation
-
-## Core Components
-
-### API Gateway
-Entry point for all requests. Handles validation, authentication, and rate limiting.
-
-### Orchestrator
-Coordinates the entire pipeline, deciding which services to call and in what order. Future versions will use LangGraph for more intelligent orchestration.
-
-### Search Service
-Fetches URLs from multiple search providers (Bing, DuckDuckGo, Reddit).
-
-### Crawl Service
-Loads webpages using Puppeteer with stealth plugins to handle dynamic JavaScript-heavy sites and evade simple bot detection.
-
-### Extract Service
-Extracts structured, readable text content while preserving document structure (paragraphs, headers) and cleaning up noise.
-
-### Rank Service
-Uses embedding models to measure semantic relevance and filter low-quality content.
-
-### Synthesis Service
-Uses an LLM to generate final answers with enforced citations for transparency.
+Searqon uses a **microservice architecture** where each service has a single, well-defined responsibility. The scraping layer is powered by an auto-scaling Python engine that runs alongside the main Node.js API.
 
 ## Technology Stack
 
-**Backend**
-- Node.js & Express.js
-- **Puppeteer** (browser automation & scraping)
-- **puppeteer-extra** (stealth mode plugin)
-- Ollama (embeddings & LLMs)
-- Docker & Docker Compose
+- **Backend**: Node.js & Express.js
+- **Scraper**: Python 3.x (BeautifulSoup & aiohttp)
+- **Orchestration**: Node.js + Python (via HTTP microservice)
+- **LLM/Embeddings**: Ollama (Interchangeable)
+- **Configuration**: YAML-based settings
 
-**Frontend** (Demo UI)
-- React
-- Vite
-- Tailwind CSS
+## Getting Started
 
-## Use Cases
-
-Searqon is designed for:
-- **Learning** — Understanding how modern AI search systems work under the hood
-- **RAG Systems** — Providing high-quality, cited web content for retrieval pipelines
-- **AI Agents** — Serving as the web intelligence layer for autonomous agents
-- **Research Tools** — Building custom search and synthesis workflows
-- **Enterprise Applications** — Self-hosted search for sensitive or specialized domains
-
-## Current Status
-
-**What's Working:**
-- Single-query web search with citation-backed answers
-- **Direct URL Scraping** via the new `web` service
-- Multi-source crawling and extraction with **Puppeteer** (stealth mode)
-- Semantic ranking and content filtering
-- **Performance Timing**: Detailed duration logs for scraping and overall search
-
-**What's Coming:**
-- LangGraph-based orchestrator for agent-like behavior
-- Conversational memory and multi-turn queries
-- Autonomous retry logic and self-reflection
-- Advanced caching and optimization
+To get started with Searqon, please follow the detailed [Setup Guide](./docs/setup.md).
 
 ## Project Philosophy
 
@@ -117,52 +50,18 @@ Searqon is designed for:
 
 Searqon prioritizes transparency, modularity, and control. Every decision in the pipeline is visible and customizable — no black boxes, no magic.
 
-## Getting Started
-
-*(Instructions for setup and usage will go here)*
-
 ## Roadmap
 
-**Phase 1** — Core Engine
-- Stable microservices
-- Reliable search, crawl, extract, rank, synthesize pipeline
-- Citation-based answer generation
+**Phase 1** — Core Engine (Completed)
+- Stable microservices & Unified Search
+- Parallelized Python-based scraping engine
+- Citation-backed answer generation
 
-**Phase 2** — Intelligent Orchestration
-- LangGraph integration
+**Phase 2** — Intelligent Orchestration (In Progress)
+- LangGraph integration for complex reasoning
 - Agent planning and self-reflection
 - Multi-turn conversational interface
 
-**Phase 3** — Enterprise Features
-- Advanced caching strategies
-- Queue-based job processing
-- Multi-user management
-- API analytics and monitoring
-
-## Contributing
-
-Searqon is open source and contributions are welcome. Whether you're improving extraction logic, adding new search providers, or enhancing the synthesis quality — your input helps make Searqon better for everyone.
-
 ## License
 
-MIT License
-
-Copyright (c) 2026 Sooriya B
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+MIT License. See [LICENSE](LICENSE) for details.

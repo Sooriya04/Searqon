@@ -24,7 +24,7 @@ async function searchDOAJ(query, limit = 5) {
             params: {
                 pageSize: limit,
             },
-            timeout: 10000,
+            timeout: 20000,
         });
 
         const results = response.data?.results || [];

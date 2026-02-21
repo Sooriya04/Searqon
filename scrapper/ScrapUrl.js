@@ -1,83 +1,42 @@
-const { getBrowser } = require("./browser");
+const axios = require('axios');
 const limiter = require("../utils/Limiter");
 const config = require('../utils/configLoader');
 
+const PYTHON_SCRAPER_URL = 'http://127.0.0.1:3002/scrape';
+const BINARY_EXTENSIONS = /\.(jpg|jpeg|png|gif|pdf|zip|mp4|webp|svg)$/i;
+
 async function ScrapUrl(url, options = {}) {
+    if (BINARY_EXTENSIONS.test(url)) {
+        console.warn(`[ScrapUrl] Skipping binary/image URL: ${url}`);
+        return { title: "Binary File", content: "", url: url, wordCount: 0, duration: 0 };
+    }
+
     return limiter.add(async () => {
         const startTime = Date.now();
-        console.log(`[ScrapUrl] Started: ${url} at ${new Date(startTime).toISOString()}`);
+        console.log(`[ScrapUrl] Delegating to Python API: ${url} at ${new Date(startTime).toISOString()}`);
 
-        const browser = await getBrowser();
-        const page = await browser.newPage();
+        const timeout = options.timeout || config.browser.timeout || 15000;
 
         try {
-            await page.setRequestInterception(true);
-            page.on('request', (req) => {
-                if (config.scraping.block_resources.includes(req.resourceType())) {
-                    req.abort();
-                } else {
-                    req.continue();
-                }
+            const response = await axios.post(PYTHON_SCRAPER_URL, { url: url }, {
+                timeout: timeout + 5000, // Slightly higher than crawler timeout
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            const timeout = options.timeout || config.browser.timeout;
+            const report = response.data;
 
-            // Navigate
-            await page.goto(url, {
-                waitUntil: 'domcontentloaded',
-                timeout: timeout
-            });
-
-            const result = await page.evaluate(() => {
-                const scripts = document.querySelectorAll('script, style, noscript, iframe, svg, nav');
-                scripts.forEach(s => s.remove());
-
-                const title = document.title;
-
-                const body = document.body ? document.body.innerText : '';
-
-                const cleanBody = body
-                    .split('\n')
-                    .map(line => line.trim())
-                    .filter(line => line.length > 0)
-                    .join('\n');
-
-                return {
-                    title: title.trim(),
-                    content: cleanBody
-                };
-            });
-
-            const wordCount = result.content ? result.content.split(/\s+/).length : 0;
-            const endTime = Date.now();
-
-            const report = {
-                title: result.title,
-                content: result.content,
-                url: url,
-                wordCount: wordCount,
-                startTime: new Date(startTime).toISOString(),
-                endTime: new Date(endTime).toISOString(),
-                duration: endTime - startTime
-            };
-
-            console.log(`[ScrapUrl] Finished: ${url}`);
-            console.log(`Title: ${result.title}`);
-            console.log(`Started: ${report.startTime}`);
-            console.log(`Ended:   ${report.endTime}`);
+            console.log(`[ScrapUrl] Finished via API: ${url}`);
+            console.log(`Title: ${report.title}`);
             console.log(`Duration: ${report.duration}ms`);
 
             return report;
         } catch (error) {
-            // Ignore resource blocking errors (expected due to request interception)
-            if (error.message.includes('net::ERR_BLOCKED_BY_CLIENT')) {
-                console.warn(`[ScrapUrl] Resource blocked on ${url} (expected)`);
+            if (error.response && error.response.status === 504) {
+                console.warn(`[ScrapUrl] Python API reported timeout/block for ${url}`);
             } else {
-                console.error(`[ScrapUrl] Error scraping ${url}:`, error.message);
+                console.error(`[ScrapUrl] Error calling Python API for ${url}:`, error.message);
             }
-            throw error;
-        } finally {
-            if (page) await page.close();
+            throw new Error(`ScrapUrl API failed: ${error.message}`);
         }
     });
 }

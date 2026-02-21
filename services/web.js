@@ -5,8 +5,10 @@ async function searchWeb(query, limit = 1) {
     try {
         new URL(query);
     } catch (_) {
-        // Not a URL, return empty (or we could search Google/DDG, but this service is for direct scraping)
-        return [];
+        // Not a URL, fallback to general search (DuckDuckGo)
+        const { searchDuckDuckGo } = require('./duckduckgo');
+        const results = await searchDuckDuckGo(query, limit);
+        return results.map(r => ({ ...r, source: 'web' }));
     }
 
     console.log(`[Web] Scraping URL: ${query}`);
