@@ -4,34 +4,48 @@ import uuid
 import time
 from datetime import datetime, timezone
 from aiohttp import web
-from src import BeautifulSoupCrawler, BeautifulSoupCrawlingContext, Request
+from src import ScraplingCrawler, ScraplingCrawlingContext, Request
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('api_server')
 
 # Global state mapping request IDs to futures
 pending_requests = {}
-crawler = BeautifulSoupCrawler(max_concurrency=10, max_request_retries=2)
+# Optimized for 4GB RAM: Lower concurrency, minimal retries for speed
+crawler = ScraplingCrawler(max_concurrency=4, max_request_retries=1)
 
 @crawler.router.default_handler
-async def process_page(context: BeautifulSoupCrawlingContext) -> None:
+async def process_page(context: ScraplingCrawlingContext) -> None:
     req_id = context.request.user_data.get('req_id')
     if not req_id or req_id not in pending_requests:
         return
         
-    title = context.soup.title.string.strip() if context.soup.title else "No Title"
+    # context.page IS a Scrapling Response (extends Selector)
+    title_nodes = context.page.css('title')
+    title = title_nodes[0].text.strip() if title_nodes else "No Title"
     
-    # Mimic ScrapUrl.js element removing
-    for s in context.soup(['script', 'style', 'noscript', 'iframe', 'svg', 'nav']):
-        s.extract()
-        
-    body_text = context.soup.get_text(separator='\n')
-    clean_body = '\n'.join([line.strip() for line in body_text.split('\n') if line.strip()])
-    word_count = len(clean_body.split())
+    # Extract FULL visible body text using lxml's text_content()
+    # This grabs ALL text nodes from the page body
+    body_nodes = context.page.css('body')
+    if body_nodes:
+        from lxml import etree
+        body_el = body_nodes[0]._root  # underlying lxml element
+        # Remove script, style, noscript tags from a copy
+        for tag in body_el.iter('script', 'style', 'noscript'):
+            tag.getparent().remove(tag)
+        # Get all remaining visible text
+        body_text = body_el.text_content()
+        # Clean up excessive whitespace while preserving structure
+        lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+        body_text = '\n'.join(lines)
+    else:
+        body_text = context.page.text_content or ""
+    
+    word_count = len(body_text.split())
     
     data = {
         "title": title,
-        "content": clean_body,
+        "content": body_text,
         "url": context.request.url,
         "wordCount": word_count,
         "status": "success"
@@ -65,8 +79,8 @@ async def scrape_handler(request):
         await crawler.request_queue.add_request(req)
         
         try:
-            # Wait up to 15 seconds for the crawler worker to process it
-            result = await asyncio.wait_for(future, timeout=15.0)
+            # Reasonable timeout: 12s total budget
+            result = await asyncio.wait_for(future, timeout=12.0)
             
             # Decorate with timing identical to ScrapUrl.js
             end_time_ms = time.time()

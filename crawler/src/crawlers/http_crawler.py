@@ -24,9 +24,14 @@ class AbstractHttpCrawler(BasicCrawler):
     async def _make_http_request(self, request: Request, proxy_session: Any) -> Any:
         """Performs raw I/O."""
         if not self._session:
-            # Add reasonable timeouts and browser headers
-            timeout = aiohttp.ClientTimeout(total=15)
-            self._session = aiohttp.ClientSession(timeout=timeout)
+            # Reduced timeout for faster failure on blocked sites + Brotli support via auto_decompress
+            timeout = aiohttp.ClientTimeout(total=10)
+            connector = aiohttp.TCPConnector(limit=20, ttl_dns_cache=300, ssl=False)
+            self._session = aiohttp.ClientSession(
+                timeout=timeout,
+                connector=connector,
+                auto_decompress=True
+            )
             
         # Standard browser headers to avoid 403 Forbidden
         headers = {

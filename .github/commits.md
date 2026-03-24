@@ -69,3 +69,8 @@ The Searqon scraper pipeline was optimized to resolve execution bottlenecks by t
 ### ISSUE 26 : migrate to auto-scaling Python microservice architecture
 
 Replace legacy Node.js Puppeteer scraper with distributed Python-based asynchronous crawler. Introduce persistent aiohttp API with session pooling and integrated autoscaling. Refactor ScrapUrl bridge into lightweight HTTP client and reorganize project into modular crawler/src structure. Update local orchestration and documentation to reflect new hybrid scraping architecture.
+
+
+### ISSUE 27 : upgrade to high-performance Scrapling-based extraction layer
+
+Replace legacy BeautifulSoup parsing with Scrapling’s lxml-backed CSS selector engine to significantly improve extraction speed and accuracy. Introduce a hardware-aware architecture optimized for 4GB RAM systems by reducing concurrency and implementing a hybrid pipeline that uses aiohttp for ultra-fast network fetching and Scrapling for efficient HTML parsing. Eliminate latency bottlenecks and hanging requests by refining Node.js–Python interprocess communication and removing redundant retry stacking, ensuring fast-fail behavior. Enhance data quality by transitioning from snippet-based scraping to full-page visible text extraction with intelligent filtering to strip scripts, styles, and navigation noise. Harden external integrations such as MedRxiv and DuckDuckGo with extended timeouts and improved reliability handling. Finalize with a full codebase cleanup, removing deprecated BeautifulSoup modules and temporary scripts to deliver a lean, production-ready extraction system.

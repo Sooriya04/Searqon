@@ -29,7 +29,7 @@ async function searchMedRxiv(query, limit = 5) {
                 pageSize: limit,
                 format: 'json',
             },
-            timeout: 15000,
+            timeout: 45000,
         });
 
         const results = response.data?.resultList?.result || [];

@@ -1,2 +1,10 @@
-node_modules
-*__pycache__
+node_modules/
+*__pycache__/
+*.pyc
+.env
+dataset.jsonl
+storage/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.log

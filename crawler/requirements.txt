@@ -1,2 +1,6 @@
 aiohttp==3.11.11
 beautifulsoup4==4.12.3
+scrapling[fetchers]
+brotli
+curl_cffi
+psutil

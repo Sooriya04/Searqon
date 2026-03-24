@@ -60,7 +60,7 @@ async function searchDuckDuckGo(query, limit = 5) {
     if (result.url) {
       try {
         const pageData = await ScrapUrl(result.url);
-        if (pageData && pageData.content && pageData.wordCount >= 50) {
+        if (pageData && pageData.content && pageData.wordCount >= 10) {
           resultData = {
             query: query,
             source: 'duckduckgo',

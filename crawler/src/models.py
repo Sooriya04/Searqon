@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Coroutine
 
+from scrapling import Selector
+
 class RequestState(Enum):
     UNPROCESSED = 0
     BEFORE_NAV = 1
@@ -57,7 +59,7 @@ class HttpCrawlingContext(BasicCrawlingContext):
     response: Any # aiohttp/httpx response
 
 @dataclass
-class BeautifulSoupCrawlingContext(HttpCrawlingContext):
-    """Context extended with parsed BeautifulSoup."""
-    soup: Any # BeautifulSoup object
+class ScraplingCrawlingContext(HttpCrawlingContext):
+    """Context extended with Scrapling's Selector page object."""
+    page: Selector
 
