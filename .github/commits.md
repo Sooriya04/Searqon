@@ -84,3 +84,7 @@ Introduce a Puppeteer Stealth fallback in DuckDuckGo service to bypass CAPTCHA b
 ### ISSUE 29 : migrate to high-performance Go scraper microservice
 
 Replace legacy Python crawler with a high-performance Go-based microservice running on port `3002` to eliminate bottlenecks in parallel scraping. Implement a dual-extraction pipeline using `go-readability` for semantic content parsing and `goquery` for precise DOM cleanup, removing ads, navigation elements, and other noise. Introduce concurrency using Goroutines with `sync.WaitGroup` to enable efficient parallel scraping of 10+ URLs with sub-second response times. Add manual Brotli, Gzip, and Deflate decoding to handle compressed responses and prevent binary output issues, along with Content-Type validation to skip non-text resources. Integrate an aggressive text normalization layer to strip newlines, Markdown artifacts, and special characters, producing clean flat text output. Refactor the Node.js integration via `ScrapUrl.js` into a lightweight HTTP bridge and remove the legacy Python crawler, resulting in a faster, memory-efficient, and scalable scraping architecture.
+
+### ISSUE 30 : Updated project documentation
+
+Updated the project's documentation files, including `readme.md`, `setup.md`, and `scraping.md`, to accurately reflect the changes made to the scraping architecture and setup requirements.

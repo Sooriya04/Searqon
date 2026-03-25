@@ -5,8 +5,7 @@ This guide will help you get Searqon up and running on your local machine.
 ## Prerequisites
 
 - **Node.js** (v18 or higher)
-- **Python** (v3.10 or higher)
-- **Pip** (Python package manager)
+- **Go** (v1.22 or higher)
 - **Ollama** (optional, for LLM features)
 
 ## Installation
@@ -22,16 +21,12 @@ cd Searqon
 npm install
 ```
 
-### 3. Setup Python Crawler
-The scraping engine runs as a Python microservice.
+### 3. Setup Go Scraper
+The scraping engine runs as a high-performance Go microservice.
 ```bash
-cd crawler
-# Create a virtual environment (optional but recommended)
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install requirements
-pip install -r requirements.txt
+cd go_scraper
+# Fetch dependencies
+go mod tidy
 cd ..
 ```
 
@@ -41,7 +36,7 @@ Create a `settings.yaml` in the root directory (or modify the existing one) to c
 
 ## Running the Application
 
-Searqon uses `concurrently` to run both the Node.js API and the Python Scraper at the same time.
+Searqon uses `concurrently` to run both the Node.js API and the Go Scraper at the same time.
 
 ### Development Mode (with hot-reload)
 ```bash
@@ -53,8 +48,10 @@ npm run dev
 npm start
 ```
 
-Once started, the API will be available at `http://localhost:3001`.
+Once started:
+- **Main API**: Available at `http://localhost:3001`
+- **Go Scraper**: Available at `http://localhost:3002`
 
 ## Documentation
 
-- [Scraping Architecture](./scraping.md) - Deep dive into how our Python-based crawler works.
+- [Scraping Architecture](./scraping.md) - Deep dive into how our Go-based crawler works.
