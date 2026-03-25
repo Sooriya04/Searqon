@@ -2,7 +2,7 @@ const cheerio = require('cheerio');
 const httpClient = require('../utils/httpClient');
 const { BROWSER_HEADERS } = require('../utils/browserHeaders');
 const { cleanText, cleanSearchSnippet } = require('../utils/textCleaner');
-const ScrapUrl = require('../scrapper/ScrapUrl');
+const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
 
 const DUCKDUCKGO_URL = 'https://html.duckduckgo.com/html/';
 
@@ -53,33 +53,52 @@ async function searchDuckDuckGo(query, limit = 5) {
   console.log(`[DuckDuckGo] Searching for: "${query}"`);
 
   const rawResults = await fetchSearchResults(query);
-  console.log(`[DuckDuckGo] Scraping ${rawResults.slice(0, limit).length} results in parallel...`);
-  const savedResults = await Promise.all(rawResults.slice(0, limit).map(async (result) => {
+  const sliced = rawResults.slice(0, limit);
+  console.log(`[DuckDuckGo] Scraping ${sliced.length} results in parallel using Go Batch Api...`);
+  
+  // Extract URLs to batch
+  const urlsToScrape = sliced.map(r => r.url).filter(Boolean);
+  
+  // Hit the Go Batch Endpoint
+  let batchResults = [];
+  try {
+      if (urlsToScrape.length > 0) {
+          batchResults = await ScrapUrlBatch(urlsToScrape);
+      }
+  } catch (e) {
+      console.warn(`[DuckDuckGo] Batch scraping failed, falling back to snippets: ${e.message}`);
+  }
+
+  // Create a map of URL -> Scraped Content
+  const scrapedDataMap = {};
+  batchResults.forEach(res => {
+      if (res && res.content && res.wordCount >= 10 && !res.error) {
+          scrapedDataMap[res.url] = res;
+      }
+  });
+
+  const savedResults = sliced.map((result) => {
     let resultData = null;
 
-    if (result.url) {
-      try {
-        const pageData = await ScrapUrl(result.url);
-        if (pageData && pageData.content && pageData.wordCount >= 10) {
-          resultData = {
-            query: query,
-            source: 'duckduckgo',
-            title: pageData.title || result.title,
-            url: result.url,
-            content: pageData.content,
-            score: 0.7,
-            wordCount: pageData.wordCount,
-            metadata: {
-              snippet: result.snippet || '',
-              extraction_method: 'worker_pool_scraper',
-            },
-          };
-        }
-      } catch (e) {
-        // Silently fail scraping
-      }
+    // Check if we got good scraped data from the batch
+    if (result.url && scrapedDataMap[result.url]) {
+      const pageData = scrapedDataMap[result.url];
+      resultData = {
+        query: query,
+        source: 'duckduckgo',
+        title: pageData.title || result.title,
+        url: result.url,
+        content: pageData.content,
+        score: 0.7,
+        wordCount: pageData.wordCount,
+        metadata: {
+          snippet: result.snippet || '',
+          extraction_method: 'go_batch_scraper',
+        },
+      };
     }
 
+    // Fall back to snippet if scraping failed or was too short
     if (!resultData && result.snippet && result.snippet.length >= 30) {
       const cleanedSnippet = cleanSearchSnippet(result.snippet);
       resultData = {
@@ -97,7 +116,7 @@ async function searchDuckDuckGo(query, limit = 5) {
       };
     }
     return resultData;
-  }));
+  });
 
   const filteredResults = savedResults.filter(r => r !== null);
   console.log(`[DuckDuckGo] Returning ${filteredResults.length} results`);

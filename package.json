@@ -19,8 +19,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "npx concurrently \"node server.js\" \"cd crawler && .venv/bin/python server.py\"",
-    "dev": "npx concurrently \"npx nodemon server.js\" \"cd crawler && .venv/bin/python server.py\"",
+    "start": "npx concurrently \"node server.js\" \"cd go_scraper && go run main.go\"",
+    "dev": "npx concurrently \"npx nodemon server.js\" \"cd go_scraper && go run main.go\"",
     "db": "node database/server.js",
     "db:dev": "npx nodemon database/server.js"
   },
