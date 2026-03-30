@@ -1,6 +1,9 @@
+const httpClient = require('../utils/httpClient');
 const axios = require('axios');
 const limiter = require("../utils/Limiter");
 const config = require('../utils/configLoader');
+const { BROWSER_HEADERS } = require('../utils/browserHeaders');
+const { cleanYouTubeDescription } = require('../utils/textCleaner');
 
 const GO_SCRAPER_URL = 'http://127.0.0.1:3002';
 const BINARY_EXTENSIONS = /\.(jpg|jpeg|png|gif|pdf|zip|mp4|webp|svg)$/i;
@@ -23,16 +26,15 @@ async function ScrapUrl(url, options = {}) {
                 timeout: 10000
             });
             if (readmeRes.data && typeof readmeRes.data === 'string') {
-                // Strip markdown and ASCII box drawing chars for clean plain text
                 let cleanReadme = readmeRes.data
-                    .replace(/```[\s\S]*?```/g, '') // remove large code blocks
-                    .replace(/`([^`]+)`/g, '$1') // remove inline code backticks
-                    .replace(/^#+\s/gm, '') // remove heading hashes
-                    .replace(/[┌┬┐├┼┤└┴┘│─━┏┳┓┣╋┫┗┻┛┃]/g, '') // remove ascii box drawing
-                    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // replace links with just text
-                    .replace(/\n/g, ' ') // replace all newlines with spaces
-                    .replace(/\*/g, '') // remove all asterisks
-                    .replace(/\s{2,}/g, ' ') // collapse multiple spaces
+                    .replace(/```[\s\S]*?```/g, '')
+                    .replace(/`([^`]+)`/g, '$1')
+                    .replace(/^#+\s/gm, '')
+                    .replace(/[┌┬┐├┼┤└┴┘│─━┏┳┓┣╋┫┗┻┛┃]/g, '')
+                    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+                    .replace(/\n/g, ' ')
+                    .replace(/\*/g, '')
+                    .replace(/\s{2,}/g, ' ')
                     .trim();
                 
                 return {
@@ -45,6 +47,95 @@ async function ScrapUrl(url, options = {}) {
             }
         } catch (e) {
             console.warn(`[ScrapUrl] GitHub README fetch failed: ${e.message}`);
+        }
+    }
+
+    // YouTube: extract description from internal metadata (avoiding footer junk)
+    const youtubeMatch = url.match(/^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (youtubeMatch) {
+        try {
+            console.error(`[ScrapUrl] YouTube intercept -> ${url}`);
+            const ytResponse = await httpClient.get(url, {
+                headers: { ...BROWSER_HEADERS, 'Accept-Language': 'en-US' },
+                timeout: 15000
+            });
+            const html = ytResponse.data;
+            
+            // Log if we hitting a consent wall
+            if (html.includes('consent.youtube.com') || html.includes('Before you continue to YouTube')) {
+                console.warn(`[ScrapUrl] Hit YouTube consent wall for ${url}`);
+            }
+
+            let description = "";
+            let title = "YouTube Video";
+
+            // 1. Try ytInitialPlayerResponse
+            const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*({[\s\S]*?});/);
+            if (playerResponseMatch) {
+                try {
+                    const data = JSON.parse(playerResponseMatch[1]);
+                    title = data.videoDetails?.title || title;
+                    description = data.videoDetails?.shortDescription || "";
+                    if (description) console.log(`[ScrapUrl] Got description from ytInitialPlayerResponse (${description.length} chars)`);
+                } catch (e) {
+                    console.warn(`[ScrapUrl] JSON.parse(ytInitialPlayerResponse) failed`);
+                }
+            }
+
+            // 2. Try ytInitialData (secondary extraction)
+            if (!description) {
+                const initialDataMatch = html.match(/ytInitialData\s*=\s*({[\s\S]*?});/);
+                if (initialDataMatch) {
+                    try {
+                        const data = JSON.parse(initialDataMatch[1]);
+                        const secondary = data.contents?.twoColumnWatchNextResults?.results?.results?.contents;
+                        if (secondary) {
+                            const videoSecondaryInfo = secondary.find(c => c.videoSecondaryInfoRenderer)?.videoSecondaryInfoRenderer;
+                            if (videoSecondaryInfo?.description) {
+                                description = videoSecondaryInfo.description.runs?.map(r => r.text).join('') || videoSecondaryInfo.description.simpleText || "";
+                                if (description) console.log(`[ScrapUrl] Got description from ytInitialData (${description.length} chars)`);
+                            }
+                        }
+                    } catch (e) { }
+                }
+            }
+
+            // 3. Raw search for "shortDescription" if JSON parsing was flaky
+            if (!description) {
+                const rawDescMatch = html.match(/"shortDescription":"([\s\S]*?)(?<!\\)"/);
+                if (rawDescMatch) {
+                    description = rawDescMatch[1]
+                        .replace(/\\n/g, '\n')
+                        .replace(/\\"/g, '"')
+                        .replace(/\\u([0-9a-fA-F]{4})/g, (match, grp) => String.fromCharCode(parseInt(grp, 16)));
+                    if (description) console.log(`[ScrapUrl] Got description from raw regex search (${description.length} chars)`);
+                }
+            }
+
+            // 4. Meta tag fallback (usually truncated but better than nothing)
+            if (!description) {
+                const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) || html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+                if (metaMatch) {
+                    description = metaMatch[1];
+                    console.log(`[ScrapUrl] Falling back to meta description tag`);
+                }
+            }
+
+            if (description) {
+                console.error(`[ScrapUrl] SUCCESS: Extracted ${description.length} chars for ${url}`);
+                return {
+                    title: title,
+                    content: description,
+                    description: description,
+                    url: url,
+                    wordCount: description.split(/\s+/).length,
+                    duration: 500
+                };
+            } else {
+                console.error(`[ScrapUrl] FAILURE: No description found for ${url}`);
+            }
+        } catch (e) {
+            console.error(`[ScrapUrl] YouTube bypass error: ${e.message}`);
         }
     }
 
@@ -85,19 +176,52 @@ async function ScrapUrlBatch(urls, options = {}) {
 
     const timeout = options.timeout || config.browser.timeout || 15000;
 
-    try {
-        console.log(`[ScrapUrl Batch] Sending ${validUrls.length} URLs to Go scraper...`);
-        const response = await axios.post(`${GO_SCRAPER_URL}/scrape/batch`, { urls: validUrls }, {
-            timeout: timeout * 2, // Batch needs more time
-            headers: { 'Content-Type': 'application/json' }
-        });
+    // Separate bypass URLs (GitHub, YouTube) from normal ones
+    const bypassPatterns = [
+        /^https?:\/\/(?:www\.)?github\.com\/[^\/]+\/[^\/#?]+/,
+        /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}/
+    ];
 
-        const results = response.data;
-        console.log(`[ScrapUrl Batch] Got ${results.length} results`);
-        return results;
+    const bypassUrls = [];
+    const normalUrls = [];
+
+    validUrls.forEach(u => {
+        if (bypassPatterns.some(p => p.test(u))) {
+            bypassUrls.push(u);
+        } else {
+            normalUrls.push(u);
+        }
+    });
+
+    try {
+        const resultsMap = {};
+
+        // 1. Process bypass URLs in parallel (utilizes optimized Node.js logic)
+        if (bypassUrls.length > 0) {
+            console.log(`[ScrapUrl Batch] Processing ${bypassUrls.length} bypass URLs (Node.js)...`);
+            const bypassResults = await Promise.all(
+                bypassUrls.map(u => ScrapUrl(u, options).catch(e => ({
+                    title: '', content: '', url: u, wordCount: 0, error: e.message
+                })))
+            );
+            bypassResults.forEach(r => resultsMap[r.url] = r);
+        }
+
+        // 2. Process remaining URLs via Go Batch Scraper
+        if (normalUrls.length > 0) {
+            console.log(`[ScrapUrl Batch] Sending ${normalUrls.length} normal URLs to Go scraper...`);
+            const response = await axios.post(`${GO_SCRAPER_URL}/scrape/batch`, { urls: normalUrls }, {
+                timeout: timeout * 2,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            response.data.forEach(r => resultsMap[r.url] = r);
+        }
+
+        // Return results in original order
+        return validUrls.map(u => resultsMap[u]);
+
     } catch (error) {
-        console.error(`[ScrapUrl Batch] Failed:`, error.message);
-        // Fallback: try individual scraping
+        console.error(`[ScrapUrl Batch] Failed, falling back to individual scraping:`, error.message);
         return Promise.all(validUrls.map(u => ScrapUrl(u, options).catch(() => ({
             title: '', content: '', url: u, wordCount: 0, error: 'failed'
         }))));

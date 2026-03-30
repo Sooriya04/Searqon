@@ -11,6 +11,7 @@ const doaj = require("./routes/doaj");
 const medrxiv = require("./routes/medrxiv");
 const unified = require("./routes/unified");
 const geeksforgeeks = require("./routes/geeksforgeeks");
+const youtube = require("./routes/youtube");
 const app = express();
 
 app.use(express.json());
@@ -31,5 +32,6 @@ app.use("/api", doaj);
 app.use("/api", medrxiv);
 app.use("/api", unified);
 app.use("/api", geeksforgeeks);
+app.use("/api", youtube);
 
 module.exports = app;

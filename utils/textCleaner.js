@@ -63,8 +63,41 @@ function cleanSearchSnippet(snippet) {
   return cleanText(cleaned);
 }
 
+/**
+ * Clean YouTube descriptions
+ * Removes hashtags, URLs, and common promotional boilerplate
+ */
+function cleanYouTubeDescription(text) {
+  if (!text) return "";
+
+  let cleaned = text
+    // Remove URLs
+    .replace(/https?:\/\/[^\s]+/g, "")
+    // Remove hashtags
+    .replace(/#[a-zA-Z0-9_]+/g, "")
+    // Remove common promotional boilerplate
+    .split("\n")
+    .filter((line) => {
+      const lowerLine = line.toLowerCase();
+      if (lowerLine.includes("subscribe")) return false;
+      if (lowerLine.includes("follow me on")) return false;
+      if (lowerLine.includes("facebook.com")) return false;
+      if (lowerLine.includes("twitter.com")) return false;
+      if (lowerLine.includes("instagram.com")) return false;
+      if (lowerLine.includes(" fireship pro ")) return false; // Specific to the user's example
+      if (lowerLine.match(/get \d+% off/i)) return false;
+      if (lowerLine.match(/use code [a-z0-9]+/i)) return false;
+      return true;
+    })
+    .join("\n")
+    .trim();
+
+  return cleanText(cleaned);
+}
+
 module.exports = {
   cleanText,
   removePageMetadataNoise,
   cleanSearchSnippet,
+  cleanYouTubeDescription,
 };

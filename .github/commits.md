@@ -88,3 +88,7 @@ Replace legacy Python crawler with a high-performance Go-based microservice runn
 ### ISSUE 30 : Updated project documentation
 
 Updated the project's documentation files, including `readme.md`, `setup.md`, and `scraping.md`, to accurately reflect the changes made to the scraping architecture and setup requirements.
+
+### ISSUE 31 : YouTube Search Service with Full Description Extraction
+
+Implemented a dedicated YouTube search service that scrapes video metadata without an API key by parsing `ytInitialData`. Developed a robust, parallelized extraction strategy that retrieves full, un-truncated video descriptions directly from individual video pages, bypassing the limited snippets found in search results. Integrated a specialized YouTube text cleaner to strip hashtags, social media URLs, and promotional boilerplate, ensuring high-quality, sanitized content is delivered through the unified search controller.
