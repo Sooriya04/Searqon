@@ -24,8 +24,8 @@ A bridge that delegates scraping tasks to the Go service.
 
 ## Data Flow
 
-1. A **Service** (e.g., `duckduckgo.js`) identifies a list of URLs to scrape.
-2. It calls `ScrapUrlBatch(urls)`.
+1. **Route** — (Phase 0) The **Intelligent Classifier** (Python port 3003) analyzes the query using qwen2.5:0.5b and selects the most relevant domain-specific sources (e.g., `pubmed` for medicine, `github` for tech).
+2. A **Service** (e.g., `github.js`) is triggered for the specific domain sources, followed by the `duckduckgo.js` baseline.
 3. The request hits the Go microservice on port `3002`.
 4. The Go server spawns parallel goroutines to fetch all URLs simultaneously.
 5. Content is cleaned (noise removed, flattened to plain text) and returned as a JSON array.

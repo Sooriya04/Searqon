@@ -18,15 +18,14 @@ Most AI search APIs operate as black boxes:
 
 **Searqon changes this.** Every component is transparent, modular, and customizable.
 
-## What Searqon Does
+## Searqon processes web searches through six core stages:
 
-Searqon processes web searches through five core stages:
-
-1. **Search** — Queries multiple sources (Bing, DuckDuckGo, Reddit, GitHub) and collects relevant URLs.
-2. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper**.
-3. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text.
-4. **Rank** — Uses semantic embeddings to prioritize the most relevant information.
-5. **Synthesize** — Generates concise, citation-backed answers using an LLM.
+1. **Route** — (New) Classifies the query using a **Python-based LLM microservice** to identify relevant domain sources.
+2. **Search** — Queries specialized sources (GitHub, PubMed, Reddit) based on intent and always includes DuckDuckGo as a baseline.
+3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper**.
+4. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text.
+5. **Rank** — Uses semantic embeddings to prioritize the most relevant information.
+6. **Synthesize** — Generates concise, citation-backed answers using an LLM.
 
 ## Architecture
 
@@ -35,9 +34,10 @@ Searqon uses a **microservice architecture**. The extraction layer is powered by
 ## Technology Stack
 
 - **Backend**: Node.js & Express.js
+- **Intelligent Routing**: Python 3.9+ (Microservice)
 - **Extraction Engine**: Go 1.22+ (GoQuery & Go-Readability)
-- **Orchestration**: Node.js + Go (via HTTP microservice)
-- **LLM/Embeddings**: Ollama (Interchangeable)
+- **Orchestration**: Node.js + Go (Port 3002) + Python (Port 3003)
+- **LLM/Embeddings**: Ollama (qwen2.5:0.5b for routing, configurable)
 - **Configuration**: YAML-based settings
 
 ## Getting Started

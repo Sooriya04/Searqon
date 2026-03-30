@@ -9,3 +9,5 @@ storage/
 .ipynb_checkpoints/
 *.log
 todos/
+oracle.md
+*txt

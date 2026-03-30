@@ -6,7 +6,8 @@ This guide will help you get Searqon up and running on your local machine.
 
 - **Node.js** (v18 or higher)
 - **Go** (v1.22 or higher)
-- **Ollama** (optional, for LLM features)
+- **Python** (v3.9 or higher)
+- **Ollama** (v0.6 or higher for Intelligent Routing)
 
 ## Installation
 
@@ -30,6 +31,16 @@ go mod tidy
 cd ..
 ```
 
+### 4. Setup Python Classifier
+The intelligence layer uses Ollama for classification.
+```bash
+# Pull the required model
+ollama pull qwen2.5:0.5b
+
+# Install dependencies
+pip3 install ollama
+```
+
 ## Configuration
 
 Create a `settings.yaml` in the root directory (or modify the existing one) to configure timeouts, concurrency, and browser settings.
@@ -51,6 +62,7 @@ npm start
 Once started:
 - **Main API**: Available at `http://localhost:3001`
 - **Go Scraper**: Available at `http://localhost:3002`
+- **Intelligent Classifier**: Available at `http://localhost:3003`
 
 ## Documentation
 
