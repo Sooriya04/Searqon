@@ -25,12 +25,14 @@ async function searchWithReadmes(query, limit = 10) {
 
     try {
         const repos = await githubSearch(query, limit);
-        const savedResults = await Promise.all(repos.map(async (repo) => {
+        const savedResults = await Promise.all(repos.map(async (repo, index) => {
             let content = '';
             try {
-                const scraped = await ScrapUrl(repo.html_url);
-                if (scraped && scraped.content) {
-                    content = scraped.content;
+                if (index < 3) {
+                    const scraped = await ScrapUrl(repo.html_url);
+                    if (scraped && scraped.content) {
+                        content = scraped.content;
+                    }
                 }
             } catch (e) { }
 

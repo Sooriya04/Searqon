@@ -28,7 +28,7 @@ async function searchDOAJ(query, limit = 5) {
         });
 
         const results = response.data?.results || [];
-        const savedResults = await Promise.all(results.map(async (item) => {
+        const savedResults = await Promise.all(results.map(async (item, index) => {
             const bib = item.bibjson || {};
             const title = bib.title?.trim();
             const publisherName = typeof bib.publisher === 'object' ? bib.publisher?.name || '' : bib.publisher || '';
@@ -44,7 +44,7 @@ async function searchDOAJ(query, limit = 5) {
             const summary = `Publisher: ${publisherName}. Country: ${country}. Subjects: ${subjects.join(', ')}`;
             let content = summary;
 
-            if (journalUrl) {
+            if (journalUrl && index < 3) {
                 try {
                     const scraped = await ScrapUrl(journalUrl);
                     if (scraped && scraped.content && scraped.content.length > summary.length) {

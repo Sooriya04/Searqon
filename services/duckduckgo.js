@@ -54,10 +54,10 @@ async function searchDuckDuckGo(query, limit = 5) {
 
   const rawResults = await fetchSearchResults(query);
   const sliced = rawResults.slice(0, limit);
-  console.log(`[DuckDuckGo] Scraping ${sliced.length} results in parallel using Go Batch Api...`);
+  console.log(`[DuckDuckGo] Scraping top 3 results in parallel using Go Batch Api...`);
   
-  // Extract URLs to batch
-  const urlsToScrape = sliced.map(r => r.url).filter(Boolean);
+  // Extract URLs to batch (only top 3)
+  const urlsToScrape = sliced.slice(0, 3).map(r => r.url).filter(Boolean);
   
   // Hit the Go Batch Endpoint
   let batchResults = [];

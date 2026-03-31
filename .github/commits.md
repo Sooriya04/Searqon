@@ -97,3 +97,7 @@ Refactored the Node.js architecture to follow the Route → Controller → Servi
 Enhanced the search pipeline by implementing a two-phase retrieval strategy in `unifiedController.js`, prioritizing domain-specific sources (e.g., GitHub, PubMed) before falling back to DuckDuckGo for comprehensive coverage.
 
 Improved system orchestration by updating `package.json` to enable unified startup of the Node API, Go scraper, and Python classifier via `npm run dev`. Also resolved Ollama SDK compatibility issues (v0.6) and optimized timeout handling for local LLM inference.
+
+### ISSUE 33 : High-Performance Two-Phase Research Engine with Optimized Scraping Pipeline
+
+Redesigned Searqon into a high-performance, intelligent research engine by introducing a two-phase search architecture. Built a lightweight Semantic Intent Engine in Python to instantly classify queries and route them to specialized data sources without relying on a local LLM daemon, significantly reducing latency. Optimized the scraping pipeline to extract full-page content only from the top 3 results per source, balancing depth with speed. Implemented strict 10-second per-source timeouts in the Node.js coordination layer to prevent slow or unresponsive APIs from blocking execution. Strengthened system reliability by enabling address reuse across microservices and eliminating zombie processes, resulting in a stable, multi-service stack that delivers faster, deeper insights at scale.

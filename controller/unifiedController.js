@@ -39,7 +39,6 @@ const ALL_SOURCES = [
     { name: "geeksforgeeks", fn: (q, l) => searchGeeksForGeeks(q, l) },
     { name: "youtube",       fn: (q, l) => searchYoutube(q, l)       },
     { name: "web",           fn: (q, l) => searchWeb(q, l)           },
-    // DuckDuckGo is always executed last (baseline) — kept separate
     { name: "duckduckgo",    fn: (q, l) => searchDuckDuckGo(q, l)    },
 ];
 
@@ -61,13 +60,22 @@ async function runSource(name, query, limit) {
     const def = SOURCE_MAP[name];
     if (!def) return { name, status: "skipped", error: `Unknown source: ${name}` };
 
+    const SOURCE_TIMEOUT_MS = 10000; // 10s per source
+
     try {
-        const raw = await def.fn(query, limit);
+        // Enforce per-source timeout
+        const sourcePromise = def.fn(query, limit);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Source timeout")), SOURCE_TIMEOUT_MS)
+        );
+
+        const raw = await Promise.race([sourcePromise, timeoutPromise]);
         const data = normalizeResults(raw);
         return { name, status: "ok", count: data.length, data };
     } catch (err) {
-        console.error(`[Unified] ${name} failed: ${err.message}`);
-        return { name, status: "failed", error: err.message || "Unknown error" };
+        const msg = err.message === "Source timeout" ? "timed out after 10s" : err.message;
+        console.error(`[Unified] ${name} failed: ${msg}`);
+        return { name, status: "failed", error: msg || "Unknown error" };
     }
 }
 

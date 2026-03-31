@@ -29,7 +29,7 @@ async function searchArxiv(query, limit = 10) {
     const entries = parsed.feed?.entry || [];
     const list = Array.isArray(entries) ? entries : [entries];
     // Scrape each arxiv page for content in parallel
-    const savedResults = await Promise.all(list.map(async (item) => {
+    const savedResults = await Promise.all(list.map(async (item, index) => {
         const title = cleanText(item.title);
         const summary = cleanText(item.summary);
         const authors = item.author
@@ -41,7 +41,7 @@ async function searchArxiv(query, limit = 10) {
 
         if (title && summary && summary.length >= 50) {
             let content = summary;
-            if (arxivUrl) {
+            if (arxivUrl && index < 3) {
                 try {
                     const scraped = await ScrapUrl(arxivUrl);
                     if (scraped && scraped.content && scraped.content.length > summary.length) {

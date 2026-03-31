@@ -48,11 +48,13 @@ async function searchPubMed(query, limit = 10) {
         console.log(
             `[PubMed] Found ${basicResults.length} results, fetching abstracts...`,
         );
-        const results = await Promise.all(basicResults.map(async (basic) => {
+        const results = await Promise.all(basicResults.map(async (basic, index) => {
             let abstract = '';
             try {
-                const scrapeResult = await ScrapUrl(basic.url);
-                abstract = scrapeResult.content || '';
+                if (index < 3) {
+                    const scrapeResult = await ScrapUrl(basic.url);
+                    abstract = scrapeResult.content || '';
+                }
             } catch (e) {
                 console.error(`[PubMed] Scraping failed for ${basic.url}: ${e.message}`);
             }

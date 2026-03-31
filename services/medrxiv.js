@@ -33,7 +33,7 @@ async function searchMedRxiv(query, limit = 5) {
         });
 
         const results = response.data?.resultList?.result || [];
-        const savedResults = await Promise.all(results.map(async (item) => {
+        const savedResults = await Promise.all(results.map(async (item, index) => {
             const title = cleanText(item.title || '');
             const summary = cleanText(item.abstractText || '');
             const articleUrl = item.doi
@@ -41,7 +41,7 @@ async function searchMedRxiv(query, limit = 5) {
                 : item.fullTextUrlList?.fullTextUrl?.[0]?.url || null;
 
             let content = summary;
-            if (articleUrl) {
+            if (articleUrl && index < 3) {
                 try {
                     const scraped = await ScrapUrl(articleUrl);
                     if (scraped && scraped.content && scraped.content.length > summary.length) {

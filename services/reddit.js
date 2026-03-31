@@ -59,9 +59,9 @@ async function reddit(query, limit = 10) {
         }
 
         // Parallel scrape external links
-        console.log(`[Reddit] Scrapping ${savedResults.filter(r => r.externalUrl).length} external links in parallel...`);
-        await Promise.all(savedResults.map(async (result) => {
-            if (result.externalUrl) {
+        console.log(`[Reddit] Scrapping up to 3 external links in parallel...`);
+        await Promise.all(savedResults.map(async (result, index) => {
+            if (result.externalUrl && index < 3) {
                 try {
                     const scraped = await ScrapUrl(result.externalUrl);
                     if (scraped && scraped.content) {

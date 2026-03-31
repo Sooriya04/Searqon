@@ -135,9 +135,9 @@ async function searchYoutube(query, limit = 5) {
         }
 
         // Fetch full descriptions in parallel locally
-        console.log(`[YouTube] Fetching full descriptions for ${searchResults.length} videos...`);
-        const finalResults = await Promise.all(searchResults.map(async (res) => {
-            const fullDescriptionRaw = await fetchVideoDescription(res.videoId);
+        console.log(`[YouTube] Fetching full descriptions for up to 3 videos...`);
+        const finalResults = await Promise.all(searchResults.map(async (res, index) => {
+            const fullDescriptionRaw = index < 3 ? await fetchVideoDescription(res.videoId) : null;
             const description = cleanYouTubeDescription(fullDescriptionRaw || res.snippet);
             
             return {

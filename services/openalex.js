@@ -54,11 +54,13 @@ async function searchOpenAlex(query, limit = 10) {
         );
 
         // Scrape each paper URL for content in parallel
-        const results = await Promise.all(basicResults.map(async (basic) => {
+        const results = await Promise.all(basicResults.map(async (basic, index) => {
             let content = '';
             try {
-                const scrapeResult = await ScrapUrl(basic.url);
-                content = scrapeResult.content || '';
+                if (index < 3) {
+                    const scrapeResult = await ScrapUrl(basic.url);
+                    content = scrapeResult.content || '';
+                }
             } catch (e) {
                 console.error(`[OpenAlex] Scraping failed for ${basic.url}: ${e.message}`);
             }

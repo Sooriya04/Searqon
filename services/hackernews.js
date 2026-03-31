@@ -23,7 +23,7 @@ async function searchHNByQuery(query, limit = 10) {
 
         if (data && data.hits) {
             // Fetch content for all URLs in parallel
-            const contentPromises = data.hits.map(async (hit) => {
+            const contentPromises = data.hits.map(async (hit, index) => {
                 const title = hit.title || '';
                 const url =
                     hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
@@ -32,8 +32,10 @@ async function searchHNByQuery(query, limit = 10) {
                 let content = 'Content could not be fetched';
 
                 try {
-                    const scrapeResult = await ScrapUrl(url);
-                    content = scrapeResult.content || content;
+                    if (index < 3) {
+                        const scrapeResult = await ScrapUrl(url);
+                        content = scrapeResult.content || content;
+                    }
                 } catch (err) {
                     console.error(`[HackerNews] Failed to scrape ${url}: ${err.message}`);
                 }
