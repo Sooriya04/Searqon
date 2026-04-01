@@ -1,28 +1,29 @@
 /**
  * Classifier Service
- * Thin HTTP client that calls the Python classifier microservice (port 3003).
- * All routing logic (LLM via qwen2.5:0.5b + keyword fallback) lives in classifier/classifier.py.
+ * Thin HTTP client that calls the Python Intelligence microservice (port 3003).
+ * Endpoints consumed:
+ *   POST /classify   → query routing (semantic intent)
+ *   POST /summarize  → TF-IDF extractive highlights
+ *
  * Used by: controller/classifierController.js, controller/unifiedController.js
  */
 
 const http = require("http");
 
-const CLASSIFIER_TIMEOUT_MS = 30000; // 30s — Ollama inference needs time
+const CLASSIFIER_PORT = 3003;
+const CLASSIFIER_TIMEOUT_MS = 5000; // 5s — pure math, no LLM needed
 
-/**
- * Call the Python classifier microservice.
- * @param {string} query
- * @returns {Promise<{sources: string[], strategy: string, categories: string[]}>}
- */
-function callClassifier(query) {
+// ─── Generic HTTP Helper ──────────────────────────────────────────────────────
+
+function postToClassifier(path, payload) {
     return new Promise((resolve, reject) => {
-        const body = JSON.stringify({ query });
+        const body = JSON.stringify(payload);
 
         const req = http.request(
             {
                 hostname: "localhost",
-                port: 3003,
-                path: "/classify",
+                port: CLASSIFIER_PORT,
+                path,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -37,7 +38,7 @@ function callClassifier(query) {
                     try {
                         resolve(JSON.parse(data));
                     } catch (e) {
-                        reject(new Error("Invalid JSON from classifier"));
+                        reject(new Error(`Invalid JSON from classifier ${path}`));
                     }
                 });
             }
@@ -46,7 +47,7 @@ function callClassifier(query) {
         req.on("error", reject);
         req.on("timeout", () => {
             req.destroy();
-            reject(new Error("Classifier timeout"));
+            reject(new Error(`Classifier ${path} timeout`));
         });
 
         req.write(body);
@@ -54,18 +55,16 @@ function callClassifier(query) {
     });
 }
 
+// ─── Route Query ──────────────────────────────────────────────────────────────
+
 /**
  * Route a query to the relevant sources.
- * Returns an object with: sources[], strategy, categories[]
- *
- * DuckDuckGo is always the last source (guaranteed by the Python classifier).
- *
  * @param {string} query
  * @returns {Promise<{sources: string[], strategy: string, categories: string[]}>}
  */
 async function routeQuery(query) {
     try {
-        const result = await callClassifier(query);
+        const result = await postToClassifier("/classify", { query });
 
         if (!result?.sources?.length) {
             throw new Error("Empty response from classifier");
@@ -81,8 +80,6 @@ async function routeQuery(query) {
             categories: result.categories || [],
         };
     } catch (err) {
-        // Classifier is down or errored — should not happen as Python has its own fallback,
-        // but this is a last-resort safety net.
         console.warn(`[Router] Classifier unavailable (${err.message}), using safe defaults`);
         return {
             sources:    ["wikipedia", "web", "duckduckgo"],
@@ -92,4 +89,33 @@ async function routeQuery(query) {
     }
 }
 
-module.exports = { routeQuery };
+// ─── Summarize Results ────────────────────────────────────────────────────────
+
+/**
+ * Send scraped documents to the Python TF-IDF summarizer.
+ * @param {string} query - The original user query
+ * @param {Array} documents - Array of { source, title, content, url }
+ * @param {number} numHighlights - How many highlight sentences to extract
+ * @returns {Promise<Array>} - Array of highlight objects
+ */
+async function summarizeResults(query, documents, numHighlights = 5) {
+    try {
+        const result = await postToClassifier("/summarize", {
+            query,
+            documents,
+            num_highlights: numHighlights,
+        });
+
+        if (!result?.highlights) {
+            throw new Error("No highlights in summarizer response");
+        }
+
+        console.log(`[Summarizer] Extracted ${result.highlights.length} highlights`);
+        return result.highlights;
+    } catch (err) {
+        console.warn(`[Summarizer] Failed (${err.message}), skipping highlights`);
+        return [];
+    }
+}
+
+module.exports = { routeQuery, summarizeResults };

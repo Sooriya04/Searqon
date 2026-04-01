@@ -18,26 +18,31 @@ Most AI search APIs operate as black boxes:
 
 **Searqon changes this.** Every component is transparent, modular, and customizable.
 
-## Searqon processes web searches through six core stages:
+## Searqon processes web searches through five core stages:
 
-1. **Route** — (New) Classifies the query using a **Python-based LLM microservice** to identify relevant domain sources.
-2. **Search** — Queries specialized sources (GitHub, PubMed, Reddit) based on intent and always includes DuckDuckGo as a baseline.
-3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper**.
+1. **Route** — Classifies the query using a **Semantic Intent Engine** (weighted scoring, no LLM) to identify relevant domain sources in under 1ms.
+2. **Search** — Queries specialized sources (GitHub, PubMed, Reddit, YouTube, etc.) based on intent and always includes DuckDuckGo as a baseline.
+3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper** with top-3 deep extraction per source.
 4. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text.
-5. **Rank** — Uses semantic embeddings to prioritize the most relevant information.
-6. **Synthesize** — Generates concise, citation-backed answers using an LLM.
+5. **Synthesize** — Uses **TF-IDF extractive summarization** to extract the most relevant research highlights from all scraped content — no LLM required.
 
 ## Architecture
 
-Searqon uses a **microservice architecture**. The extraction layer is powered by a Go-based microservice that leverages **Goroutines** for true parallel scraping, ensuring extremely low latency and memory usage.
+Searqon uses a **microservice architecture** with three lightweight services:
+
+- **Node.js (Port 3001)** — API orchestration, source coordination, response assembly
+- **Go (Port 3002)** — High-performance parallel scraper using Goroutines
+- **Python (Port 3003)** — Intelligence layer: semantic routing + TF-IDF summarization
+
+Total idle RAM: ~120MB. No GPU required. No LLM server needed.
 
 ## Technology Stack
 
 - **Backend**: Node.js & Express.js
-- **Intelligent Routing**: Python 3.9+ (Microservice)
+- **Intelligent Routing**: Python 3.9+ (Semantic Intent Engine, < 1ms)
+- **Summarization**: Python (TF-IDF Extractive, < 10ms, no external dependencies)
 - **Extraction Engine**: Go 1.22+ (GoQuery & Go-Readability)
 - **Orchestration**: Node.js + Go (Port 3002) + Python (Port 3003)
-- **LLM/Embeddings**: Ollama (qwen2.5:0.5b for routing, configurable)
 - **Configuration**: YAML-based settings
 
 ## Getting Started
@@ -55,7 +60,7 @@ Searqon prioritizes transparency, modularity, and control. Every decision in the
 **Phase 1** — Core Engine (Completed)
 - Stable microservices & Unified Search
 - High-performance **Go-based** parallel scraping engine
-- Citation-backed answer generation
+- TF-IDF extractive research highlights
 
 **Phase 2** — Intelligent Orchestration (In Progress)
 - LangGraph integration for complex reasoning

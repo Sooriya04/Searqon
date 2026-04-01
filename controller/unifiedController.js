@@ -2,10 +2,11 @@
  * Searqon Unified Search Controller
  *
  * Flow:
- *  1. Classify query → get ordered source list (LLM or keyword fallback)
+ *  1. Classify query → get ordered source list (Semantic Intent Engine)
  *  2. Execute domain-specific sources concurrently (phase 1)
  *  3. Execute DuckDuckGo last as the baseline (phase 2)
- *  4. Return merged results with routing metadata
+ *  4. Summarize all results using TF-IDF extractive highlights (phase 3)
+ *  5. Return merged results with routing metadata + research highlights
  */
 
 const { searchArxiv }        = require("../services/arxiv");
@@ -21,11 +22,10 @@ const { reddit }             = require("../services/reddit");
 const { searchWeb }          = require("../services/web");
 const { searchGeeksForGeeks} = require("../services/geeksforgeeks");
 const { searchYoutube }      = require("../services/youtube");
-const { routeQuery }         = require("../services/classifierService");
+const { routeQuery, summarizeResults } = require("../services/classifierService");
 
 // ─── Source Registry ──────────────────────────────────────────────────────────
 
-/** All available source definitions. Name must match what the router outputs. */
 const ALL_SOURCES = [
     { name: "arxiv",         fn: (q, l) => searchArxiv(q, l)         },
     { name: "doaj",          fn: (q, l) => searchDOAJ(q, l)          },
@@ -48,11 +48,8 @@ const SOURCE_MAP = Object.fromEntries(ALL_SOURCES.map((s) => [s.name, s]));
 
 function normalizeResults(data) {
     if (!data) return [];
-    // PubMed / OpenAlex shape: { query, source, count, results: [] }
     if (data.results && Array.isArray(data.results)) return data.results;
-    // Standard array (most sources)
     if (Array.isArray(data)) return data;
-    // Single object (wiki)
     return [data];
 }
 
@@ -60,12 +57,11 @@ async function runSource(name, query, limit) {
     const def = SOURCE_MAP[name];
     if (!def) return { name, status: "skipped", error: `Unknown source: ${name}` };
 
-    const SOURCE_TIMEOUT_MS = 10000; // 10s per source
+    const SOURCE_TIMEOUT_MS = 10000;
 
     try {
-        // Enforce per-source timeout
         const sourcePromise = def.fn(query, limit);
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error("Source timeout")), SOURCE_TIMEOUT_MS)
         );
 
@@ -77,6 +73,29 @@ async function runSource(name, query, limit) {
         console.error(`[Unified] ${name} failed: ${msg}`);
         return { name, status: "failed", error: msg || "Unknown error" };
     }
+}
+
+/**
+ * Flatten all successful source results into a single array of documents
+ * suitable for the TF-IDF summarizer.
+ */
+function flattenForSummarizer(sources) {
+    const docs = [];
+    for (const [sourceName, sourceData] of Object.entries(sources)) {
+        if (sourceData.status !== "ok" || !sourceData.data) continue;
+        for (const item of sourceData.data) {
+            const content = item.content || item.abstract || item.description || item.summary || "";
+            if (!content || content.length < 30) continue;
+
+            docs.push({
+                source: sourceName,
+                title: item.title || item.name || "",
+                content: content,
+                url: item.url || item.link || item.html_url || "",
+            });
+        }
+    }
+    return docs;
 }
 
 // ─── Controller ───────────────────────────────────────────────────────────────
@@ -101,7 +120,6 @@ exports.unifiedSearchPost = async (req, res) => {
         // ── Phase 0: Route ────────────────────────────────────────────────────
         const routing = await routeQuery(query);
 
-        // Separate domain sources from DuckDuckGo baseline
         const domainSourceNames = routing.sources.filter((s) => s !== "duckduckgo");
         const hasBaseline = routing.sources.includes("duckduckgo");
 
@@ -120,7 +138,7 @@ exports.unifiedSearchPost = async (req, res) => {
             ddgResult = await runSource("duckduckgo", query, maxResults);
         }
 
-        // ── Build response ────────────────────────────────────────────────────
+        // ── Build sources map ─────────────────────────────────────────────────
         const sources = {};
         let totalResults = 0;
 
@@ -138,11 +156,19 @@ exports.unifiedSearchPost = async (req, res) => {
             if (ddgResult.status === "ok") totalResults += ddgResult.count;
         }
 
+        // ── Phase 3: TF-IDF Research Highlights ───────────────────────────────
+        console.log(`[Unified] Phase 3: Extracting research highlights...`);
+        const docsForSummarizer = flattenForSummarizer(sources);
+        let highlights = [];
+        if (docsForSummarizer.length > 0) {
+            highlights = await summarizeResults(query, docsForSummarizer, 5);
+        }
+
         const ok     = Object.values(sources).filter((s) => s.status === "ok").length;
         const failed = Object.values(sources).filter((s) => s.status === "failed").length;
         const duration = Date.now() - startTime;
 
-        console.log(`[Unified] Done — ${ok} ok | ${failed} failed | ${totalResults} results | ${duration}ms`);
+        console.log(`[Unified] Done — ${ok} ok | ${failed} failed | ${totalResults} results | ${highlights.length} highlights | ${duration}ms`);
         console.log(`[Unified] ──────────────────────────────────────\n`);
 
         res.json({
@@ -157,6 +183,7 @@ exports.unifiedSearchPost = async (req, res) => {
                 startTime: new Date(startTime).toISOString(),
                 duration:  `${duration}ms`,
             },
+            highlights,
             totalResults,
             sourcesQueried:   Object.keys(sources).length,
             sourcesSucceeded: ok,
