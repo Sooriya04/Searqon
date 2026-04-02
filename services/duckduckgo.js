@@ -54,16 +54,17 @@ async function searchDuckDuckGo(query, limit = 5) {
 
   const rawResults = await fetchSearchResults(query);
   const sliced = rawResults.slice(0, limit);
-  console.log(`[DuckDuckGo] Scraping top 3 results in parallel using Go Batch Api...`);
+  console.log(`[DuckDuckGo] Scraping top ${sliced.length} results in parallel using Go Batch Api...`);
   
-  // Extract URLs to batch (only top 3)
-  const urlsToScrape = sliced.slice(0, 3).map(r => r.url).filter(Boolean);
+  // Extract URLs to batch
+  const urlsToScrape = sliced.map(r => r.url).filter(Boolean);
   
   // Hit the Go Batch Endpoint
   let batchResults = [];
   try {
       if (urlsToScrape.length > 0) {
-          batchResults = await ScrapUrlBatch(urlsToScrape);
+          // Pass format: 'markdown' to get high-fidelity content
+          batchResults = await ScrapUrlBatch(urlsToScrape, { format: 'markdown' });
       }
   } catch (e) {
       console.warn(`[DuckDuckGo] Batch scraping failed, falling back to snippets: ${e.message}`);
@@ -89,6 +90,7 @@ async function searchDuckDuckGo(query, limit = 5) {
         title: pageData.title || result.title,
         url: result.url,
         content: pageData.content,
+        markdown: pageData.markdown || null,
         score: 0.7,
         wordCount: pageData.wordCount,
         metadata: {
@@ -99,7 +101,7 @@ async function searchDuckDuckGo(query, limit = 5) {
     }
 
     // Fall back to snippet if scraping failed or was too short
-    if (!resultData && result.snippet && result.snippet.length >= 30) {
+    if (!resultData && result.snippet && result.snippet.length >= 20) {
       const cleanedSnippet = cleanSearchSnippet(result.snippet);
       resultData = {
         query: query,
@@ -107,6 +109,7 @@ async function searchDuckDuckGo(query, limit = 5) {
         title: result.title,
         url: result.url,
         content: cleanedSnippet,
+        markdown: null,
         score: 0.5,
         wordCount: cleanedSnippet.split(/\s+/).length,
         metadata: {

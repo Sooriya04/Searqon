@@ -142,10 +142,11 @@ async function ScrapUrl(url, options = {}) {
     return limiter.add(async () => {
         const startTime = Date.now();
         const timeout = options.timeout || config.browser.timeout || 15000;
+        const format = options.format || 'markdown';
 
         try {
-            console.log(`[ScrapUrl] Go scraper -> ${url}`);
-            const response = await axios.post(`${GO_SCRAPER_URL}/scrape`, { url }, {
+            console.log(`[ScrapUrl] Go scraper -> ${url} (format: ${format})`);
+            const response = await axios.post(`${GO_SCRAPER_URL}/scrape`, { url, format }, {
                 timeout: timeout,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -175,6 +176,7 @@ async function ScrapUrlBatch(urls, options = {}) {
     if (validUrls.length === 0) return [];
 
     const timeout = options.timeout || config.browser.timeout || 15000;
+    const format = options.format || 'markdown';
 
     // Separate bypass URLs (GitHub, YouTube) from normal ones
     const bypassPatterns = [
@@ -209,8 +211,8 @@ async function ScrapUrlBatch(urls, options = {}) {
 
         // 2. Process remaining URLs via Go Batch Scraper
         if (normalUrls.length > 0) {
-            console.log(`[ScrapUrl Batch] Sending ${normalUrls.length} normal URLs to Go scraper...`);
-            const response = await axios.post(`${GO_SCRAPER_URL}/scrape/batch`, { urls: normalUrls }, {
+            console.log(`[ScrapUrl Batch] Sending ${normalUrls.length} normal URLs to Go scraper (format: ${format})...`);
+            const response = await axios.post(`${GO_SCRAPER_URL}/scrape/batch`, { urls: normalUrls, format }, {
                 timeout: timeout * 2,
                 headers: { 'Content-Type': 'application/json' }
             });

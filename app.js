@@ -13,6 +13,7 @@ const unified = require("./routes/unified");
 const geeksforgeeks = require("./routes/geeksforgeeks");
 const youtube = require("./routes/youtube");
 const classifier = require("./routes/classifier");
+const crawl = require("./routes/crawl");
 const app = express();
 
 app.use(express.json());
@@ -35,5 +36,6 @@ app.use("/api", unified);
 app.use("/api", geeksforgeeks);
 app.use("/api", youtube);
 app.use("/api", classifier);
+app.use("/api", crawl);
 
 module.exports = app;
