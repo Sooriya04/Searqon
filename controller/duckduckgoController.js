@@ -18,16 +18,19 @@ async function searchController(req, res) {
     const responseTime = Date.now() - startTime;
     
     return res.status(200).json({
-      query: q.trim(),
-      responseTime,
+      success: true,
+      query:   q.trim(),
       results: results.map((r) => ({
         title: r.title,
-        url: r.url,
+        url:   r.url,
         content: r.content,
         rawContent: includeRawContent ? r.rawContent : undefined,
         score: r.score,
-        publishedDate: r.publishedDate || null,
-        author: r.author || null,
+        metadata: {
+          publishedDate: r.publishedDate || null,
+          author: r.author || null,
+          duration: `${responseTime}ms`
+        }
       })),
     });
   } catch (err) {

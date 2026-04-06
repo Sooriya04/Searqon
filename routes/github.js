@@ -2,6 +2,6 @@ const { githubSearchWithReadmeController } = require("../controller/githubContro
 
 const router = require("express").Router();
 
-router.post("/search/github", githubSearchWithReadmeController)
+router.post("/github", githubSearchWithReadmeController)
 
 module.exports = router;

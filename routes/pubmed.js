@@ -2,6 +2,6 @@ const { pubmedController } = require('../controller/pubmedController');
 
 const router = require('express').Router();
 
-router.post('/search/pubmed', pubmedController);
+router.post('/pubmed', pubmedController);
 
 module.exports = router;

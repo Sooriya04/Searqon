@@ -2,6 +2,6 @@ const router = require("express").Router();
 
 const { redditController } = require("../controller/redditController");
 
-router.post("/search/reddit", redditController);
+router.post("/reddit", redditController);
 
 module.exports = router;

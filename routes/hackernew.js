@@ -3,6 +3,6 @@ const { hackerNewsController } = require("../controller/hackerNewsController");
 const router = require("express").Router();
 
 
-router.post("/search/hackernew", hackerNewsController)
+router.post("/hackernew", hackerNewsController)
 
 module.exports = router;

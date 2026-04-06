@@ -206,21 +206,58 @@ async function extractWithOpenAI(prompt) {
 // ─── JSON Parser ──────────────────────────────────────────────────────────────
 
 function parseJSON(raw) {
-    // Try JSON code block first
-    const block = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (block) {
-        try { return JSON.parse(block[1].trim()); } catch (_) {}
+    if (!raw) return null;
+
+    let jsonStr = raw.trim();
+
+    // 1. Try to extract from markdown code blocks
+    const blockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (blockMatch) {
+        jsonStr = blockMatch[1].trim();
+    } else {
+        // 2. Try to find the first '{' or '[' and the last '}' or ']'
+        const firstBrace = jsonStr.indexOf('{');
+        const firstBracket = jsonStr.indexOf('[');
+        let start = -1;
+        let end = -1;
+
+        if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+            start = firstBrace;
+            end = jsonStr.lastIndexOf('}');
+        } else if (firstBracket !== -1) {
+            start = firstBracket;
+            end = jsonStr.lastIndexOf(']');
+        }
+
+        if (start !== -1 && end !== -1 && end > start) {
+            jsonStr = jsonStr.substring(start, end + 1);
+        }
     }
 
-    // Try bare JSON object/array
-    const obj = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (obj) {
-        try { return JSON.parse(obj[1].trim()); } catch (_) {}
-    }
+    // 3. Attempt initial parse
+    try {
+        return JSON.parse(jsonStr);
+    } catch (err) {
+        // 4. Heuristic cleanup for common LLM sloppy JSON
+        try {
+            // Remove thousands separators (e.g., 18,000,000 -> 18000000)
+            // Only targets commas between digits that look like thousands (3 digits following)
+            let fixed = jsonStr.replace(/(\d),(\d{3}(?!\d))/g, '$1$2');
 
-    // Last resort: raw string
-    try { return JSON.parse(raw.trim()); } catch (_) {}
-    return raw.trim();
+            // Fix trailing commas in objects or arrays (e.g., [1, 2,] -> [1, 2])
+            fixed = fixed.replace(/,\s*([\]}])/g, '$1');
+
+            return JSON.parse(fixed);
+        } catch (err2) {
+            console.warn('[Extraction] Failed to parse JSON even after cleanup heuristics.');
+            // Fallback: if it starts with { or [, it's probably intended to be JSON but too broken
+            // otherwise it might be just a text response.
+            if (jsonStr.startsWith('{') || jsonStr.startsWith('[')) {
+                return { error: 'Invalid JSON format from LLM', raw: jsonStr.slice(0, 500) };
+            }
+            return jsonStr;
+        }
+    }
 }
 
-module.exports = { extract, synthesizeAnswer };
+module.exports = { extract, synthesizeAnswer, BACKEND };

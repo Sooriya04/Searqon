@@ -1,4 +1,4 @@
-/**
+ /**
  * Searqon Crawl Controller
  *
  * Exposes Firecrawl-compatible endpoints:
@@ -17,6 +17,34 @@ const { searchDuckDuckGo } = require('../services/duckduckgo');
 
 const GO_SCRAPER_URL   = 'http://127.0.0.1:3002';
 const SCRAPER_TIMEOUT  = 30000; // ms
+
+// ─── Production Job Store (In-memory) ──────────────────────────────────────────
+// In a real-world production app, this would be Redis or a database.
+const jobs = new Map();
+
+function createJob(type, payload = {}) {
+    const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+    const job = {
+        id,
+        type,
+        status: 'pending',
+        progress: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        data: null,
+        error: null,
+        payload
+    };
+    jobs.set(id, job);
+    return job;
+}
+
+function updateJob(id, updates) {
+    const job = jobs.get(id);
+    if (job) {
+        Object.assign(job, updates, { updatedAt: new Date() });
+    }
+}
 
 // ─── Helper: fetch JSON from Go scraper ───────────────────────────────────────
 
@@ -172,47 +200,102 @@ exports.map = async (req, res) => {
 
 exports.crawl = async (req, res) => {
     try {
-        const { url, limit = 30, depth = 2, format = 'markdown' } = req.body;
+        const { url, limit = 30, depth = 2, format = 'markdown', webhook } = req.body;
 
         if (!url) {
             return res.status(400).json({ success: false, error: 'url is required' });
         }
 
-        const safeLimit = Math.min(limit, 50);
-        const safeDepth = Math.min(depth, 3);
+        const safeLimit = Math.min(limit, 100);
+        const safeDepth = Math.min(depth, 5);
 
-        console.log(`[Crawl] Crawl: ${url} (limit: ${safeLimit}, depth: ${safeDepth}, format: ${format})`);
+        console.log(`[Crawl] Job Created: ${url} (limit: ${safeLimit}, depth: ${safeDepth})`);
 
-        const { pages, total, duration } = await goPost(
-            '/crawl',
-            { url, limit: safeLimit, depth: safeDepth, format },
-            120000 // crawls can take a while
-        );
+        const job = createJob('crawl', { url, limit: safeLimit, depth: safeDepth, format });
 
-        const successPages = pages.filter(p => !p.error);
-        const failedPages  = pages.filter(p =>  p.error);
+        // Start the crawl in the background (Async)
+        process.nextTick(async () => {
+            try {
+                updateJob(job.id, { status: 'running' });
+                
+                const response = await goPost(
+                    '/crawl',
+                    { url, limit: safeLimit, depth: safeDepth, format },
+                    300000 // 5m timeout for batch jobs
+                );
 
-        return res.json({
-            success:   true,
-            sourceUrl: url,
-            status:    'completed',
-            total,
-            completed: successPages.length,
-            failed:    failedPages.length,
-            duration,
-            data: successPages.map(p => ({
-                url:       p.url,
-                title:     p.title,
-                markdown:  p.markdown || null,
-                content:   p.content,
-                wordCount: p.wordCount
-            }))
+                const successPages = response.pages.filter(p => !p.error);
+                const result = {
+                    success:   true,
+                    sourceUrl: url,
+                    status:    'completed',
+                    total:     response.total,
+                    completed: successPages.length,
+                    failed:    response.pages.length - successPages.length,
+                    duration:  response.duration,
+                    data:      successPages.map(p => ({
+                        url:       p.url,
+                        title:     p.title,
+                        markdown:  p.markdown || null,
+                        content:   p.content,
+                        wordCount: p.wordCount,
+                        metadata:  p.metadata
+                    }))
+                };
+
+                updateJob(job.id, { status: 'completed', data: result, progress: 100 });
+
+                // If webhook is provided, trigger it
+                if (webhook) {
+                    console.log(`[Crawl] Triggering webhook for job ${job.id}: ${webhook}`);
+                    fetch(webhook, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result)
+                    }).catch(e => console.error(`[Crawl] Webhook failed:`, e.message));
+                }
+
+            } catch (err) {
+                console.error(`[Crawl] Job ${job.id} failed:`, err.message);
+                updateJob(job.id, { status: 'failed', error: err.message });
+            }
+        });
+
+        // Return the Job ID immediately (Production standard)
+        return res.status(202).json({
+            success: true,
+            jobId: job.id,
+            statusUrl: `/api/crawl/${job.id}`
         });
 
     } catch (err) {
-        console.error(`[Crawl] Crawl error:`, err.message);
+        console.error(`[Crawl] Crawl initiation error:`, err.message);
         return res.status(500).json({ success: false, error: err.message });
     }
+};
+
+// ─── Get Crawl Status (Job Status Polling) ───────────────────────────────────
+
+exports.getCrawlStatus = async (req, res) => {
+    const { id } = req.params;
+    const job = jobs.get(id);
+
+    if (!job) {
+        return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+
+    // Standard Firecrawl-style response object
+    const response = {
+        success:  true,
+        status:   job.status,
+        progress: job.progress,
+        data:     job.data || null,
+        error:    job.error || null,
+        total:    job.data ? job.data.total : 0,
+        completed: job.data ? job.data.completed : 0
+    };
+
+    return res.json(response);
 };
 
 // ─── Search + Scrape (Single Query) ─────────────────────────────────────────
@@ -257,8 +340,14 @@ exports.extract = async (req, res) => {
     try {
         const { url, urls, query, prompt, schema, limit = 3 } = req.body;
 
-        if (!prompt) {
-            return res.status(400).json({ success: false, error: 'prompt is required' });
+        let effectivePrompt = prompt;
+
+        if (!effectivePrompt && query) {
+            effectivePrompt = query;
+        }
+
+        if (!effectivePrompt) {
+            return res.status(400).json({ success: false, error: 'prompt or query is required' });
         }
 
         let targetUrls = urls || (url ? [url] : null);
@@ -274,7 +363,7 @@ exports.extract = async (req, res) => {
             return res.status(400).json({ success: false, error: 'url, urls, or query is required' });
         }
 
-        console.log(`[Crawl] Extract: ${targetUrls.length} URL(s) — "${prompt.slice(0, 60)}..."`);
+        console.log(`[Crawl] Extract: ${targetUrls.length} URL(s) — "${effectivePrompt.slice(0, 60)}..."`);
 
         // Scrape all target URLs
         const scraped   = await ScrapUrlBatch(targetUrls, { format: 'markdown' });
@@ -291,17 +380,26 @@ exports.extract = async (req, res) => {
 
         const schemaInstruction = schema
             ? `\n\nRespond ONLY with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`
-            : '\n\nRespond in structured JSON.';
+            : '\n\nRespond in clean, valid JSON object format.';
 
-        const fullPrompt = `${prompt}${schemaInstruction}\n\n---\n\nContext from web:\n${context.slice(0, 12000)}`;
+        const strictRules = '\n\nCRITICAL: Do not include conversational text or markdown code blocks outside the JSON. Do NOT use thousands separators in numbers (e.g., use 18000000 instead of 18,000,000). Your response must be parseable by JSON.parse().';
+
+        const fullPrompt = `${effectivePrompt}${schemaInstruction}${strictRules}\n\n---\n\nContext from web:\n${context.slice(0, 12000)}`;
 
         const extractionService = require('../services/extractionService');
         const extracted = await extractionService.extract(fullPrompt);
 
         return res.json({
             success: true,
-            sources: validDocs.map(d => d.url),
-            data:    extracted
+            data:    extracted,
+            metadata: {
+                sources: validDocs.map(d => ({
+                    url: d.url,
+                    title: d.title,
+                    wordCount: d.wordCount
+                })),
+                engine: extractionService.BACKEND || 'ollama'
+            }
         });
 
     } catch (err) {
