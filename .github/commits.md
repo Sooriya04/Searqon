@@ -113,3 +113,7 @@ Re-architected Searqon into a high-performance, autonomous web-scraping and data
 ### ISSUE 36 : Real-Time RAG-Based Smart Answer System with Multi-LLM Synthesis
 
 Implemented a real-time RAG-based smart answer system in Searqon that transforms search results into a single, concise AI-generated response. A new synthesizeAnswer engine aggregates context from top-ranked results and uses multiple LLMs (Gemini, OpenAI, Ollama) to generate accurate summaries. The search pipeline was enhanced with an additional AI synthesis phase, shifting the experience from fragmented snippets to a unified, intelligent answer for queries involving pricing, specs, and general knowledge.
+
+### ISSUE 37 : Production-Grade Asynchronous API Architecture and Versioned Search Hub
+
+Transformed the Searqon API from a flat, synchronous prototype into a production-grade asynchronous architecture versioned under /api/v1. Implemented a centralized routing hub and Job ID lifecycle for long-running tasks, moving from blocking requests to an efficient, scalable polling model with webhook support. Standardized the entire multi-source search marketplace by grouping specialized integrations under a unified /sources namespace and introduced a comprehensive endpoints.md reference. Additionally, hardened the AI extraction pipeline with a specialized "self-healing" JSON parser and standardized metadata responses, ensuring high-reliability structured data output across all search, crawl, and extraction endpoints.
