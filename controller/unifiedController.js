@@ -23,6 +23,7 @@ const { searchWeb }          = require("../services/web");
 const { searchGeeksForGeeks} = require("../services/geeksforgeeks");
 const { searchYoutube }      = require("../services/youtube");
 const { routeQuery, summarizeResults } = require("../services/classifierService");
+const { synthesizeAnswer } = require("../services/extractionService");
 
 // ─── Source Registry ──────────────────────────────────────────────────────────
 
@@ -164,6 +165,18 @@ exports.unifiedSearchPost = async (req, res) => {
             highlights = await summarizeResults(query, docsForSummarizer, 5);
         }
 
+        // ── Phase 4: AI Synthesized Answer ────────────────────────────────────
+        console.log(`[Unified] Phase 4: Synthesizing direct answer...`);
+        let answer = null;
+        try {
+            // Only synthesize if we have good content
+            if (docsForSummarizer.length > 0) {
+                answer = await synthesizeAnswer(query, docsForSummarizer);
+            }
+        } catch (err) {
+            console.warn(`[Unified] Answer synthesis failed: ${err.message}`);
+        }
+
         const ok     = Object.values(sources).filter((s) => s.status === "ok").length;
         const failed = Object.values(sources).filter((s) => s.status === "failed").length;
         const duration = Date.now() - startTime;
@@ -184,6 +197,7 @@ exports.unifiedSearchPost = async (req, res) => {
                 duration:  `${duration}ms`,
             },
             highlights,
+            answer,
             totalResults,
             sourcesQueried:   Object.keys(sources).length,
             sourcesSucceeded: ok,

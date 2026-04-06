@@ -52,6 +52,89 @@ async function extract(prompt) {
     }
 }
 
+/**
+ * Synthesize a direct answer from multiple search results (RAG).
+ * @param {string} query
+ * @param {Array} documents - Array of { source, title, content, url }
+ */
+async function synthesizeAnswer(query, documents) {
+    if (!documents || documents.length === 0) return null;
+
+    // 1. Build context from top 3-5 documents
+    const context = documents.slice(0, 5).map(d =>
+        `Title: ${d.title}\nSource: ${d.url}\nContent: ${d.content.slice(0, 2000)}`
+    ).join('\n\n---\n\n');
+
+    // 2. Prepare the prompt
+    const prompt = `You are Searqon-AI, a helpful and accurate search assistant. 
+Your task is to provide a concise, direct, and factual answer to the query based ONLY on the provided context.
+
+Query: "${query}"
+
+Context from web:
+${context}
+
+Instructions:
+- Be direct and start with the answer.
+- If the information is not in the context, say "I couldn't find a definitive answer in the search results."
+- Keep it under 3-4 sentences unless more detail is absolutely necessary.
+- Use markdown for formatting (bolding important terms).
+- If there are multiple viewpoints or rates, list them briefly.
+
+Answer:`;
+
+    // 3. Call current backend
+    switch (BACKEND) {
+        case 'gemini':  return await callGeminiRaw(prompt);
+        case 'openai':  return await callOpenAIRaw(prompt);
+        case 'ollama':
+        default:        return await callOllamaRaw(prompt);
+    }
+}
+
+// ─── Direct LLM Callers (Raw Text) ───────────────────────────────────────────
+
+async function callOllamaRaw(prompt) {
+    const data = await postJSON(`${OLLAMA_URL}/api/generate`, {
+        model:   OLLAMA_MODEL,
+        prompt:  prompt,
+        stream:  false,
+        options: { temperature: 0.1, num_predict: 512 }
+    });
+    return data?.response?.trim() || '';
+}
+
+async function callGeminiRaw(prompt) {
+    if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY is not set');
+    const data = await postJSON(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
+        }
+    );
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+}
+
+async function callOpenAIRaw(prompt) {
+    if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY is not set');
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:  'POST',
+        headers: {
+            'Authorization': `Bearer ${OPENAI_KEY}`,
+            'Content-Type':  'application/json'
+        },
+        body: JSON.stringify({
+            model:       'gpt-4o-mini',
+            messages:    [{ role: 'user', content: prompt }],
+            temperature: 0.2,
+            max_tokens:  512
+        })
+    });
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content?.trim() || '';
+}
+
 // ─── Ollama (local) ───────────────────────────────────────────────────────────
 
 async function extractWithOllama(prompt) {
@@ -140,4 +223,4 @@ function parseJSON(raw) {
     return raw.trim();
 }
 
-module.exports = { extract };
+module.exports = { extract, synthesizeAnswer };
