@@ -112,4 +112,8 @@ Re-architected Searqon into a high-performance, autonomous web-scraping and data
 
 ### ISSUE 36 : Real-Time RAG-Based Smart Answer System with Multi-LLM Synthesis
 
-Implemented a real-time RAG-based smart answer system in Searqon that transforms search results into a single, concise AI-generated response. A new synthesizeAnswer engine aggregates context from top-ranked results and uses multiple LLMs (Gemini, OpenAI, Ollama) to generate accurate summaries. The search pipeline was enhanced with an additional AI synthesis phase, shifting the experience from fragmented snippets to a unified, intelligent answer for queries involving pricing, specs, and general knowledge.
+Implemented a real-time RAG-based smart answer system in Searqon that transforms search results into a single, concise AI-generated response. A new synthesizeAnswer engine aggregates context from top-ranked results and uses multiple LLMs (Gemini, OpenAI, Ollama) to generate accurate summaries. The search pipeline was enhanced with an additional AI synthesis phase, shifting the experience from fragmented snippets to a unified, intelligent answer for queries involving pricing, specs, and general knowledge.'
+
+### Add search_api.md documenting unified search architecture, RAG-based Smart Answer, and future AI search roadmap
+
+Added comprehensive documentation (search_api.md) detailing Searqon’s unified search architecture, including the newly introduced RAG-powered Smart Answer phase. The document outlines how AI-driven synthesis integrates into the search pipeline and provides a forward-looking roadmap to evolve the system into a Google-like AI search experience, covering features such as citations, knowledge panels, and agentic search capabilities.
