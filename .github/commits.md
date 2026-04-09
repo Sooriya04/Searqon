@@ -118,7 +118,10 @@ Implemented a real-time RAG-based smart answer system in Searqon that transforms
 
 Transformed the Searqon API from a flat, synchronous prototype into a production-grade asynchronous architecture versioned under /api/v1. Implemented a centralized routing hub and Job ID lifecycle for long-running tasks, moving from blocking requests to an efficient, scalable polling model with webhook support. Standardized the entire multi-source search marketplace by grouping specialized integrations under a unified /sources namespace and introduced a comprehensive endpoints.md reference. Additionally, hardened the AI extraction pipeline with a specialized "self-healing" JSON parser and standardized metadata responses, ensuring high-reliability structured data output across all search, crawl, and extraction endpoints.
 
-
 ### ISSUE 38 : Add SSE streaming, conversational search, and Python LLM proxy integration
 
 Implemented real-time token streaming for LLM responses using Server-Sent Events via a new /api/search/stream endpoint to enable a live "typing" experience. Added conversational follow-up search support with dedicated chat routes and controllers to maintain context across queries. Replaced complex JavaScript SSE handling with a lightweight Python microservice (llm_stream.py) that efficiently streams responses from Gemini, OpenAI, and Ollama, with Node.js acting as a proxy layer. Integrated all endpoints into the main router and updated package scripts to orchestrate the full stack (Node server, Python streamer, Go scraper, and TF-IDF engine) through a unified startup command.
+
+### ISSUE 39 : Optimize search latency, introduce async extraction pipeline, and enforce structured LLM outputs
+
+Reduced meta-search latency by lowering engine timeouts from 15 seconds to 1.5 seconds, enabling near-instant browser results. Decoupled heavy scraping and extraction into an asynchronous background daemon that triggers alongside search requests and returns a summary_job_id for non-blocking frontend polling. Enhanced the extraction engine by enforcing a strict native JSON schema with high-detail output, minimizing hallucinations from local LLMs while preserving complete raw markdown for transparency and deeper user access.

@@ -248,6 +248,7 @@ async function extractWithOllama(prompt) {
     const data = await postJSON(`${OLLAMA_URL}/api/generate`, {
         model:   OLLAMA_MODEL,
         prompt:  prompt,
+        format:  "json",
         stream:  false,
         options: { temperature: 0.1, num_predict: 2048 }
     });
