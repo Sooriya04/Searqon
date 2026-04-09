@@ -61,7 +61,7 @@ The Smart Answer feature is controlled via environment variables in the Node.js 
 
 Planned features to reach full parity with modern AI search overviews:
 
-- [ ] **Inline Citations**: Clickable `[1]`, `[2]` links within the Smart Answer mapped directly to source URLs.
+- [x] **Inline Citations**: Clickable `[1]`, `[2]` links within the Smart Answer mapped directly to source URLs.
 - [ ] **Knowledge Panel Extraction**: Automatic JSON extraction of key stats (price, HQ, founders, GitHub stars) into a structured sidebar.
 - [ ] **Agentic Deep Search**: Allowing the LLM to autonomously trigger a second search if the initial results are insufficient.
 - [ ] **Streaming Responses**: Real-time "typing" effect for the AI answer to reduce perceived latency.

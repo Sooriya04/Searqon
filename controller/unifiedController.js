@@ -23,7 +23,7 @@ const { searchWeb }          = require("../services/web");
 const { searchGeeksForGeeks} = require("../services/geeksforgeeks");
 const { searchYoutube }      = require("../services/youtube");
 const { routeQuery, summarizeResults } = require("../services/classifierService");
-const { synthesizeAnswer } = require("../services/extractionService");
+const { synthesizeAnswer, extractKnowledgePanel } = require("../services/extractionService");
 
 // ─── Source Registry ──────────────────────────────────────────────────────────
 
@@ -165,16 +165,50 @@ exports.unifiedSearchPost = async (req, res) => {
             highlights = await summarizeResults(query, docsForSummarizer, 5);
         }
 
-        // ── Phase 4: AI Synthesized Answer ────────────────────────────────────
-        console.log(`[Unified] Phase 4: Synthesizing direct answer...`);
-        let answer = null;
+        // ── Phase 4: AI Synthesized Answer & Knowledge Panel ──────────────────
+        console.log(`[Unified] Phase 4: Synthesizing direct answer & extracting knowledge panel...`);
+        let smartAnswer = null;
+        let knowledgePanel = null;
+        
         try {
-            // Only synthesize if we have good content
             if (docsForSummarizer.length > 0) {
-                answer = await synthesizeAnswer(query, docsForSummarizer);
+                // Run answer synthesis and knowledge panel extraction concurrently
+                const [answerResult, panelResult] = await Promise.all([
+                    synthesizeAnswer(query, docsForSummarizer),
+                    extractKnowledgePanel(query, docsForSummarizer)
+                ]);
+                smartAnswer = answerResult;
+                knowledgePanel = panelResult;
+
+                // ── Agentic Deep Search ──────────────────────────────────────────
+                // Check if the LLM failed to find an answer
+                if (smartAnswer && smartAnswer.text && smartAnswer.text.includes("couldn't find a definitive answer")) {
+                    console.log(`[Unified] Agentic Deep Search triggered: Answer insufficient. Re-searching...`);
+                    const deepQuery = `${query} details OR explanation OR guide`;
+                    const deepDdgResult = await runSource("duckduckgo", deepQuery, limit ? parseInt(limit, 10) + 5 : 10);
+                    
+                    if (deepDdgResult.status === "ok" && deepDdgResult.count > 0) {
+                        const deepDocs = flattenForSummarizer({"duckduckgo": deepDdgResult});
+                        if (deepDocs.length > 0) {
+                            const existingUrls = new Set(docsForSummarizer.map(d => d.url));
+                            for (let d of deepDocs) {
+                                if (!existingUrls.has(d.url)) {
+                                    docsForSummarizer.push(d);
+                                    existingUrls.add(d.url);
+                                }
+                            }
+                            
+                            console.log(`[Unified] Retrying synthesis with ${docsForSummarizer.length} total docs...`);
+                            smartAnswer = await synthesizeAnswer(query, docsForSummarizer);
+                            if (!knowledgePanel || Object.keys(knowledgePanel).length === 0) {
+                                knowledgePanel = await extractKnowledgePanel(query, docsForSummarizer);
+                            }
+                        }
+                    }
+                }
             }
         } catch (err) {
-            console.warn(`[Unified] Answer synthesis failed: ${err.message}`);
+            console.warn(`[Unified] Answer synthesis or Knowledge Panel failed: ${err.message}`);
         }
 
         const ok     = Object.values(sources).filter((s) => s.status === "ok").length;
@@ -197,7 +231,9 @@ exports.unifiedSearchPost = async (req, res) => {
                 duration:  `${duration}ms`,
             },
             highlights,
-            answer,
+            answer: smartAnswer ? smartAnswer.text : null,
+            citations: smartAnswer ? smartAnswer.references : [],
+            knowledgePanel,
             totalResults,
             sourcesQueried:   Object.keys(sources).length,
             sourcesSucceeded: ok,

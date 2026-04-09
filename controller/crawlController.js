@@ -350,13 +350,29 @@ exports.extract = async (req, res) => {
             return res.status(400).json({ success: false, error: 'prompt or query is required' });
         }
 
-        let targetUrls = urls || (url ? [url] : null);
+        let targetUrls = [];
+        let urlOrigins = {};
+        
+        if (urls && urls.length > 0) {
+            if (typeof urls[0] === 'object') {
+                targetUrls = urls.map(u => {
+                    urlOrigins[u.url] = u.origin || 'unknown';
+                    return u.url;
+                });
+            } else {
+                targetUrls = urls;
+            }
+        } else if (url) {
+            targetUrls = [url];
+        }
 
         // If no URLs are provided, but a query is, perform a search first
-        if (!targetUrls && query) {
-            console.log(`[Crawl] Extract-Search: Performing search for query: "${query}"`);
-            const searchResults = await searchDuckDuckGo(query, limit);
-            targetUrls = searchResults.map(r => r.url);
+        if (!targetUrls || targetUrls.length === 0) {
+            if (query) {
+                console.log(`[Crawl] Extract-Search: Performing search for query: "${query}"`);
+                const searchResults = await searchDuckDuckGo(query, limit);
+                targetUrls = searchResults.map(r => r.url);
+            }
         }
 
         if (!targetUrls || targetUrls.length === 0) {
@@ -374,17 +390,24 @@ exports.extract = async (req, res) => {
         }
 
         // Build context + schema instructions
-        const context = validDocs.map(d =>
-            `## ${d.title || d.url}\nSource: ${d.url}\n\n${d.markdown || d.content}`
-        ).join('\n\n---\n\n');
+        const context = validDocs.map(d => {
+            const originLabel = urlOrigins[d.url] ? `\nOrigin Engine: ${urlOrigins[d.url]}` : '';
+            return `## ${d.title || d.url}${originLabel}\nSource: ${d.url}\n\n${d.markdown || d.content}`;
+        }).join('\n\n---\n\n');
 
         const schemaInstruction = schema
-            ? `\n\nRespond ONLY with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`
-            : '\n\nRespond in clean, valid JSON object format.';
+            ? `\n\nRespond ONLY with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}\n\nIMPORTANT: For every field in the schema, extract large amounts of text. Write comprehensive 5-6 sentence paragraphs. DO NOT summarize to one sentence.`
+            : `\n\nRespond ONLY with valid JSON matching this exact structure:
+{
+  "comprehensive_overview": "An extremely detailed, multi-paragraph explanation of all the information provided.",
+  "key_findings": ["Detailed finding 1 with substantial context.", "Detailed finding 2 with substantial context."],
+  "source_analysis": "Explanation of where the data came from based on Origin Engine tags."
+}
+IMPORTANT: You MUST write highly detailed paragraphs consisting of 5-6 sentences for each text string. DO NOT provide short one-line summaries.`;
 
         const strictRules = '\n\nCRITICAL: Do not include conversational text or markdown code blocks outside the JSON. Do NOT use thousands separators in numbers (e.g., use 18000000 instead of 18,000,000). Your response must be parseable by JSON.parse().';
 
-        const fullPrompt = `${effectivePrompt}${schemaInstruction}${strictRules}\n\n---\n\nContext from web:\n${context.slice(0, 12000)}`;
+        const fullPrompt = `${effectivePrompt}${schemaInstruction}${strictRules}\n\n---\n\nContext from web:\n${context}`;
 
         const extractionService = require('../services/extractionService');
         const extracted = await extractionService.extract(fullPrompt);
@@ -395,8 +418,10 @@ exports.extract = async (req, res) => {
             metadata: {
                 sources: validDocs.map(d => ({
                     url: d.url,
+                    origin: urlOrigins[d.url] || 'unknown',
                     title: d.title,
-                    wordCount: d.wordCount
+                    wordCount: d.wordCount,
+                    markdown: d.markdown || d.content
                 })),
                 engine: extractionService.BACKEND || 'ollama'
             }
