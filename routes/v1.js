@@ -6,6 +6,7 @@ const crawlRoutes  = require('./crawl');
 const searchRoutes = require('./search');
 const unified      = require('./unified');
 const classifier   = require('./classifier');
+const chatRoutes   = require('./chat');
 
 // ─── Import Specialized Sources ──────────────────────────────────────────────
 const reddit         = require('./reddit');
@@ -28,6 +29,7 @@ router.use('/scrape',     crawlRoutes); // scrape is handled by crawl router
 router.use('/search',     searchRoutes);
 router.use('/unified',    unified);
 router.use('/classify',   classifier);
+router.use('/chat',       chatRoutes);
 
 // Source search endpoints
 // These are currently mounted under /api/search/... so we'll maintain that or move to /v1/sources/...

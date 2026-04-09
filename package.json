@@ -20,8 +20,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "classifier": "python3 classifier/classifier.py",
-    "start": "npx concurrently \"node server.js\" \"cd go_scraper && go run main.go\" \"python3 classifier/classifier.py\"",
-    "dev": "npx concurrently \"npx nodemon server.js\" \"cd go_scraper && go run main.go\" \"python3 classifier/classifier.py\"",
+    "start": "npx concurrently \"node server.js\" \"cd go_scraper && go run main.go\" \"python3 classifier/classifier.py\" \"python3 classifier/llm_stream.py\"",
+    "dev": "npx concurrently \"npx nodemon server.js\" \"cd go_scraper && go run main.go\" \"python3 classifier/classifier.py\" \"python3 classifier/llm_stream.py\"",
     "db": "node database/server.js",
     "db:dev": "npx nodemon database/server.js"
   },
