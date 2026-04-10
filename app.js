@@ -18,5 +18,5 @@ app.use('/api/v1', v1Router);
 app.use("/api/search", searchRoutes);
 app.use("/api/search/stream", streamRoutes);
 app.use("/api/chat", chatRoutes);
-
+app.use("/api/v1", crawlRoutes)
 module.exports = app;

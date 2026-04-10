@@ -75,8 +75,29 @@ async function goPost(path, body, timeoutMs = SCRAPER_TIMEOUT) {
 
 exports.scrape = async (req, res) => {
     try {
-        const { url, format = 'markdown', useJs = false } = req.body;
+        const { url, urls, format = 'markdown', useJs = false } = req.body;
 
+        const targetUrls = Array.isArray(url) ? url : (Array.isArray(urls) ? urls : null);
+
+        // --- Batch Scrape Support ---
+        if (targetUrls) {
+            console.log(`[Crawl] Batch Scrape: ${targetUrls.length} URLs`);
+            const startTime = Date.now();
+            const batchResults = await ScrapUrlBatch(targetUrls, { format });
+            
+            const flatResults = batchResults.map(r => ({
+                title:   r.title || "No Title",
+                url:     r.url,
+                content: r.content || r.error || "",
+                source:  "scrape"
+            }));
+
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            res.set('X-Search-Duration', `${duration}s`);
+            return res.json(flatResults);
+        }
+
+        // --- Single URL Scrape (Existing Logic) ---
         if (!url) {
             return res.status(400).json({ success: false, error: 'url is required' });
         }

@@ -1,16 +1,16 @@
-# 🔍 Searqon Unified Search API (AI Search Engine)
+# 🔍 Searqon Unified Search API (High-Performance JSON)
 
-The Searqon Unified Search API is a high-performance, RAG-driven intelligence layer designed to function as a private, localized version of **Google Search AI** (AI Overviews). It orchestrates multiple specialized search services and synthesizes the results into a single, cohesive "Smart Answer" using LLMs like Gemini, OpenAI, or Ollama.
+The Searqon Unified Search API is a high-performance intelligence layer designed to function as a private, localized web extraction engine. It orchestrates multiple specialized search services and delivers raw, structured JSON intelligence directly from the web.
 
-## Endpoint: `/api/search/unified` [POST]
+## Endpoint: `/api/v1/unified` [POST]
 
-The unified endpoint executes a 5-phase retrieval and synthesis pipeline to deliver structured intelligence directly from the web.
+The unified endpoint executes an optimized 3-phase retrieval pipeline to deliver clean data in under 5 seconds.
 
 ### Request Body
 
 ```json
 {
-  "query": "what is the rate of firecrawl",
+  "query": "Kotlin programming",
   "limit": 5
 }
 ```
@@ -22,47 +22,53 @@ The unified endpoint executes a 5-phase retrieval and synthesis pipeline to deli
 
 ---
 
-## 🏗️ Architecture: The 5-Phase Pipeline
+## 🏗️ Architecture: The Optimized Pipeline
 
-Searqon’s intelligence layer processes every query through five distinct phases to ensure speed, accuracy, and depth.
+Searqon’s intelligence layer processes every query through three distinct phases to ensure maximum speed and resource efficiency.
 
-### Phase 0: Semantic Intent Routing
-The **Python Intelligence Layer** classifies the query to determine the best data sources (e.g., academic, news, tech, or general web).
+### Phase 1: Native Intent Routing
+The **Native JS Intelligence Engine** classifies the query to determine the best data sources (e.g., academic, news, tech, or general web) in under 1ms. No external LLM or Python process is required.
 
-### Phase 1: Concurrent Domain Retrieval
-Executes parallel searches across specialized providers (GitHub, PubMed, Arxiv, Reddit, etc.) based on the routing strategy.
+### Phase 2: Parallel Domain Retrieval
+Executes concurrent searches across specialized providers (GitHub, PubMed, Arxiv, Reddit, etc.) based on the routing strategy and always includes a broad web search baseline.
 
-### Phase 2: DuckDuckGo Baseline
-Runs a broad web search via DuckDuckGo to fill metadata gaps and ensure comprehensive coverage.
-
-### Phase 3: TF-IDF Research Highlights
-Extracts the most relevant "snippets" from thousands of lines of scraped Markdown using a pure Python TF-IDF engine.
-
-### Phase 4: Smart Answer AI (RAG)
-**[NEW]** Synthesizes all retrieved context into a single, direct, and factual answer using the configured LLM backend. This provides a "direct response" experience instead of just a list of links.
+### Phase 3: High-Performance Extraction
+The **Go Scraper Binary** fetches and cleans the content of the top matches in parallel. It strips away ads, navigation, and junk to deliver only the relevant text or Markdown.
 
 ---
 
-## 🛠️ Configuration (LLM Backends)
+## 📦 Direct JSON Response Format
 
-The Smart Answer feature is controlled via environment variables in the Node.js layer:
+By default, the Unified API returns a flat, ultra-minimal JSON array for immediate use in client-side applications or LLM prompts.
 
-| Variable | Values | Description |
-|---|---|---|
-| `EXTRACTION_BACKEND` | `ollama`, `gemini`, `openai` | Selects the AI synthesis engine. |
-| `GEMINI_API_KEY` | `string` | Required if using Gemini backend. |
-| `OPENAI_API_KEY` | `string` | Required if using OpenAI backend. |
-| `OLLAMA_URL` | `string` | URL of the local Ollama instance (default: http://localhost:11434). |
-| `OLLAMA_MODEL` | `string` | Model name (default: `qwen2.5:0.5b`). |
+**X-Search-Duration Header**: Indicates total execution time (e.g., `2.5s`).
+
+### Response Example
+
+```json
+[
+  {
+    "title": "Kotlin Programming Language",
+    "url": "https://kotlinlang.org/",
+    "content": "Kotlin is a modern, cross-platform, multi-purpose programming language...",
+    "source": "duckduckgo"
+  },
+  {
+    "title": "Kotlin Tutorial - GeeksforGeeks",
+    "url": "https://www.geeksforgeeks.org/kotlin-programming-language/",
+    "content": "Kotlin is a statically typed, general-purpose programming language developed by JetBrains...",
+    "source": "duckduckgo"
+  }
+]
+```
 
 ---
 
-## 🔮 Future Roadmap: Google Search AI mode
+## 🛠️ Extended Features (SSE & Chat)
 
-Planned features to reach full parity with modern AI search overviews:
+While the default endpoint returns raw JSON, Searqon supports advanced RAG features via dedicated routes:
 
-- [x] **Inline Citations**: Clickable `[1]`, `[2]` links within the Smart Answer mapped directly to source URLs.
-- [ ] **Knowledge Panel Extraction**: Automatic JSON extraction of key stats (price, HQ, founders, GitHub stars) into a structured sidebar.
-- [ ] **Agentic Deep Search**: Allowing the LLM to autonomously trigger a second search if the initial results are insufficient.
-- [ ] **Streaming Responses**: Real-time "typing" effect for the AI answer to reduce perceived latency.
-- [ ] **Follow-up Chat**: Interactive search sessions where you can ask clarifying questions about the results.
+- **Streaming API (`/api/search/stream`)**: Real-time token streaming using LLMs (Ollama, Gemini, OpenAI).
+- **Chat API (`/api/chat`)**: Multi-turn conversational search where the AI synthesizes answers from search context.
+
+See the [Setup Guide](./setup.md) for configuring LLM backends.

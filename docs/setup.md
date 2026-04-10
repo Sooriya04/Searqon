@@ -6,8 +6,7 @@ This guide will help you get Searqon up and running on your local machine.
 
 - **Node.js** (v18 or higher)
 - **Go** (v1.22 or higher)
-- **Python** (v3.9 or higher)
-- **Ollama** (v0.6 or higher for Intelligent Routing)
+- **Ollama** (v0.6 or higher - optional, for AI Smart Answers)
 
 ## Installation
 
@@ -23,7 +22,7 @@ npm install
 ```
 
 ### 3. Setup Go Scraper
-The scraping engine runs as a high-performance Go microservice.
+The scraping engine runs as a high-performance Go binary.
 ```bash
 cd go_scraper
 # Fetch dependencies
@@ -31,23 +30,22 @@ go mod tidy
 cd ..
 ```
 
-### 4. Setup Python Classifier
-The intelligence layer uses Ollama for classification.
-```bash
-# Pull the required model
-ollama pull qwen2.5:0.5b
-
-# Install dependencies
-pip3 install ollama
-```
+---
 
 ## Configuration
 
-Create a `settings.yaml` in the root directory (or modify the existing one) to configure timeouts, concurrency, and browser settings.
+Create a `settings.yaml` in the root directory (or modify the existing one) to configure timeouts, concurrency, and search engine parameters.
+
+### LLM Integration (Optional)
+If you want to use the **Smart Answer** or **Chat** features, ensure you have the required environment variables in your `.env` file:
+- `EXTRACTION_BACKEND` (ollama, gemini, or openai)
+- API Keys as required.
+
+---
 
 ## Running the Application
 
-Searqon uses `concurrently` to run both the Node.js API and the Go Scraper at the same time.
+Searqon is optimized for a **2-process architecture**. It uses `concurrently` to run both the Node.js API and the Go Scraper.
 
 ### Development Mode (with hot-reload)
 ```bash
@@ -55,15 +53,26 @@ npm run dev
 ```
 
 ### Production Mode
+The production mode automatically builds the Go scraper into a native binary for maximum performance.
 ```bash
 npm start
 ```
 
 Once started:
 - **Main API**: Available at `http://localhost:3001`
-- **Go Scraper**: Available at `http://localhost:3002`
-- **Intelligent Classifier**: Available at `http://localhost:3003`
+- **Go Scraper**: Available at `http://localhost:3002` (Internal Service)
+
+---
+
+## Project Specifications
+
+- **Target Idle RAM**: < 50MB
+- **Classification Latency**: < 1ms (Native JS Engine)
+- **Architecture**: Orchestrated Node.js + Compiled Go Binary
+
+---
 
 ## Documentation
 
-- [Scraping Architecture](./scraping.md) - Deep dive into how our Go-based crawler works.
+- [Unified Search API](./search_api.md) - How to use the main search intelligence endpoint.
+- [Scraping Architecture](./scraping.md) - Deep dive into how our Go-based extraction works.

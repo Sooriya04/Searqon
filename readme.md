@@ -1,6 +1,6 @@
 # Searqon
 
-**Searqon** is an open-source, self-hosted web intelligence engine that searches, crawls, extracts, ranks, and synthesizes information from the internet. Built with a high-performance Go-based extraction engine and a Node.js orchestration layer.
+**Searqon** is an open-source, self-hosted web intelligence engine that searches, crawls, extracts, ranks, and synthesizes information from the internet. Built with a high-performance Go-based extraction engine and a native Node.js orchestration layer.
 
 ## What is Searqon?
 
@@ -20,29 +20,27 @@ Most AI search APIs operate as black boxes:
 
 ## Searqon processes web searches through five core stages:
 
-1. **Route** — Classifies the query using a **Semantic Intent Engine** (weighted scoring, no LLM) to identify relevant domain sources in under 1ms.
+1. **Route** — Classifies the query using a native **Semantic Intent Engine** (weighted scoring, no LLM) to identify relevant domain sources in under 1ms.
 2. **Search** — Queries specialized sources (GitHub, PubMed, Reddit, YouTube, etc.) based on intent and always includes DuckDuckGo as a baseline.
-3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper** with top-3 deep extraction per source.
-4. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text.
-5. **Synthesize** — Uses **TF-IDF extractive summarization** to extract the most relevant research highlights from all scraped content — no LLM required.
+3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper** with parallel deep extraction per source.
+4. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text or high-fidelity Markdown.
+5. **Synthesize** — Provides raw, structured JSON intelligence directly to the client — optional synthesis can be performed client-side or via integrated LLM streaming.
 
 ## Architecture
 
-Searqon uses a **microservice architecture** with three lightweight services:
+Searqon uses a efficient **2-process architecture**:
 
-- **Node.js (Port 3001)** — API orchestration, source coordination, response assembly
-- **Go (Port 3002)** — High-performance parallel scraper using Goroutines
-- **Python (Port 3003)** — Intelligence layer: semantic routing + TF-IDF summarization
+- **Node.js (Port 3001)** — API orchestration, native semantic routing, and response assembly.
+- **Go (Port 3002)** — High-performance parallel scraper binary using Goroutines.
 
-Total idle RAM: ~120MB. No GPU required. No LLM server needed.
+**Total idle RAM: ~50MB.** Optimized for bare-metal and resource-constrained environments.
 
 ## Technology Stack
 
 - **Backend**: Node.js & Express.js
-- **Intelligent Routing**: Python 3.9+ (Semantic Intent Engine, < 1ms)
-- **Summarization**: Python (TF-IDF Extractive, < 10ms, no external dependencies)
+- **Intelligent Routing**: Native JavaScript (Semantic Intent Engine, < 1ms)
 - **Extraction Engine**: Go 1.22+ (GoQuery & Go-Readability)
-- **Orchestration**: Node.js + Go (Port 3002) + Python (Port 3003)
+- **Orchestration**: Node.js + Compiled Go Binary
 - **Configuration**: YAML-based settings
 
 ## Getting Started
@@ -58,14 +56,14 @@ Searqon prioritizes transparency, modularity, and control. Every decision in the
 ## Roadmap
 
 **Phase 1** — Core Engine (Completed)
-- Stable microservices & Unified Search
-- High-performance **Go-based** parallel scraping engine
-- TF-IDF extractive research highlights
+- High-performance **Go-based** parallel scraping binary
+- Native JS-based intent classification
+- Unified Search API (JSON-only mode)
 
 **Phase 2** — Intelligent Orchestration (In Progress)
-- LangGraph integration for complex reasoning
 - Agent planning and self-reflection
 - Multi-turn conversational interface
+- Structured Knowledge Panel extraction
 
 ## License
 
