@@ -2,7 +2,7 @@
  * Searqon Extraction Service
  *
  * LLM-based structured data extraction for /api/extract.
- * Uses native fetch (Node 18+) — no axios.
+ * Uses native fetch (Node 18+) — no axial/python dependencies.
  *
  * Backend is controlled by the EXTRACTION_BACKEND env var:
  *   EXTRACTION_BACKEND=ollama  → http://localhost:11434 (default, free)
@@ -54,19 +54,15 @@ async function extract(prompt) {
 
 /**
  * Synthesize a direct answer from multiple search results (RAG).
- * @param {string} query
- * @param {Array} documents - Array of { source, title, content, url }
  */
 async function synthesizeAnswer(query, documents) {
     if (!documents || documents.length === 0) return null;
 
-    // 1. Build context from top 3-5 documents
     const topDocs = documents.slice(0, 5);
     const context = topDocs.map((d, i) =>
         `[${i + 1}] Title: ${d.title}\nSource: ${d.url}\nContent: ${d.content.slice(0, 2000)}`
     ).join('\n\n---\n\n');
 
-    // 2. Prepare the prompt
     const prompt = `You are Searqon-AI, a helpful and accurate search assistant. 
 Your task is to provide a concise, direct, and factual answer to the query based ONLY on the provided context.
 
@@ -85,7 +81,6 @@ Instructions:
 
 Answer:`;
 
-    // 3. Call current backend
     let answerText = '';
     switch (BACKEND) {
         case 'gemini':  answerText = await callGeminiRaw(prompt); break;
@@ -147,36 +142,110 @@ async function callOpenAIRaw(prompt) {
     return data?.choices?.[0]?.message?.content?.trim() || '';
 }
 
-// ─── Stream LLM Callers (SSE Generators via Python Proxy) ────────────────────
+// ─── Stream LLM Callers (SSE Generators) ────────────────────────────────────
 
-const http = require("http");
-
-function callPythonStream(prompt) {
-    return new Promise((resolve, reject) => {
-        const req = http.request(
-            {
-                hostname: "localhost",
-                port: 3004,
-                path: "/stream",
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-            },
-            (res) => {
-                if (res.statusCode !== 200) {
-                    return reject(new Error(`Python stream rejected: ${res.statusCode}`));
-                }
-                const { Transform } = require('stream');
-                resolve(res);
-            }
-        );
-        req.on("error", reject);
-        req.write(JSON.stringify({ backend: BACKEND, prompt }));
-        req.end();
+async function* callOllamaStream(prompt) {
+    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: OLLAMA_MODEL,
+            prompt: prompt,
+            stream: true,
+            options: { temperature: 0.1, num_predict: 512 }
+        })
     });
+    if (!res.ok) throw new Error(`Ollama Stream Error: ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const data = JSON.parse(line);
+                if (data.response) yield data.response;
+            } catch (e) {}
+        }
+    }
+}
+
+async function* callGeminiStream(prompt) {
+    if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY is not set');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_KEY}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
+        })
+    });
+    if (!res.ok) throw new Error(`Gemini Stream Error: ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(line.substring(6));
+                    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) yield text;
+                } catch (e) {}
+            }
+        }
+    }
+}
+
+async function* callOpenAIStream(prompt) {
+    if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY is not set');
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${OPENAI_KEY}`,
+            'Content-Type':  'application/json'
+        },
+        body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            stream: true,
+            temperature: 0.2,
+            max_tokens: 512
+        })
+    });
+    if (!res.ok) throw new Error(`OpenAI Stream Error: ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+            if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+                try {
+                    const data = JSON.parse(line.substring(6));
+                    const text = data?.choices?.[0]?.delta?.content;
+                    if (text) yield text;
+                } catch (e) {}
+            }
+        }
+    }
 }
 
 /**
- * Synthesize answer using streaming generator (proxied to Python)
+ * Synthesize answer using native streaming generators
  */
 async function* synthesizeAnswerStream(query, documents) {
     if (!documents || documents.length === 0) return;
@@ -213,29 +282,16 @@ Answer:`;
     yield JSON.stringify({ type: 'references', data: references }) + '\n\n';
 
     try {
-        const streamRes = await callPythonStream(prompt);
-        // We read the raw byte stream from "res" and yield it as chunks
-        for await (const chunk of streamRes) {
-            // The python server sends `data: {"chunk": "..."}\n\n`
-            // But we actually only wanted to yield JSON string chunks in JS
-            // Wait, Python already sends `data: ...` so we can just yield the raw chunk?
-            // Actually streamController.js wraps my chunkStr: `res.write(`data: ${chunkStr}`);`
-            // Meaning chunkStr is expected to be a JSON string like:
-            // JSON.stringify({ type: 'chunk', data: text }) + '\n\n'
-            
-            // For simplicity, let's parse Python's outgoing SSE and re-emit:
-            const str = chunk.toString();
-            const lines = str.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataObj = JSON.parse(line.substring(6));
-                    if (dataObj.chunk) {
-                        yield JSON.stringify({ type: 'chunk', data: dataObj.chunk }) + '\n\n';
-                    } else if (dataObj.error) {
-                        yield JSON.stringify({ type: 'error', data: dataObj.error }) + '\n\n';
-                    }
-                }
-            }
+        let stream;
+        switch (BACKEND) {
+            case 'gemini':  stream = callGeminiStream(prompt); break;
+            case 'openai':  stream = callOpenAIStream(prompt); break;
+            case 'ollama':
+            default:        stream = callOllamaStream(prompt); break;
+        }
+
+        for await (const text of stream) {
+            yield JSON.stringify({ type: 'chunk', data: text }) + '\n\n';
         }
     } catch(err) {
         yield JSON.stringify({ type: 'error', data: err.message }) + '\n\n';
@@ -315,45 +371,25 @@ async function extractWithOpenAI(prompt) {
 
 function parseJSON(raw) {
     if (!raw) return null;
-
     let jsonStr = raw.trim();
-
-    // 1. Try to extract from markdown code blocks
     const blockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (blockMatch) {
-        jsonStr = blockMatch[1].trim();
-    } else {
-        // 2. Try to find the first '{' or '[' and the last '}' or ']'
+    if (blockMatch) { jsonStr = blockMatch[1].trim(); }
+    else {
         const firstBrace = jsonStr.indexOf('{');
         const firstBracket = jsonStr.indexOf('[');
-        let start = -1;
-        let end = -1;
-
+        let start = -1; let end = -1;
         if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-            start = firstBrace;
-            end = jsonStr.lastIndexOf('}');
+            start = firstBrace; end = jsonStr.lastIndexOf('}');
         } else if (firstBracket !== -1) {
-            start = firstBracket;
-            end = jsonStr.lastIndexOf(']');
+            start = firstBracket; end = jsonStr.lastIndexOf(']');
         }
-
-        if (start !== -1 && end !== -1 && end > start) {
-            jsonStr = jsonStr.substring(start, end + 1);
-        }
+        if (start !== -1 && end !== -1 && end > start) { jsonStr = jsonStr.substring(start, end + 1); }
     }
-
-    // 3. Attempt initial parse
-    try {
-        return JSON.parse(jsonStr);
-    } catch (err) {
-        // 4. Heuristic cleanup for common LLM sloppy JSON
+    try { return JSON.parse(jsonStr); }
+    catch (err) {
         try {
-            // Remove thousands separators (e.g., 18,000,000 -> 18000000)
             let fixed = jsonStr.replace(/(\d),(\d{3}(?!\d))/g, '$1$2');
-
-            // Fix trailing commas in objects or arrays
             fixed = fixed.replace(/,\s*([\]}])/g, '$1');
-
             return JSON.parse(fixed);
         } catch (err2) {
             if (jsonStr.startsWith('{') || jsonStr.startsWith('[')) {
@@ -369,7 +405,6 @@ function parseJSON(raw) {
 async function extractKnowledgePanel(query, documents) {
     if (!documents || documents.length === 0) return null;
     const context = documents.slice(0, 4).map(d => `Source: ${d.url}\n${d.content.slice(0, 1000)}`).join('\n---\n');
-    
     const prompt = `You are an entity extractor. Based on the query and context, extract key statistics, facts, and entities about the subject of the search into a valid JSON object.
 Query: "${query}"
 Context:
@@ -412,20 +447,16 @@ Instructions:
 ASSISTANT:`;
 
     try {
-        const streamRes = await callPythonStream(prompt);
-        for await (const chunk of streamRes) {
-            const str = chunk.toString();
-            const lines = str.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataObj = JSON.parse(line.substring(6));
-                    if (dataObj.chunk) {
-                        yield JSON.stringify({ type: 'chunk', data: dataObj.chunk }) + '\n\n';
-                    } else if (dataObj.error) {
-                        yield JSON.stringify({ type: 'error', data: dataObj.error }) + '\n\n';
-                    }
-                }
-            }
+        let stream;
+        switch (BACKEND) {
+            case 'gemini':  stream = callGeminiStream(prompt); break;
+            case 'openai':  stream = callOpenAIStream(prompt); break;
+            case 'ollama':
+            default:        stream = callOllamaStream(prompt); break;
+        }
+
+        for await (const text of stream) {
+            yield JSON.stringify({ type: 'chunk', data: text }) + '\n\n';
         }
     } catch(err) {
         yield JSON.stringify({ type: 'error', data: err.message }) + '\n\n';

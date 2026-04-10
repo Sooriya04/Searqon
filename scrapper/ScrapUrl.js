@@ -141,7 +141,7 @@ async function ScrapUrl(url, options = {}) {
 
     return limiter.add(async () => {
         const startTime = Date.now();
-        const timeout = options.timeout || config.browser.timeout || 15000;
+        const timeout = options.timeout || config.browser.timeout || 10000;
         const format = options.format || 'markdown';
 
         try {

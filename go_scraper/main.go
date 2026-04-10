@@ -100,7 +100,7 @@ var noiseSelectors = []string{
 // ─── Stealth HTTP Client ─────────────────────────────────────────────────────
 
 var httpClient = &http.Client{
-	Timeout: 12 * time.Second,
+	Timeout: 8 * time.Second,
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return fmt.Errorf("too many redirects")
@@ -129,7 +129,7 @@ func fetchHTML(targetURL string) (string, *url.URL, int, error) {
 		return "", nil, 0, fmt.Errorf("invalid URL")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
