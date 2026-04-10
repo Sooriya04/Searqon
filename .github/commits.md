@@ -125,3 +125,8 @@ Implemented real-time token streaming for LLM responses using Server-Sent Events
 ### ISSUE 39 : Optimize search latency, introduce async extraction pipeline, and enforce structured LLM outputs
 
 Reduced meta-search latency by lowering engine timeouts from 15 seconds to 1.5 seconds, enabling near-instant browser results. Decoupled heavy scraping and extraction into an asynchronous background daemon that triggers alongside search requests and returns a summary_job_id for non-blocking frontend polling. Enhanced the extraction engine by enforcing a strict native JSON schema with high-detail output, minimizing hallucinations from local LLMs while preserving complete raw markdown for transparency and deeper user access.
+
+
+### ISSUE 40 : Re-architect Searqon to Node.js + Go, eliminate Python, achieve sub-100MB footprint
+
+Re-engineered Searqon into a streamlined, high-efficiency system by consolidating its multi-language architecture into a minimal 2-process model built on Node.js and Go. All Python dependencies were eliminated by migrating semantic intent classification and LLM streaming into native JavaScript, removing interpreter overhead entirely. Heavy dependencies like Puppeteer and Mongoose were decommissioned, and web extraction was rebuilt using a compiled Go-based scraper for near-zero runtime overhead. The Unified Search API was simplified to return raw JSON results, reducing processing latency, while system-wide optimizations brought response times under five seconds. With an integrated Go build pipeline and updated deployment workflow, the system is now optimized for fast, reliable execution in bare-metal environments with a total memory footprint under 100MB.

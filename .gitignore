@@ -13,3 +13,11 @@ oracle.md
 *txt
 testing/
 Talven/
+deployment
+
+# Searqon Binaries & DB
+go_scraper_bin
+*.sqlite
+*.sqlite-journal
+results/
+.DS_Store
