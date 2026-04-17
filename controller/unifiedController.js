@@ -21,6 +21,7 @@ const { searchGeeksForGeeks} = require("../services/geeksforgeeks");
 const { searchYoutube } = require("../services/youtube");
 const { routeQuery } = require("../services/classifierService");
 const config = require("../utils/configLoader");
+const { rerankResults } = require("../services/rerankService");
 
 const ALL_SOURCES = [
     { name: "arxiv",         fn: (q, l) => searchArxiv(q, l)         },
@@ -89,13 +90,17 @@ exports.unifiedSearchPost = async (req, res) => {
         }
 
         const taskResults = await Promise.all(searchPromises);
-        const flatResults = taskResults.flat();
+        let flatResults = taskResults.flat();
+
+        // 3. Intelligent Reranking
+        // The service logic handles node_rerank vs python_rerank
+        if (flatResults.length > 0) {
+            flatResults = await rerankResults(query, flatResults, maxResults);
+        }
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-        // 3. Return Flat JSON Array as requested
-        // Added a small "meta" header if needed, or just the array. 
-        // User said "send the json alone", so I'll send the array directly.
+        // 4. Return Flat JSON Array as requested
         res.set('X-Search-Duration', `${duration}s`);
         res.json(flatResults);
 

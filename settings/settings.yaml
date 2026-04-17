@@ -15,3 +15,5 @@ scraping:
 
 providers:
   talven: true
+  node_rerank: true
+  python_rerank: false

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
-const SETTINGS_PATH = path.join(__dirname, '../settings.yaml');
+const SETTINGS_PATH = path.join(__dirname, '../settings/settings.yaml');
 
 let config = null;
 

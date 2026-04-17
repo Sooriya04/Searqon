@@ -137,3 +137,7 @@ Upgraded the crawling pipeline by enhancing crawlController.js to support high-s
 ### ISSUE 42: integrate Talven meta-search, standardize query payloads, and add configurable search-layer toggle
 
 Integrated Talven as the primary meta-search engine, replacing DuckDuckGo as the default general web source and enhancing search coverage. Standardized all search endpoints to exclusively accept a `query` parameter within a JSON body payload, ensuring consistent request formatting. Added a new configuration option in `settings.yaml` to enable or disable the Talven provider, providing users with flexibility to control search sources while maintaining backward compatibility.
+
+### ISSUE 43: integrate Talven meta-search, standardize query payloads, and add configurable search-layer toggle
+
+Upgraded Searqon into a more resilient and modular extraction pipeline by adding Talven as a parallel meta-search provider alongside DuckDuckGo. Implemented a new `provider/talven.js` module, introduced intelligent result merging and deduplication across routing controllers, and ensured that higher-quality URLs are passed to the Go Scraper. Standardized the codebase by replacing `q` with `query` across request payloads for consistency, and improved architectural flexibility by documenting the flow in `endpoints.md` and adding a dynamic `settings.yaml` toggle to enable or disable the Talven search layer without code changes.

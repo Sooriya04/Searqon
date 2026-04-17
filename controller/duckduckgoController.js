@@ -1,5 +1,8 @@
 
 const { searchDuckDuckGo } = require("../services/duckduckgo");
+const { searchTalven }     = require("../provider/talven");
+const { rerankResults }    = require("../services/rerankService");
+const config               = require("../utils/configLoader");
 
 async function searchController(req, res) {
   const { query, maxResults = 5, includeRawContent = true } = req.body;
@@ -14,7 +17,32 @@ async function searchController(req, res) {
 
   try {
     const startTime = Date.now();
-    const results = await searchDuckDuckGo(query.trim(), maxResults);
+    const useTalven = config.providers?.talven !== false;
+    const useRerank = config.providers?.rerank !== false;
+
+    // 1. Parallel Discovery (DuckDuckGo + Talven)
+    const [ddgRes, talvenRes] = await Promise.all([
+      searchDuckDuckGo(query.trim(), maxResults).catch(() => []),
+      useTalven ? searchTalven(query.trim(), 3).catch(() => []) : Promise.resolve([])
+    ]);
+
+    // 2. Flatten and map results
+    let results = [...ddgRes, ...talvenRes.map(r => ({ ...r, source: 'talven' }))];
+    
+    // Deduplicate by URL
+    const seen = new Set();
+    results = results.filter(r => {
+      if (!r.url || seen.has(r.url)) return false;
+      seen.add(r.url);
+      return true;
+    });
+
+    // 3. Intelligent Reranking
+    // The service internally handles node_rerank vs python_rerank toggles
+    if (results.length > 0) {
+      results = await rerankResults(query.trim(), results, maxResults);
+    }
+
     const responseTime = Date.now() - startTime;
     
     return res.status(200).json({
@@ -24,11 +52,10 @@ async function searchController(req, res) {
         title: r.title,
         url:   r.url,
         content: r.content,
-        rawContent: includeRawContent ? r.rawContent : undefined,
+        explanation: r.explanation, // New field from reranker
         score: r.score,
         metadata: {
-          publishedDate: r.publishedDate || null,
-          author: r.author || null,
+          source: r.source || 'duckduckgo',
           duration: `${responseTime}ms`
         }
       })),
