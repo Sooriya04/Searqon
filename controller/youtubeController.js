@@ -1,23 +1,23 @@
 const { searchYoutube } = require("../services/youtube");
 
 async function youtubeSearchController(req, res) {
-  const { q, maxResults = 5 } = req.body;
+  const { query, maxResults = 5 } = req.body;
 
   // Validate input
-  if (!q || typeof q !== "string" || q.trim().length === 0) {
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
     return res.status(400).json({
       error: "Invalid request body",
-      message: "`q` must be a non-empty string",
+      message: "`query` must be a non-empty string",
     });
   }
 
   try {
     const startTime = Date.now();
-    const results = await searchYoutube(q.trim(), maxResults);
+    const results = await searchYoutube(query.trim(), maxResults);
     const responseTime = Date.now() - startTime;
     
     return res.status(200).json({
-      query: q.trim(),
+      query: query.trim(),
       responseTime,
       results: results.map((r) => ({
         title: r.title,

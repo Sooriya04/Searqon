@@ -3,12 +3,12 @@ const { searchHNByQuery } = require("../services/hackernews");
 async function hackerNewsController(req, res){
     try{
 
-        const { q } = req.body;
-        const result = await searchHNByQuery(q);
+        const { query } = req.body;
+        const result = await searchHNByQuery(query);
         return res.status(200)
         .json({
             success : true,
-            query : q,
+            query : query,
             data : result
         })
 

@@ -2,24 +2,24 @@
 const { searchDuckDuckGo } = require("../services/duckduckgo");
 
 async function searchController(req, res) {
-  const { q, maxResults = 5, includeRawContent = true } = req.body;
+  const { query, maxResults = 5, includeRawContent = true } = req.body;
 
   // Validate input
-  if (!q || typeof q !== "string" || q.trim().length === 0) {
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
     return res.status(400).json({
       error: "Invalid request body",
-      message: "`q` must be a non-empty string",
+      message: "`query` must be a non-empty string",
     });
   }
 
   try {
     const startTime = Date.now();
-    const results = await searchDuckDuckGo(q.trim(), maxResults);
+    const results = await searchDuckDuckGo(query.trim(), maxResults);
     const responseTime = Date.now() - startTime;
     
     return res.status(200).json({
       success: true,
-      query:   q.trim(),
+      query:   query.trim(),
       results: results.map((r) => ({
         title: r.title,
         url:   r.url,

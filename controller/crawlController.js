@@ -13,7 +13,9 @@
  */
 
 const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
+const { searchTalven }   = require('../provider/talven');
 const { searchDuckDuckGo } = require('../services/duckduckgo');
+const config = require('../utils/configLoader');
 
 const GO_SCRAPER_URL   = 'http://127.0.0.1:3002';
 const SCRAPER_TIMEOUT  = 30000; // ms
@@ -331,9 +333,19 @@ exports.search = async (req, res) => {
 
         console.log(`[Crawl] Search (Firecrawl style): "${query}" (limit: ${limit})`);
 
-        // Perform the search and scrape in one go using the DuckDuckGo service
-        // (which we just updated to scrape all results with markdown)
-        const results = await searchDuckDuckGo(query, limit);
+        // Perform the search and scrape in parallel using both providers
+        const useTalven = config.providers?.talven !== false;
+        const [talvenRes, ddgRes] = await Promise.all([
+            useTalven ? searchTalven(query, 3).catch(() => []) : Promise.resolve([]),
+            searchDuckDuckGo(query, limit).catch(() => [])
+        ]);
+
+        const seen = new Set();
+        const results = [...ddgRes, ...talvenRes].filter(r => {
+            if (!r || !r.url || seen.has(r.url)) return false;
+            seen.add(r.url);
+            return true;
+        });
 
         return res.json({
             success: true,
@@ -390,9 +402,14 @@ exports.extract = async (req, res) => {
         // If no URLs are provided, but a query is, perform a search first
         if (!targetUrls || targetUrls.length === 0) {
             if (query) {
-                console.log(`[Crawl] Extract-Search: Performing search for query: "${query}"`);
-                const searchResults = await searchDuckDuckGo(query, limit);
-                targetUrls = searchResults.map(r => r.url);
+                console.log(`[Crawl] Extract-Search: Performing parallel search for query: "${query}"`);
+                const useTalven = config.providers?.talven !== false;
+                const [talvenRes, ddgRes] = await Promise.all([
+                    useTalven ? searchTalven(query, 3).catch(() => []) : Promise.resolve([]),
+                    searchDuckDuckGo(query, limit).catch(() => [])
+                ]);
+                const combinedUrls = [...ddgRes, ...talvenRes].map(r => r.url).filter(Boolean);
+                targetUrls = [...new Set(combinedUrls)];
             }
         }
 

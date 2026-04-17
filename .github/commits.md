@@ -126,12 +126,14 @@ Implemented real-time token streaming for LLM responses using Server-Sent Events
 
 Reduced meta-search latency by lowering engine timeouts from 15 seconds to 1.5 seconds, enabling near-instant browser results. Decoupled heavy scraping and extraction into an asynchronous background daemon that triggers alongside search requests and returns a summary_job_id for non-blocking frontend polling. Enhanced the extraction engine by enforcing a strict native JSON schema with high-detail output, minimizing hallucinations from local LLMs while preserving complete raw markdown for transparency and deeper user access.
 
-
 ### ISSUE 40 : Re-architect Searqon to Node.js + Go, eliminate Python, achieve sub-100MB footprint
 
 Re-engineered Searqon into a streamlined, high-efficiency system by consolidating its multi-language architecture into a minimal 2-process model built on Node.js and Go. All Python dependencies were eliminated by migrating semantic intent classification and LLM streaming into native JavaScript, removing interpreter overhead entirely. Heavy dependencies like Puppeteer and Mongoose were decommissioned, and web extraction was rebuilt using a compiled Go-based scraper for near-zero runtime overhead. The Unified Search API was simplified to return raw JSON results, reducing processing latency, while system-wide optimizations brought response times under five seconds. With an integrated Go build pipeline and updated deployment workflow, the system is now optimized for fast, reliable execution in bare-metal environments with a total memory footprint under 100MB.
 
-
 ### ISSUE 41 : enable batch crawling support and align documentation with new 2-process architecture
 
 Upgraded the crawling pipeline by enhancing crawlController.js to support high-speed batch processing, allowing the scrape endpoint to handle both individual URLs and arrays of links while returning results in a consistent, ultra-minimal flat JSON format aligned with the unified search engine. In parallel, performed a comprehensive overhaul of the entire documentation suite, including README.md, setup.md, and all supporting docs, to accurately reflect the new streamlined 2-process architecture built on Node.js and Go. All legacy references to deprecated Python microservices, outdated port configurations, and Puppeteer-based workflows were removed and replaced with updated specifications highlighting the system’s optimized ~50MB RAM footprint and sub-5-second performance benchmarks.
+
+### ISSUE 42: integrate Talven meta-search, standardize query payloads, and add configurable search-layer toggle
+
+Integrated Talven as the primary meta-search engine, replacing DuckDuckGo as the default general web source and enhancing search coverage. Standardized all search endpoints to exclusively accept a `query` parameter within a JSON body payload, ensuring consistent request formatting. Added a new configuration option in `settings.yaml` to enable or disable the Talven provider, providing users with flexibility to control search sources while maintaining backward compatibility.

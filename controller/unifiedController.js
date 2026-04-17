@@ -8,17 +8,19 @@
 const { searchArxiv }        = require("../services/arxiv");
 const { searchDOAJ }         = require("../services/doaj");
 const { searchMedRxiv }      = require("../services/medrxiv");
+const { searchTalven }       = require("../provider/talven");
 const { searchDuckDuckGo }   = require("../services/duckduckgo");
 const { searchOpenAlex }     = require("../services/openalex");
 const { searchPubMed }       = require("../services/pubmed");
 const { searchHNByQuery }    = require("../services/hackernews");
-const { wikiSearch }         = require("../services/wiki");
+const { wikiSearch } = require("../services/wiki");
 const { searchWithReadmes }  = require("../services/github");
-const { reddit }             = require("../services/reddit");
-const { searchWeb }          = require("../services/web");
+const { reddit } = require("../services/reddit");
+const { searchWeb } = require("../services/web");
 const { searchGeeksForGeeks} = require("../services/geeksforgeeks");
-const { searchYoutube }      = require("../services/youtube");
-const { routeQuery }         = require("../services/classifierService");
+const { searchYoutube } = require("../services/youtube");
+const { routeQuery } = require("../services/classifierService");
+const config = require("../utils/configLoader");
 
 const ALL_SOURCES = [
     { name: "arxiv",         fn: (q, l) => searchArxiv(q, l)         },
@@ -34,6 +36,7 @@ const ALL_SOURCES = [
     { name: "youtube",       fn: (q, l) => searchYoutube(q, l)       },
     { name: "web",           fn: (q, l) => searchWeb(q, l)           },
     { name: "duckduckgo",    fn: (q, l) => searchDuckDuckGo(q, l)    },
+    { name: "talven",        fn: (q, l) => searchTalven(q, l)        },
 ];
 
 const SOURCE_MAP = Object.fromEntries(ALL_SOURCES.map((s) => [s.name, s]));
@@ -68,12 +71,21 @@ exports.unifiedSearchPost = async (req, res) => {
 
         // 1. Route Query
         const routing = await routeQuery(query);
-        const domainSources = routing.sources.filter(s => s !== "duckduckgo");
+        const domainSources = routing.sources.filter(s => s !== "duckduckgo" && s !== "talven");
         
         // 2. Parallel Search
         const searchPromises = domainSources.map(name => runSource(name, query, maxResults));
-        if (routing.sources.includes("duckduckgo")) {
+        
+        const useTalven = config.providers?.talven !== false;
+        
+        // Always include DuckDuckGo as the normal web search baseline if general search is needed
+        if (routing.sources.includes("duckduckgo") || routing.sources.includes("talven") || routing.sources.length === 0) {
             searchPromises.push(runSource("duckduckgo", query, maxResults));
+        }
+        
+        // If Talven is enabled, it ALWAYS adds 3 additional results on top of the limit
+        if (useTalven) {
+            searchPromises.push(runSource("talven", query, 3));
         }
 
         const taskResults = await Promise.all(searchPromises);

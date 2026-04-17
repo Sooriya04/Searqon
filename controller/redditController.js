@@ -2,17 +2,17 @@ const { reddit } = require("../services/reddit");
 
 async function redditController(req, res) {
     try {
-        const {q} = req.body;
-        if(!q){
+        const { query } = req.body;
+        if(!query){
             return res.status(400).json({
-                error : "Query parameter 'q' is required" 
+                error : "Query parameter 'query' is required" 
             });
         }
-        const results = await reddit(q);
+        const results = await reddit(query);
 
         return res.json({
             source : "reddit",
-            query : q,
+            query : query,
             count : results.length,
             results
         })

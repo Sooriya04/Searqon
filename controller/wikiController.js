@@ -2,19 +2,19 @@ const { wikiSearch } = require("../services/wiki");
 
 async function wikiController(req, res) {
     try {
-        const { q } = req.body;
-        if (!q) {
+        const { query } = req.body;
+        if (!query) {
             return res
                 .status(400)
                 .json({
-                    error: "Query parameter 'q' is required"
+                    error: "Query parameter 'query' is required"
                 });
         }
-        const result = await wikiSearch(q);
+        const result = await wikiSearch(query);
 
         return res.json({
             source: "Wiki search",
-            query: q,
+            query: query,
             count: 1,
             result
         })

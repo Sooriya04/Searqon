@@ -1,13 +1,29 @@
 const ScrapUrl = require('../scrapper/ScrapUrl');
+const config = require('../utils/configLoader');
 
 async function searchWeb(query, limit = 1) {
     // Basic URL validation
     try {
         new URL(query);
     } catch (_) {
-        // Not a URL, fallback to general search (DuckDuckGo)
+        // Not a URL, fallback to general search (Talven + DuckDuckGo)
         const { searchDuckDuckGo } = require('./duckduckgo');
-        const results = await searchDuckDuckGo(query, limit);
+        const { searchTalven } = require('../provider/talven');
+        
+        const useTalven = config.providers?.talven !== false;
+        
+        const [talvenRes, ddgRes] = await Promise.all([
+            useTalven ? searchTalven(query, 3).catch(() => []) : Promise.resolve([]),
+            searchDuckDuckGo(query, limit).catch(() => [])
+        ]);
+
+        const seen = new Set();
+        const results = [...ddgRes, ...talvenRes].filter(r => {
+            if (!r || !r.url || seen.has(r.url)) return false;
+            seen.add(r.url);
+            return true;
+        });
+
         return results.map(r => ({ ...r, source: 'web' }));
     }
 

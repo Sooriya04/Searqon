@@ -3,19 +3,19 @@ const { searchWithReadmes } = require("../services/github");
 
 async function githubSearchWithReadmeController(req, res) {
   try {
-    const { q } = req.body;
+    const { query } = req.body;
 
-    if (!q) {
+    if (!query) {
       return res.status(400).json({
         error: "Query parameter 'q' is required"
       });
     }
 
-    const results = await searchWithReadmes(q);
+    const results = await searchWithReadmes(query);
 
     return res.json({
       source: "github",
-      query: q,
+      query: query,
       count: results.length,
       results
     });

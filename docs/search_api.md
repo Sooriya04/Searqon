@@ -30,16 +30,17 @@ Searqon’s intelligence layer processes every query through three distinct phas
 The **Native JS Intelligence Engine** classifies the query to determine the best data sources (e.g., academic, news, tech, or general web) in under 1ms. No external LLM or Python process is required.
 
 ### Phase 2: Parallel Domain Retrieval
-Executes concurrent searches across specialized providers (GitHub, PubMed, Arxiv, Reddit, etc.) based on the routing strategy and always includes a broad web search baseline.
+Executes concurrent searches across specialized providers (GitHub, PubMed, Arxiv, Reddit, etc.) based on the routing strategy. 
+**Crucially**, it always includes a massive web search baseline powered by **Talven** (an aggregated Meta-Search API via SearXNG) running in parallel with DuckDuckGo. It deduplicates and merges these URLs to ensure absolute maximum coverage before scraping.
 
 ### Phase 3: High-Performance Extraction
-The **Go Scraper Binary** fetches and cleans the content of the top matches in parallel. It strips away ads, navigation, and junk to deliver only the relevant text or Markdown.
+The **Go Scraper Binary** fetches and cleans the content of the top matches in parallel. It completely parses pages into LLM-ready **Markdown** format, using an advanced Readability algorithm that scales to any unknown URL.
 
 ---
 
 ## 📦 Direct JSON Response Format
 
-By default, the Unified API returns a flat, ultra-minimal JSON array for immediate use in client-side applications or LLM prompts.
+By default, the Unified API returns a flat, ultra-minimal JSON array for immediate use in client-side applications or downstream NLP architectures (like Local IR semantic rankers).
 
 **X-Search-Duration Header**: Indicates total execution time (e.g., `2.5s`).
 
@@ -51,7 +52,7 @@ By default, the Unified API returns a flat, ultra-minimal JSON array for immedia
     "title": "Kotlin Programming Language",
     "url": "https://kotlinlang.org/",
     "content": "Kotlin is a modern, cross-platform, multi-purpose programming language...",
-    "source": "duckduckgo"
+    "source": "talven"
   },
   {
     "title": "Kotlin Tutorial - GeeksforGeeks",

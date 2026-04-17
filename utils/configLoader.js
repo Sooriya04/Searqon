@@ -28,6 +28,9 @@ function loadConfig() {
             scraping: {
                 block_resources: ["image", "stylesheet", "font", "media"],
                 user_agent: "Searqon/1.0"
+            },
+            providers: {
+                talven: true
             }
         };
     }
