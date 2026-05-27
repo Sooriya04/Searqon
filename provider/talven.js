@@ -34,18 +34,46 @@ async function fetchTalvenResults(query, categories = '') {
     }
 }
 
-async function searchTalven(query, limit = 5, categories = '') {
+async function searchTalven(query, limit = 5, categories = '', options = {}) {
+    // If the 3rd argument is an object (i.e. options was passed as the 3rd arg), swap them
+    let opt = options;
+    let cats = categories;
+    if (typeof categories === 'object') {
+        opt = categories;
+        cats = '';
+    }
+
     console.log(`[TalvenProvider] Searching for: "${query}" (limit: ${limit})`);
 
     let rawResults = [];
     try {
-        rawResults = await fetchTalvenResults(query, categories);
+        rawResults = await fetchTalvenResults(query, cats);
     } catch (e) {
         console.warn(`[TalvenProvider] Search failed: ${e.message}. Talven must be running on ${TALVEN_URL}`);
         return [];
     }
 
     const sliced = rawResults.slice(0, limit);
+
+    if (opt.skipScrape) {
+        console.log(`[TalvenProvider] Skipping page scraping, returning raw metadata/snippets only.`);
+        return sliced.map(result => ({
+            query: query,
+            source: 'talven',
+            title: result.title,
+            url: result.url,
+            content: cleanSearchSnippet(result.content),
+            markdown: null,
+            score: result.score || 0.8,
+            wordCount: result.content ? result.content.split(/\s+/).length : 0,
+            metadata: {
+                snippet: result.content || '',
+                extraction_method: 'snippet_only',
+                engine: result.engine || 'multiple'
+            }
+        }));
+    }
+
     console.log(`[TalvenProvider] Scraping top ${sliced.length} results in parallel using Go Batch Api...`);
     
     // Extract URLs to batch

@@ -1,7 +1,7 @@
 const ScrapUrl = require('../scrapper/ScrapUrl');
 const config = require('../utils/configLoader');
 
-async function searchWeb(query, limit = 1) {
+async function searchWeb(query, limit = 1, options = {}) {
     // Basic URL validation
     try {
         new URL(query);
@@ -13,8 +13,8 @@ async function searchWeb(query, limit = 1) {
         const useTalven = config.providers?.talven !== false;
         
         const [talvenRes, ddgRes] = await Promise.all([
-            useTalven ? searchTalven(query, 3).catch(() => []) : Promise.resolve([]),
-            searchDuckDuckGo(query, limit).catch(() => [])
+            useTalven ? searchTalven(query, 3, options).catch(() => []) : Promise.resolve([]),
+            searchDuckDuckGo(query, limit, options).catch(() => [])
         ]);
 
         const seen = new Set();

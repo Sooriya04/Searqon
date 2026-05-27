@@ -104,19 +104,9 @@ exports.scrape = async (req, res) => {
             return res.status(400).json({ success: false, error: 'url is required' });
         }
 
-        console.log(`[Crawl] Scrape: ${url} (format: ${format}, js: ${useJs})`);
-
-        if (useJs) {
-            return await handleJsScrape(url, format, res);
-        }
+        console.log(`[Crawl] Scrape: ${url} (format: ${format})`);
 
         const data = await goPost('/scrape', { url, format });
-
-        // Auto-fallback to Puppeteer if Go returns too little
-        if (!data.error && data.wordCount < 30) {
-            console.log(`[Crawl] Sparse content (${data.wordCount} words), trying JS fallback...`);
-            return await handleJsScrape(url, format, res);
-        }
 
         return res.json({
             success:   !data.error,
@@ -135,57 +125,6 @@ exports.scrape = async (req, res) => {
         return res.status(500).json({ success: false, error: err.message });
     }
 };
-
-// ─── JS Rendering via Puppeteer ───────────────────────────────────────────────
-
-async function handleJsScrape(url, format, res) {
-    let browser = null;
-    try {
-        const puppeteer = require('puppeteer');
-        browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
-
-        const page = await browser.newPage();
-
-        // Block heavy resources to speed up load
-        await page.setRequestInterception(true);
-        page.on('request', r => {
-            if (['image', 'stylesheet', 'font', 'media'].includes(r.resourceType())) {
-                r.abort();
-            } else {
-                r.continue();
-            }
-        });
-
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/121.0.0.0 Safari/537.36');
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await new Promise(r => setTimeout(r, 1500));
-
-        const title = await page.title();
-
-        // Feed rendered URL back through Go for clean extraction
-        const data = await goPost('/scrape', { url, format });
-
-        return res.json({
-            success:   true,
-            url,
-            title:     title || data.title,
-            content:   data.content,
-            markdown:  data.markdown || null,
-            wordCount: data.wordCount,
-            engine:    'puppeteer_js',
-            error:     null
-        });
-
-    } catch (err) {
-        console.error(`[Crawl] JS scrape error:`, err.message);
-        return res.status(500).json({ success: false, error: `JS rendering failed: ${err.message}` });
-    } finally {
-        if (browser) await browser.close();
-    }
-}
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
@@ -223,7 +162,7 @@ exports.map = async (req, res) => {
 
 exports.crawl = async (req, res) => {
     try {
-        const { url, limit = 30, depth = 2, format = 'markdown', webhook } = req.body;
+        const { url, limit = 30, depth = 2, format = 'markdown', webhook, stream = false } = req.body;
 
         if (!url) {
             return res.status(400).json({ success: false, error: 'url is required' });
@@ -231,6 +170,45 @@ exports.crawl = async (req, res) => {
 
         const safeLimit = Math.min(limit, 100);
         const safeDepth = Math.min(depth, 5);
+
+        const isStreaming = stream === true || req.query.stream === 'true';
+
+        if (isStreaming) {
+            console.log(`[Crawl] Starting Streaming Crawl: ${url} (limit: ${safeLimit}, depth: ${safeDepth})`);
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
+
+            try {
+                const response = await fetch(`${GO_SCRAPER_URL}/crawl`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, limit: safeLimit, depth: safeDepth, format, stream: true })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    res.write(`event: error\ndata: ${JSON.stringify({ error: text })}\n\n`);
+                    res.end();
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    res.write(chunk);
+                }
+            } catch (err) {
+                res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+            }
+            res.end();
+            return;
+        }
 
         console.log(`[Crawl] Job Created: ${url} (limit: ${safeLimit}, depth: ${safeDepth})`);
 
@@ -331,34 +309,62 @@ exports.search = async (req, res) => {
             return res.status(400).json({ success: false, error: 'query is required' });
         }
 
-        console.log(`[Crawl] Search (Firecrawl style): "${query}" (limit: ${limit})`);
+        console.log(`[Crawl] Parallelized Search (Firecrawl style): "${query}" (limit: ${limit})`);
 
-        // Perform the search and scrape in parallel using both providers
+        // Perform the discovery phase in parallel without scraping
         const useTalven = config.providers?.talven !== false;
         const [talvenRes, ddgRes] = await Promise.all([
-            useTalven ? searchTalven(query, 3).catch(() => []) : Promise.resolve([]),
-            searchDuckDuckGo(query, limit).catch(() => [])
+            useTalven ? searchTalven(query, 3, { skipScrape: true }).catch(() => []) : Promise.resolve([]),
+            searchDuckDuckGo(query, limit, { skipScrape: true }).catch(() => [])
         ]);
 
+        // Merge and deduplicate discovery results by URL
         const seen = new Set();
-        const results = [...ddgRes, ...talvenRes].filter(r => {
+        const rawResults = [...ddgRes, ...talvenRes].filter(r => {
             if (!r || !r.url || seen.has(r.url)) return false;
             seen.add(r.url);
             return true;
         });
 
+        // Slice to limit
+        const finalResults = rawResults.slice(0, limit);
+
+        // Fetch page content of final results concurrently
+        const urlsToScrape = finalResults.map(r => r.url).filter(Boolean);
+        let scrapedDataMap = {};
+        if (urlsToScrape.length > 0) {
+            const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
+            console.log(`[Crawl] Scraping final ${urlsToScrape.length} search results concurrently using Go Batch Scraper...`);
+            try {
+                const batchResults = await ScrapUrlBatch(urlsToScrape, { format: 'markdown' });
+                batchResults.forEach(scraped => {
+                    if (scraped && scraped.url) {
+                        scrapedDataMap[scraped.url] = scraped;
+                    }
+                });
+            } catch (err) {
+                console.warn(`[Crawl] Batch scraping search results failed:`, err.message);
+            }
+        }
+
         return res.json({
             success: true,
             query,
-            totalResults: results.length,
-            data: results.map(r => ({
-                url: r.url,
-                title: r.title,
-                markdown: r.markdown,
-                content: r.content,
-                score: r.score,
-                metadata: r.metadata
-            }))
+            totalResults: finalResults.length,
+            data: finalResults.map(r => {
+                const pageData = scrapedDataMap[r.url];
+                return {
+                    url:      r.url,
+                    title:    (pageData && pageData.title) || r.title,
+                    markdown: (pageData && pageData.markdown) || null,
+                    content:  (pageData && pageData.content) || r.content,
+                    score:    r.score,
+                    metadata: {
+                        ...r.metadata,
+                        extraction_method: pageData ? 'parallel_go_batch' : 'snippet_only'
+                    }
+                };
+            })
         });
 
     } catch (err) {

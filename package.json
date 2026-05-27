@@ -19,9 +19,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:go": "cd go_scraper && go build -o ../go_scraper_bin main.go",
+    "build:go": "cd go_scraper && go build -o ../go_scraper_bin .",
     "start": "npm run build:go && npx concurrently \"node server.js\" \"./go_scraper_bin\"",
-    "dev": "npx concurrently \"npx nodemon server.js\" \"cd go_scraper && go run main.go\"",
+    "dev": "npx concurrently \"npx nodemon server.js\" \"cd go_scraper && go run .\"",
     "db": "node database/server.js",
     "db:dev": "npx nodemon database/server.js"
   },

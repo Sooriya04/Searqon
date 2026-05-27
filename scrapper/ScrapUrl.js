@@ -141,7 +141,7 @@ async function ScrapUrl(url, options = {}) {
 
     return limiter.add(async () => {
         const startTime = Date.now();
-        const timeout = options.timeout || config.browser.timeout || 10000;
+        const timeout = options.timeout || config.browser.timeout || 2500;
         const format = options.format || 'markdown';
 
         try {
@@ -175,7 +175,7 @@ async function ScrapUrlBatch(urls, options = {}) {
     const validUrls = urls.filter(u => !BINARY_EXTENSIONS.test(u));
     if (validUrls.length === 0) return [];
 
-    const timeout = options.timeout || config.browser.timeout || 15000;
+    const timeout = options.timeout || config.browser.timeout || 3000;
     const format = options.format || 'markdown';
 
     // Separate bypass URLs (GitHub, YouTube) from normal ones

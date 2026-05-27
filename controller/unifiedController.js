@@ -24,31 +24,31 @@ const config = require("../utils/configLoader");
 const { rerankResults } = require("../services/rerankService");
 
 const ALL_SOURCES = [
-    { name: "arxiv",         fn: (q, l) => searchArxiv(q, l)         },
-    { name: "doaj",          fn: (q, l) => searchDOAJ(q, l)          },
-    { name: "medrxiv",       fn: (q, l) => searchMedRxiv(q, l)       },
-    { name: "openalex",      fn: (q, l) => searchOpenAlex(q, l)      },
-    { name: "pubmed",        fn: (q, l) => searchPubMed(q, l)        },
-    { name: "hackernews",    fn: (q, l) => searchHNByQuery(q, l)     },
-    { name: "wikipedia",     fn: (q)    => wikiSearch(q)             },
-    { name: "github",        fn: (q, l) => searchWithReadmes(q, l)   },
-    { name: "reddit",        fn: (q, l) => reddit(q, l)              },
-    { name: "geeksforgeeks", fn: (q, l) => searchGeeksForGeeks(q, l) },
-    { name: "youtube",       fn: (q, l) => searchYoutube(q, l)       },
-    { name: "web",           fn: (q, l) => searchWeb(q, l)           },
-    { name: "duckduckgo",    fn: (q, l) => searchDuckDuckGo(q, l)    },
-    { name: "talven",        fn: (q, l) => searchTalven(q, l)        },
+    { name: "arxiv",         fn: (q, l)         => searchArxiv(q, l)                                },
+    { name: "doaj",          fn: (q, l)         => searchDOAJ(q, l)                                 },
+    { name: "medrxiv",       fn: (q, l)         => searchMedRxiv(q, l)                              },
+    { name: "openalex",      fn: (q, l)         => searchOpenAlex(q, l)                             },
+    { name: "pubmed",        fn: (q, l)         => searchPubMed(q, l)                               },
+    { name: "hackernews",    fn: (q, l)         => searchHNByQuery(q, l)                            },
+    { name: "wikipedia",     fn: (q)            => wikiSearch(q)                                    },
+    { name: "github",        fn: (q, l)         => searchWithReadmes(q, l)                          },
+    { name: "reddit",        fn: (q, l)         => reddit(q, l)                                     },
+    { name: "geeksforgeeks", fn: (q, l)         => searchGeeksForGeeks(q, l)                        },
+    { name: "youtube",       fn: (q, l)         => searchYoutube(q, l)                              },
+    { name: "web",           fn: (q, l, options) => searchWeb(q, l, options)                          },
+    { name: "duckduckgo",    fn: (q, l, options) => searchDuckDuckGo(q, l, options)                   },
+    { name: "talven",        fn: (q, l, options) => searchTalven(q, l, options)                       },
 ];
 
 const SOURCE_MAP = Object.fromEntries(ALL_SOURCES.map((s) => [s.name, s]));
 
-async function runSource(name, query, limit) {
+async function runSource(name, query, limit, options = {}) {
     const def = SOURCE_MAP[name];
     if (!def) return [];
     try {
         const raw = await Promise.race([
-            def.fn(query, limit),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+            def.fn(query, limit, options),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1800))
         ]);
         const data = (raw.results || (Array.isArray(raw) ? raw : [raw])).filter(Boolean);
         return data.map(item => ({
@@ -74,19 +74,20 @@ exports.unifiedSearchPost = async (req, res) => {
         const routing = await routeQuery(query);
         const domainSources = routing.sources.filter(s => s !== "duckduckgo" && s !== "talven");
         
-        // 2. Parallel Search
-        const searchPromises = domainSources.map(name => runSource(name, query, maxResults));
+        // 2. Parallel Search Discovery (Skip scraping initially to minimize latency/bandwidth)
+        const options = { skipScrape: true };
+        const searchPromises = domainSources.map(name => runSource(name, query, maxResults, options));
         
         const useTalven = config.providers?.talven !== false;
         
         // Always include DuckDuckGo as the normal web search baseline if general search is needed
         if (routing.sources.includes("duckduckgo") || routing.sources.includes("talven") || routing.sources.length === 0) {
-            searchPromises.push(runSource("duckduckgo", query, maxResults));
+            searchPromises.push(runSource("duckduckgo", query, maxResults, options));
         }
         
         // If Talven is enabled, it ALWAYS adds 3 additional results on top of the limit
         if (useTalven) {
-            searchPromises.push(runSource("talven", query, 3));
+            searchPromises.push(runSource("talven", query, 3, options));
         }
 
         const taskResults = await Promise.all(searchPromises);
@@ -98,11 +99,45 @@ exports.unifiedSearchPost = async (req, res) => {
             flatResults = await rerankResults(query, flatResults, maxResults);
         }
 
+        // 4. Parallel Page Scraping Phase (Only scrape the final top reranked results!)
+        const urlsToScrape = flatResults.map(r => r.url).filter(Boolean);
+        let scrapedDataMap = {};
+        if (urlsToScrape.length > 0) {
+            const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
+            console.log(`[Unified] Scraping final ${urlsToScrape.length} search results concurrently using Go Batch Scraper...`);
+            try {
+                const batchResults = await ScrapUrlBatch(urlsToScrape, { format: 'markdown' });
+                batchResults.forEach(scraped => {
+                    if (scraped && scraped.url) {
+                        scrapedDataMap[scraped.url] = scraped;
+                    }
+                });
+            } catch (err) {
+                console.warn(`[Unified] Batch scraping search results failed:`, err.message);
+            }
+        }
+
+        // Map scraped content back to flatResults
+        const richResults = flatResults.map(r => {
+            const pageData = scrapedDataMap[r.url];
+            return {
+                title:    (pageData && pageData.title) || r.title,
+                url:      r.url,
+                content:  (pageData && pageData.content) || r.content,
+                markdown: (pageData && pageData.markdown) || null,
+                source:   r.source,
+                metadata: {
+                    snippet: r.content,
+                    extraction_method: pageData ? 'parallel_go_batch' : 'snippet_only'
+                }
+            };
+        });
+
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-        // 4. Return Flat JSON Array as requested
+        // 5. Return Flat JSON Array as requested
         res.set('X-Search-Duration', `${duration}s`);
-        res.json(flatResults);
+        res.json(richResults);
 
     } catch (error) {
         res.status(500).json({ error: error.message });

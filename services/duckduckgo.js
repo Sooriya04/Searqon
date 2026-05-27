@@ -49,11 +49,30 @@ function parseSearchResults(html) {
   return results;
 }
 
-async function searchDuckDuckGo(query, limit = 5) {
+async function searchDuckDuckGo(query, limit = 5, options = {}) {
   console.log(`[DuckDuckGo] Searching for: "${query}"`);
 
   const rawResults = await fetchSearchResults(query);
   const sliced = rawResults.slice(0, limit);
+
+  if (options.skipScrape) {
+    console.log(`[DuckDuckGo] Skipping page scraping, returning raw metadata/snippets only.`);
+    return sliced.map(result => ({
+      query: query,
+      source: 'duckduckgo',
+      title: result.title,
+      url: result.url,
+      content: cleanSearchSnippet(result.snippet),
+      markdown: null,
+      score: 0.5,
+      wordCount: result.snippet ? result.snippet.split(/\s+/).length : 0,
+      metadata: {
+        snippet: result.snippet || '',
+        extraction_method: 'snippet_only'
+      }
+    }));
+  }
+
   console.log(`[DuckDuckGo] Scraping top ${sliced.length} results in parallel using Go Batch Api...`);
   
   // Extract URLs to batch

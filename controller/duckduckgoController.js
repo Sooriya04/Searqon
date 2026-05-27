@@ -20,10 +20,10 @@ async function searchController(req, res) {
     const useTalven = config.providers?.talven !== false;
     const useRerank = config.providers?.rerank !== false;
 
-    // 1. Parallel Discovery (DuckDuckGo + Talven)
+    // 1. Parallel Discovery (DuckDuckGo + Talven) - Skip page scraping to minimize discovery latency
     const [ddgRes, talvenRes] = await Promise.all([
-      searchDuckDuckGo(query.trim(), maxResults).catch(() => []),
-      useTalven ? searchTalven(query.trim(), 3).catch(() => []) : Promise.resolve([])
+      searchDuckDuckGo(query.trim(), maxResults, { skipScrape: true }).catch(() => []),
+      useTalven ? searchTalven(query.trim(), 3, { skipScrape: true }).catch(() => []) : Promise.resolve([])
     ]);
 
     // 2. Flatten and map results
@@ -43,22 +43,45 @@ async function searchController(req, res) {
       results = await rerankResults(query.trim(), results, maxResults);
     }
 
+    // 4. Parallel Page Scraping Phase (Only scrape the final top reranked results!)
+    const urlsToScrape = results.map(r => r.url).filter(Boolean);
+    let scrapedDataMap = {};
+    if (urlsToScrape.length > 0) {
+      const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
+      console.log(`[SearchController] Scraping final ${urlsToScrape.length} search results concurrently using Go Batch Scraper...`);
+      try {
+        const batchResults = await ScrapUrlBatch(urlsToScrape, { format: 'markdown' });
+        batchResults.forEach(scraped => {
+          if (scraped && scraped.url) {
+            scrapedDataMap[scraped.url] = scraped;
+          }
+        });
+      } catch (err) {
+        console.warn(`[SearchController] Batch scraping search results failed:`, err.message);
+      }
+    }
+
     const responseTime = Date.now() - startTime;
     
     return res.status(200).json({
       success: true,
       query:   query.trim(),
-      results: results.map((r) => ({
-        title: r.title,
-        url:   r.url,
-        content: r.content,
-        explanation: r.explanation, // New field from reranker
-        score: r.score,
-        metadata: {
-          source: r.source || 'duckduckgo',
-          duration: `${responseTime}ms`
-        }
-      })),
+      results: results.map((r) => {
+        const pageData = scrapedDataMap[r.url];
+        return {
+          title:       (pageData && pageData.title) || r.title,
+          url:         r.url,
+          content:     (pageData && pageData.content) || r.content,
+          markdown:    (pageData && pageData.markdown) || null,
+          explanation: r.explanation, // New field from reranker
+          score:       r.score,
+          metadata: {
+            source:            r.source || 'duckduckgo',
+            duration:          `${responseTime}ms`,
+            extraction_method: pageData ? 'parallel_go_batch' : 'snippet_only'
+          }
+        };
+      }),
     });
   } catch (err) {
     console.error("Search execution failed:", err.message);
