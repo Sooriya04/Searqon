@@ -1,55 +1,62 @@
-const mongoose = require("mongoose");
+const { getPool } = require('../config/database');
 
-const resultSchema = new mongoose.Schema(
-  {
-    query: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    source: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    url: {
-      type: String,
-      required: true,
-    },
-    content: {
-      type: String,
-      required: true,
-    },
-    score: {
-      type: Number,
-      default: 0.5,
-    },
-    wordCount: {
-      type: Number,
-    },
-    author: {
-      type: String,
-    },
-    publishedDate: {
-      type: String,
-    },
-    metadata: {
-      type: mongoose.Schema.Types.Mixed,
-    },
-  },
-  {
-    timestamps: true,
+async function saveSearchResult({ query, source, title, url, content, score, wordCount, metadata }) {
+  const pool = getPool();
+  if (!pool) return null;
+
+  try {
+    const queryText = `
+      INSERT INTO search_results (query, source, title, url, content, score, word_count, metadata, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      ON CONFLICT (url) DO UPDATE
+      SET query = EXCLUDED.query,
+          title = EXCLUDED.title,
+          content = EXCLUDED.content,
+          score = EXCLUDED.score,
+          word_count = EXCLUDED.word_count,
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW()
+      RETURNING *;
+    `;
+    const values = [query, source, title, url, content, score, wordCount, JSON.stringify(metadata || {})];
+    const res = await pool.query(queryText, values);
+    return res.rows[0];
+  } catch (err) {
+    console.error('[Database] Failed to save search result:', err.message);
+    return null;
   }
-);
+}
 
-// Index for faster queries
-resultSchema.index({ query: 1, source: 1 });
-resultSchema.index({ createdAt: -1 });
+async function getCachedSearchResults(query) {
+  const pool = getPool();
+  if (!pool) return null;
 
-const Result = mongoose.model("Result", resultSchema);
+  try {
+    const queryText = `
+      SELECT * FROM search_results 
+      WHERE query = $1 
+      ORDER BY score DESC;
+    `;
+    const res = await pool.query(queryText, [query]);
+    return res.rows.map(row => ({
+      query: row.query,
+      source: row.source,
+      title: row.title,
+      url: row.url,
+      content: row.content,
+      score: row.score,
+      wordCount: row.word_count,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  } catch (err) {
+    console.error('[Database] Failed to fetch cached search results:', err.message);
+    return null;
+  }
+}
 
-module.exports = Result;
+module.exports = {
+  saveSearchResult,
+  getCachedSearchResults
+};

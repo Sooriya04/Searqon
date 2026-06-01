@@ -1,4 +1,3 @@
-const axios = require('axios');
 const xml2js = require('xml2js');
 const ScrapUrl = require('../scrapper/ScrapUrl');
 const { cleanText } = require('../utils/textCleaner');
@@ -12,17 +11,21 @@ async function searchArxiv(query, limit = 10) {
         throw new Error('Valid query is required');
     }
 
-    const response = await axios.get(ARXIV_API, {
-        params: {
-            search_query: `all:${query}`,
-            start: 0,
-            max_results: limit,
-            sortBy: 'relevance',
-            sortOrder: 'descending',
-        },
+    const params = new URLSearchParams({
+        search_query: `all:${query}`,
+        start: 0,
+        max_results: limit,
+        sortBy: 'relevance',
+        sortOrder: 'descending',
     });
 
-    const parsed = await xml2js.parseStringPromise(response.data, {
+    const res = await fetch(`${ARXIV_API}?${params.toString()}`);
+    if (!res.ok) {
+        throw new Error(`Arxiv API returned HTTP ${res.status}`);
+    }
+    const xmlData = await res.text();
+
+    const parsed = await xml2js.parseStringPromise(xmlData, {
         explicitArray: false,
     });
 

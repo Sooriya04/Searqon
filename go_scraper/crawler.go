@@ -17,13 +17,27 @@ import (
 
 // ─── Robots.txt Structures and Cache ─────────────────────────────────────────
 
-type RobotsData struct {
+type AgentRules struct {
 	DisallowedPaths []string
+	AllowedPaths    []string
 	CrawlDelay      time.Duration
+}
+
+type RobotsData struct {
+	Rules map[string]*AgentRules // key: lowercase user-agent name
 }
 
 var robotsCache = make(map[string]*RobotsData)
 var robotsMu sync.RWMutex
+
+var agentUserAgents = map[string]string{
+	"googlebot":   "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+	"bingbot":     "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+	"slurp":       "Mozilla/5.0 (compatible; Yahoo! Slurp; http://help.yahoo.com/help/us/ysearch/slurp)",
+	"duckduckbot": "Mozilla/5.0 (compatible; DuckDuckBot-Https/1.1; +http://duckduckgo.com/duckduckbot.html)",
+	"baiduspider": "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)",
+	"yandexbot":   "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
+}
 
 func getRobotsData(baseURL *url.URL) *RobotsData {
 	host := baseURL.Host
@@ -35,16 +49,16 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 	}
 
 	robotsURL := fmt.Sprintf("%s://%s/robots.txt", baseURL.Scheme, host)
-	data = &RobotsData{}
+	data = &RobotsData{
+		Rules: make(map[string]*AgentRules),
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", robotsURL, nil)
 	if err == nil {
-		for key, value := range defaultHeaders {
-			req.Header.Set(key, value)
-		}
+		req.Header.Set("User-Agent", "Searqon/1.0")
 		resp, rerr := httpClient.Do(req)
 		if rerr == nil {
 			defer resp.Body.Close()
@@ -52,7 +66,10 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 				body, berr := io.ReadAll(resp.Body)
 				if berr == nil {
 					lines := strings.Split(string(body), "\n")
-					isApplicable := false
+					
+					var activeAgents []string
+					lastWasAgent := false
+
 					for _, line := range lines {
 						line = strings.TrimSpace(line)
 						if line == "" || strings.HasPrefix(line, "#") {
@@ -66,22 +83,32 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 						val := strings.TrimSpace(parts[1])
 
 						if key == "user-agent" {
-							if val == "*" || strings.Contains(strings.ToLower(val), "searqon") {
-								isApplicable = true
-							} else {
-								isApplicable = false
+							if !lastWasAgent {
+								activeAgents = []string{}
 							}
-						}
-
-						if isApplicable {
-							if key == "disallow" {
-								if val != "" {
-									data.DisallowedPaths = append(data.DisallowedPaths, val)
-								}
-							} else if key == "crawl-delay" {
-								var delaySec float64
-								if _, derr := fmt.Sscanf(val, "%f", &delaySec); derr == nil {
-									data.CrawlDelay = time.Duration(delaySec * float64(time.Second))
+							agent := strings.ToLower(val)
+							activeAgents = append(activeAgents, agent)
+							if _, exists := data.Rules[agent]; !exists {
+								data.Rules[agent] = &AgentRules{}
+							}
+							lastWasAgent = true
+						} else {
+							lastWasAgent = false
+							for _, agent := range activeAgents {
+								rules := data.Rules[agent]
+								if key == "disallow" {
+									if val != "" {
+										rules.DisallowedPaths = append(rules.DisallowedPaths, val)
+									}
+								} else if key == "allow" {
+									if val != "" {
+										rules.AllowedPaths = append(rules.AllowedPaths, val)
+									}
+								} else if key == "crawl-delay" {
+									var delaySec float64
+									if _, derr := fmt.Sscanf(val, "%f", &delaySec); derr == nil {
+										rules.CrawlDelay = time.Duration(delaySec * float64(time.Second))
+									}
 								}
 							}
 						}
@@ -97,24 +124,80 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 	return data
 }
 
-func isAllowed(targetURL string, robotsData *RobotsData) bool {
+func isAgentAllowed(targetURL string, agent string, robotsData *RobotsData) (bool, time.Duration) {
 	parsed, err := url.Parse(targetURL)
 	if err != nil {
-		return false
+		return false, 0
 	}
 	path := parsed.Path
 	if path == "" {
 		path = "/"
 	}
-	for _, dis := range robotsData.DisallowedPaths {
-		if dis == "/" {
-			return false
-		}
-		if dis != "" && strings.HasPrefix(path, dis) {
-			return false
+
+	rules, exists := robotsData.Rules[agent]
+	if !exists {
+		return true, 0
+	}
+
+	longestAllow := -1
+	for _, allow := range rules.AllowedPaths {
+		if strings.HasPrefix(path, allow) {
+			if len(allow) > longestAllow {
+				longestAllow = len(allow)
+			}
 		}
 	}
-	return true
+
+	longestDisallow := -1
+	for _, disallow := range rules.DisallowedPaths {
+		if strings.HasPrefix(path, disallow) {
+			if len(disallow) > longestDisallow {
+				longestDisallow = len(disallow)
+			}
+		}
+	}
+
+	if longestAllow > longestDisallow {
+		return true, rules.CrawlDelay
+	}
+	if longestDisallow > longestAllow {
+		return false, rules.CrawlDelay
+	}
+
+	return true, rules.CrawlDelay
+}
+
+func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Duration, bool) {
+	if allowed, delay := isAgentAllowed(targetURL, "searqon", robotsData); allowed {
+		return "Searqon/1.0", delay, true
+	}
+
+	searchAgents := []string{"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot"}
+	for _, agent := range searchAgents {
+		if _, exists := robotsData.Rules[agent]; exists {
+			if allowed, delay := isAgentAllowed(targetURL, agent, robotsData); allowed {
+				ua := agentUserAgents[agent]
+				return ua, delay, true
+			}
+		}
+	}
+
+	if allowed, delay := isAgentAllowed(targetURL, "*", robotsData); allowed {
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36", delay, true
+	}
+
+	for agent, ua := range agentUserAgents {
+		if allowed, delay := isAgentAllowed(targetURL, agent, robotsData); allowed {
+			return ua, delay, true
+		}
+	}
+
+	return "", 0, false
+}
+
+func isAllowed(targetURL string, robotsData *RobotsData) bool {
+	_, _, allowed := findAllowedAgent(targetURL, robotsData)
+	return allowed
 }
 
 // ─── Site Mapper ─────────────────────────────────────────────────────────────
@@ -135,12 +218,19 @@ func mapSiteURLs(targetURL string, limit int) MapResult {
 
 	// Get robots.txt
 	robotsData := getRobotsData(parsedBase)
-	if !isAllowed(targetURL, robotsData) {
+	userAgent, delay, allowed := findAllowedAgent(targetURL, robotsData)
+	if !allowed {
 		result.Error = "disallowed by robots.txt"
 		return result
 	}
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	if userAgent == "" {
+		userAgent = defaultHeaders["User-Agent"]
+	}
 
-	htmlContent, _, _, err := fetchHTML(targetURL)
+	htmlContent, _, _, err := fetchHTML(targetURL, userAgent)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -214,6 +304,10 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 
 	// Get robots.txt
 	robotsData := getRobotsData(parsedBase)
+	if !isAllowed(targetURL, robotsData) {
+		result.Error = "root URL disallowed by robots.txt"
+		return result
+	}
 
 	type crawlTask struct {
 		url   string
@@ -239,25 +333,10 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 			for task := range jobs {
 				atomic.AddInt32(&activeWorkers, 1)
 
-				// Respect Crawl Delay if specified in robots.txt
-				if robotsData.CrawlDelay > 0 {
-					time.Sleep(robotsData.CrawlDelay)
-				}
-
 				var scraped ScrapeResult
 				var htmlContent string
 
-				// Check robots.txt allowance
-				if !isAllowed(task.url, robotsData) {
-					scraped = ScrapeResult{
-						URL:       task.url,
-						Error:     "disallowed by robots.txt",
-						StartTime: time.Now().UTC().Format(time.RFC3339),
-						EndTime:   time.Now().UTC().Format(time.RFC3339),
-					}
-				} else {
-					scraped, htmlContent = scrapeSingleURL(task.url, format)
-				}
+				scraped, htmlContent = scrapeSingleURL(task.url, format)
 
 				mu.Lock()
 				pages = append(pages, scraped)

@@ -21,3 +21,7 @@ go_scraper_bin
 *.sqlite-journal
 results/
 .DS_Store
+
+# Graphify Outputs & Agents
+graphify-out/
+.agents/

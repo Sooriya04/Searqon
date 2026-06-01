@@ -1,4 +1,3 @@
-const axios = require('axios');
 const ScrapUrl = require('../scrapper/ScrapUrl');
 
 const OPENALEX_API = 'https://api.openalex.org/works';
@@ -15,20 +14,25 @@ async function searchOpenAlex(query, limit = 10) {
     console.log(`[OpenAlex] Searching: "${query}"`);
 
     try {
-        const response = await axios.get(OPENALEX_API, {
-            params: {
-                search: query,
-                per_page: limit,
-                select: 'display_name,primary_location,doi,id,locations,best_oa_location',
-            },
+        const params = new URLSearchParams({
+            search: query,
+            per_page: limit,
+            select: 'display_name,primary_location,doi,id,locations,best_oa_location',
+        });
+        const response = await fetch(`${OPENALEX_API}?${params.toString()}`, {
             headers: {
                 Accept: 'application/json',
                 'User-Agent': 'Searqon/1.0 (mailto:searqon@example.com)',
             },
-            timeout: 30000,
+            signal: AbortSignal.timeout(30000)
         });
 
-        const papers = response.data?.results || [];
+        if (!response.ok) {
+            throw new Error(`OpenAlex API returned HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const papers = data?.results || [];
         console.log(`[OpenAlex] API returned ${papers.length} papers`);
 
         const basicResults = [];

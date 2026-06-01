@@ -1,22 +1,26 @@
 const ScrapUrl = require('../scrapper/ScrapUrl');
-const axios = require('axios'); // Used for Opensearch API
 const WIKI_SEARCH_API = 'https://en.wikipedia.org/w/api.php';
 
 async function searchWikiTitle(query) {
     try {
-        const response = await axios.get(WIKI_SEARCH_API, {
-            params: {
-                action: 'opensearch',
-                search: query,
-                limit: 1,
-                format: 'json',
-            },
+        const params = new URLSearchParams({
+            action: 'opensearch',
+            search: query,
+            limit: 1,
+            format: 'json',
+        });
+        const response = await fetch(`${WIKI_SEARCH_API}?${params.toString()}`, {
             headers: {
                 'User-Agent': 'SearqonBot/1.0',
             },
         });
 
-        const titles = response.data[1];
+        if (!response.ok) {
+            throw new Error(`Wikipedia returned HTTP ${response.status}`);
+        }
+        const data = await response.json();
+
+        const titles = data[1];
         return titles && titles.length > 0 ? titles[0] : null;
     } catch (err) {
         console.error(`[Wiki] Search failed: ${err.message}`);

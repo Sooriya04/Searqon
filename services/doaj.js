@@ -1,4 +1,3 @@
-const axios = require('axios');
 const ScrapUrl = require('../scrapper/ScrapUrl');
 
 const DOAJ_API = 'https://doaj.org/api/v2/search/journals';
@@ -20,14 +19,17 @@ async function searchDOAJ(query, limit = 5) {
     }
 
     try {
-        const response = await axios.get(`${DOAJ_API}/${encodeURIComponent(query)}`, {
-            params: {
-                pageSize: limit,
-            },
-            timeout: 20000,
+        const params = new URLSearchParams({ pageSize: limit });
+        const response = await fetch(`${DOAJ_API}/${encodeURIComponent(query)}?${params.toString()}`, {
+            signal: AbortSignal.timeout(20000)
         });
 
-        const results = response.data?.results || [];
+        if (!response.ok) {
+            throw new Error(`DOAJ API returned HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const results = data?.results || [];
         const savedResults = await Promise.all(results.map(async (item, index) => {
             const bib = item.bibjson || {};
             const title = bib.title?.trim();

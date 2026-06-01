@@ -1,4 +1,3 @@
-const axios = require('axios');
 const ScrapUrl = require('../scrapper/ScrapUrl');
 
 // Europe PMC indexes medRxiv preprints and provides a proper search API
@@ -22,17 +21,22 @@ async function searchMedRxiv(query, limit = 5) {
     }
 
     try {
-        const response = await axios.get(EUROPEPMC_API, {
-            params: {
-                query: `(SRC:PPR) AND (PUBLISHER:"medRxiv") AND (${query})`,
-                resultType: 'core',
-                pageSize: limit,
-                format: 'json',
-            },
-            timeout: 45000,
+        const params = new URLSearchParams({
+            query: `(SRC:PPR) AND (PUBLISHER:"medRxiv") AND (${query})`,
+            resultType: 'core',
+            pageSize: limit,
+            format: 'json',
+        });
+        const response = await fetch(`${EUROPEPMC_API}?${params.toString()}`, {
+            signal: AbortSignal.timeout(45000)
         });
 
-        const results = response.data?.resultList?.result || [];
+        if (!response.ok) {
+            throw new Error(`Europe PMC API returned HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const results = data?.resultList?.result || [];
         const savedResults = await Promise.all(results.map(async (item, index) => {
             const title = cleanText(item.title || '');
             const summary = cleanText(item.abstractText || '');

@@ -1,5 +1,3 @@
-const httpClient = require('../utils/httpClient');
-const axios = require('axios');
 const limiter = require("../utils/Limiter");
 const config = require('../utils/configLoader');
 const { BROWSER_HEADERS } = require('../utils/browserHeaders');
@@ -21,12 +19,13 @@ async function ScrapUrl(url, options = {}) {
         const repo = githubMatch[2];
         try {
             console.log(`[ScrapUrl] GitHub intercept, fetching README: ${url}`);
-            const readmeRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+            const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
                 headers: { 'Accept': 'application/vnd.github.v3.raw', 'User-Agent': 'SearqonBot/1.0' },
-                timeout: 10000
+                signal: AbortSignal.timeout(10000)
             });
-            if (readmeRes.data && typeof readmeRes.data === 'string') {
-                let cleanReadme = readmeRes.data
+            if (readmeRes.ok) {
+                const readmeText = await readmeRes.text();
+                let cleanReadme = readmeText
                     .replace(/```[\s\S]*?```/g, '')
                     .replace(/`([^`]+)`/g, '$1')
                     .replace(/^#+\s/gm, '')
@@ -36,7 +35,7 @@ async function ScrapUrl(url, options = {}) {
                     .replace(/\*/g, '')
                     .replace(/\s{2,}/g, ' ')
                     .trim();
-                
+
                 return {
                     title: `${repo} by ${owner} - GitHub`,
                     content: cleanReadme,
@@ -55,12 +54,12 @@ async function ScrapUrl(url, options = {}) {
     if (youtubeMatch) {
         try {
             console.error(`[ScrapUrl] YouTube intercept -> ${url}`);
-            const ytResponse = await httpClient.get(url, {
+            const ytResponse = await fetch(url, {
                 headers: { ...BROWSER_HEADERS, 'Accept-Language': 'en-US' },
-                timeout: 15000
+                signal: AbortSignal.timeout(15000)
             });
-            const html = ytResponse.data;
-            
+            const html = await ytResponse.text();
+
             // Log if we hitting a consent wall
             if (html.includes('consent.youtube.com') || html.includes('Before you continue to YouTube')) {
                 console.warn(`[ScrapUrl] Hit YouTube consent wall for ${url}`);
@@ -146,12 +145,17 @@ async function ScrapUrl(url, options = {}) {
 
         try {
             console.log(`[ScrapUrl] Go scraper -> ${url} (format: ${format})`);
-            const response = await axios.post(`${GO_SCRAPER_URL}/scrape`, { url, format }, {
-                timeout: timeout,
-                headers: { 'Content-Type': 'application/json' }
+            const response = await fetch(`${GO_SCRAPER_URL}/scrape`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, format }),
+                signal: AbortSignal.timeout(timeout)
             });
 
-            const report = response.data;
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const report = await response.json();
             console.log(`[ScrapUrl] Done: ${url} (${report.wordCount} words, ${report.duration}ms)`);
             return report;
         } catch (error) {
@@ -212,11 +216,17 @@ async function ScrapUrlBatch(urls, options = {}) {
         // 2. Process remaining URLs via Go Batch Scraper
         if (normalUrls.length > 0) {
             console.log(`[ScrapUrl Batch] Sending ${normalUrls.length} normal URLs to Go scraper (format: ${format})...`);
-            const response = await axios.post(`${GO_SCRAPER_URL}/scrape/batch`, { urls: normalUrls, format }, {
-                timeout: timeout * 2,
-                headers: { 'Content-Type': 'application/json' }
+            const response = await fetch(`${GO_SCRAPER_URL}/scrape/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls: normalUrls, format }),
+                signal: AbortSignal.timeout(timeout * 2)
             });
-            response.data.forEach(r => resultsMap[r.url] = r);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const batchData = await response.json();
+            batchData.forEach(r => resultsMap[r.url] = r);
         }
 
         // Return results in original order

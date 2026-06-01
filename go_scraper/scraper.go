@@ -31,7 +31,7 @@ var httpClient = &http.Client{
 }
 
 var defaultHeaders = map[string]string{
-	"User-Agent":                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+	"User-Agent":                "Searqon/1.0",
 	"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 	"Accept-Language":           "en-US,en;q=0.9",
 	"Cache-Control":             "no-cache",
@@ -44,7 +44,7 @@ var defaultHeaders = map[string]string{
 
 // ─── HTML Fetch Helper ───────────────────────────────────────────────────────
 
-func fetchHTML(targetURL string) (string, *url.URL, int, error) {
+func fetchHTML(targetURL string, userAgent string) (string, *url.URL, int, error) {
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil || parsedURL.Scheme == "" {
 		return "", nil, 0, fmt.Errorf("invalid URL")
@@ -59,6 +59,9 @@ func fetchHTML(targetURL string) (string, *url.URL, int, error) {
 	}
 	for key, value := range defaultHeaders {
 		req.Header.Set(key, value)
+	}
+	if userAgent != "" {
+		req.Header.Set("User-Agent", userAgent)
 	}
 
 	resp, err := httpClient.Do(req)
@@ -198,7 +201,30 @@ func scrapeSingleURL(targetURL string, format string) (ScrapeResult, string) {
 
 	result := ScrapeResult{URL: targetURL, StartTime: startISO}
 
-	htmlContent, _, _, err := fetchHTML(targetURL)
+	parsedBase, pErr := url.Parse(targetURL)
+	var userAgent string
+	var delay time.Duration
+	var allowed bool = true
+
+	if pErr == nil && parsedBase.Scheme != "" && parsedBase.Host != "" {
+		robotsData := getRobotsData(parsedBase)
+		userAgent, delay, allowed = findAllowedAgent(targetURL, robotsData)
+		if !allowed {
+			result.Error = "disallowed by robots.txt"
+			result.EndTime = time.Now().UTC().Format(time.RFC3339)
+			result.Duration = time.Since(startTime).Milliseconds()
+			return result, ""
+		}
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+	}
+
+	if userAgent == "" {
+		userAgent = defaultHeaders["User-Agent"]
+	}
+
+	htmlContent, _, _, err := fetchHTML(targetURL, userAgent)
 	if err != nil {
 		result.Error = err.Error()
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)

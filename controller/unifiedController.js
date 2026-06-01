@@ -70,6 +70,30 @@ exports.unifiedSearchPost = async (req, res) => {
         const maxResults = limit ? parseInt(limit, 10) : 5;
         const startTime  = Date.now();
 
+        // 0. Check PostgreSQL Cache
+        const { getCachedSearchResults, saveSearchResult } = require("../models/result");
+        try {
+            const cached = await getCachedSearchResults(query);
+            if (cached && cached.length > 0) {
+                console.log(`[Unified] Cache HIT: returning ${cached.length} cached results for: "${query}"`);
+                const duration = "0.00";
+                res.set('X-Search-Duration', `${duration}s`);
+                return res.json(cached.slice(0, maxResults).map(r => ({
+                    title: r.title,
+                    url: r.url,
+                    content: r.content,
+                    markdown: r.metadata?.markdown || null,
+                    source: r.source,
+                    metadata: {
+                        snippet: r.metadata?.snippet || r.content,
+                        extraction_method: 'postgres_cache'
+                    }
+                })));
+            }
+        } catch (err) {
+            console.warn(`[Unified] Cache check failed, proceeding to live search: ${err.message}`);
+        }
+
         // 1. Route Query
         const routing = await routeQuery(query);
         const domainSources = routing.sources.filter(s => s !== "duckduckgo" && s !== "talven");
@@ -94,7 +118,6 @@ exports.unifiedSearchPost = async (req, res) => {
         let flatResults = taskResults.flat();
 
         // 3. Intelligent Reranking
-        // The service logic handles node_rerank vs python_rerank
         if (flatResults.length > 0) {
             flatResults = await rerankResults(query, flatResults, maxResults);
         }
@@ -133,9 +156,27 @@ exports.unifiedSearchPost = async (req, res) => {
             };
         });
 
+        // 5. Save results to PostgreSQL Cache asynchronously
+        richResults.forEach(r => {
+            saveSearchResult({
+                query,
+                source: r.source,
+                title: r.title,
+                url: r.url,
+                content: r.content,
+                score: 0.8,
+                wordCount: r.content ? r.content.split(/\s+/).length : 0,
+                metadata: {
+                    snippet: r.metadata?.snippet,
+                    markdown: r.markdown,
+                    extraction_method: r.metadata?.extraction_method
+                }
+            }).catch(err => console.error('[Unified] Failed to cache result in Postgres:', err.message));
+        });
+
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-        // 5. Return Flat JSON Array as requested
+        // 6. Return Flat JSON Array
         res.set('X-Search-Duration', `${duration}s`);
         res.json(richResults);
 

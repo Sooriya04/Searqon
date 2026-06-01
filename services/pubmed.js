@@ -1,5 +1,3 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
 const ScrapUrl = require('../scrapper/ScrapUrl');
 const { cleanText } = require('../utils/textCleaner');
 
@@ -9,6 +7,7 @@ function extractPMID(url) {
     const match = url.match(/\/(\d+)\/?$/);
     return match ? match[1] : null;
 }
+
 async function searchPubMed(query, limit = 10) {
     if (!query) {
         throw new Error('Query is required');
@@ -19,31 +18,44 @@ async function searchPubMed(query, limit = 10) {
     const url = `${PUBMED_BASE_URL}/?term=${encodeURIComponent(query)}`;
 
     try {
-        const response = await axios.get(url, {
+        const response = await fetch(url, {
             headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
                 Accept: 'text/html',
             },
-            timeout: 15000,
+            signal: AbortSignal.timeout(15000)
         });
 
-        const $ = cheerio.load(response.data);
+        if (!response.ok) {
+            throw new Error(`PubMed returned HTTP ${response.status}`);
+        }
+
+        const html = await response.text();
         const basicResults = [];
 
-        // Get basic info from search results
-        $('.docsum-content').each((i, el) => {
-            if (i >= limit) return false;
+        // Clean HTML to simplify regex parsing
+        const cleanHtml = html.replace(/\r?\n|\r/g, ' ');
 
-            const title = cleanText($(el).find('.docsum-title').text());
-            const relativeLink = $(el).find('.docsum-title').attr('href');
-            const link = relativeLink ? `${PUBMED_BASE_URL}${relativeLink}` : null;
-            const pmid = extractPMID(link);
+        // Find each docsum-content block
+        const matches = cleanHtml.matchAll(/<div[^>]*class="[^"]*docsum-content[^"]*"[^>]*>([\s\S]*?)<\/div>/g);
+        let count = 0;
+        for (const match of matches) {
+            if (count >= limit) break;
+            const block = match[1];
 
-            if (title && link && pmid) {
-                basicResults.push({ pmid, title, url: link });
+            const linkMatch = block.match(/<a[^>]*class="[^"]*docsum-title[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+            if (linkMatch) {
+                const relativeLink = linkMatch[1];
+                const link = `${PUBMED_BASE_URL}${relativeLink}`;
+                const title = cleanText(linkMatch[2].replace(/<[^>]+>/g, '').trim());
+                const pmid = extractPMID(link);
+
+                if (title && link && pmid) {
+                    basicResults.push({ pmid, title, url: link });
+                    count++;
+                }
             }
-        });
+        }
 
         console.log(
             `[PubMed] Found ${basicResults.length} results, fetching abstracts...`,

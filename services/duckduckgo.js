@@ -1,5 +1,3 @@
-const cheerio = require('cheerio');
-const httpClient = require('../utils/httpClient');
 const { BROWSER_HEADERS } = require('../utils/browserHeaders');
 const { cleanText, cleanSearchSnippet } = require('../utils/textCleaner');
 const { ScrapUrlBatch } = require('../scrapper/ScrapUrl');
@@ -11,40 +9,50 @@ function isAdUrl(url) {
 }
 
 async function fetchSearchResults(query) {
-  const response = await httpClient.post(
-    DUCKDUCKGO_URL,
-    new URLSearchParams({ q: query }).toString(),
-    {
-      headers: {
-        ...BROWSER_HEADERS,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      responseType: 'text',
+  const response = await fetch(DUCKDUCKGO_URL, {
+    method: 'POST',
+    headers: {
+      ...BROWSER_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-  );
+    body: new URLSearchParams({ q: query }).toString(),
+    signal: AbortSignal.timeout(15000)
+  });
 
-  if (!response || typeof response.data !== 'string') {
-    throw new Error('DuckDuckGo returned no HTML');
+  if (!response.ok) {
+    throw new Error(`DuckDuckGo returned HTTP ${response.status}`);
   }
 
-  return parseSearchResults(response.data);
+  const html = await response.text();
+  return parseSearchResults(html);
 }
 
 function parseSearchResults(html) {
-  const $ = cheerio.load(html);
   const results = [];
-
-  $('.result').each((i, el) => {
-    const $el = $(el);
-    const link = $el.find('.result__a');
-    const title = cleanText(link.text());
-    const url = link.attr('href');
-    const snippet = cleanText($el.find('.result__snippet').text());
-
-    if (title && url && !isAdUrl(url)) {
-      results.push({ title, url, snippet });
+  
+  // Clean comments and carriage returns for easier regex parsing
+  const cleanHtml = html.replace(/\r?\n|\r/g, ' ');
+  
+  // Find all divs with class result
+  const matches = cleanHtml.matchAll(/<div[^>]*class="[^"]*result[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g);
+  for (const match of matches) {
+    const block = match[1];
+    
+    // Extract title & href from result__a link
+    const linkMatch = block.match(/<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+    const snippetMatch = block.match(/<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/) ||
+                         block.match(/<span[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+    
+    if (linkMatch) {
+      const url = linkMatch[1];
+      const title = cleanText(linkMatch[2].replace(/<[^>]+>/g, '').trim());
+      const snippet = snippetMatch ? cleanText(snippetMatch[1].replace(/<[^>]+>/g, '').trim()) : '';
+      
+      if (title && url && !isAdUrl(url)) {
+        results.push({ title, url, snippet });
+      }
     }
-  });
+  }
 
   return results;
 }

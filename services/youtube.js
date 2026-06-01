@@ -1,5 +1,4 @@
 const { BROWSER_HEADERS } = require('../utils/browserHeaders');
-const httpClient = require('../utils/httpClient');
 const { cleanYouTubeDescription } = require('../utils/textCleaner');
 
 /**
@@ -8,11 +7,11 @@ const { cleanYouTubeDescription } = require('../utils/textCleaner');
 async function fetchVideoDescription(videoId) {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     try {
-        const response = await httpClient.get(url, {
+        const response = await fetch(url, {
             headers: { ...BROWSER_HEADERS, 'Accept-Language': 'en-US' },
-            timeout: 15000
+            signal: AbortSignal.timeout(15000)
         });
-        const html = response.data;
+        const html = await response.text();
         
         let description = "";
 
@@ -80,15 +79,16 @@ async function searchYoutube(query, limit = 5) {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     
     try {
-        const response = await httpClient.get(url, {
-            headers: BROWSER_HEADERS
+        const response = await fetch(url, {
+            headers: BROWSER_HEADERS,
+            signal: AbortSignal.timeout(15000)
         });
 
-        if (!response || typeof response.data !== 'string') {
+        if (!response.ok) {
             throw new Error('YouTube returned no HTML');
         }
 
-        const html = response.data;
+        const html = await response.text();
         const match = html.match(/var ytInitialData = ({.*?});/);
         
         if (!match) {
