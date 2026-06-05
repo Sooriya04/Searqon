@@ -48,7 +48,7 @@ async function runSource(name, query, limit, options = {}) {
     try {
         const raw = await Promise.race([
             def.fn(query, limit, options),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1800))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
         ]);
         const data = (raw.results || (Array.isArray(raw) ? raw : [raw])).filter(Boolean);
         return data.map(item => ({

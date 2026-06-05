@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -150,31 +151,36 @@ func batchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 
 	results := make([]ScrapeResult, len(req.URLs))
 	sem := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
 
-	// Stream execution wait group
+	// Process URLs concurrently with a wait group and safe concurrency
 	for i, u := range req.URLs {
+		wg.Add(1)
 		go func(index int, targetURL string) {
+			defer wg.Done()
+			
+			// Recover from any unexpected panic to prevent deadlocks or crashes
+			defer func() {
+				if r := recover(); r != nil {
+					results[index] = ScrapeResult{
+						URL:       targetURL,
+						StartTime: time.Now().UTC().Format(time.RFC3339),
+						EndTime:   time.Now().UTC().Format(time.RFC3339),
+						Error:     fmt.Sprintf("panic recovered: %v", r),
+					}
+				}
+			}()
+
 			sem <- struct{}{}
 			defer func() { <-sem }()
+
 			scraped, _ := scrapeSingleURL(targetURL, req.Format)
 			results[index] = scraped
 		}(i, u)
 	}
 
-	// Simple check loop for batch results
-	for {
-		time.Sleep(10 * time.Millisecond)
-		allDone := true
-		for _, res := range results {
-			if res.StartTime == "" {
-				allDone = false
-				break
-			}
-		}
-		if allDone {
-			break
-		}
-	}
+	// Wait for all scraping tasks to finish cleanly
+	wg.Wait()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
