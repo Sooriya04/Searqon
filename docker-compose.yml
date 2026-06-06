@@ -1,0 +1,24 @@
+services:
+  # ── Searqon Web Intelligence Engine ─────────────────────────────────────────
+  # Independent service. Runs on port 4001.
+  # SearXNG is optional — run it separately if you want it as a search provider.
+  # When SearXNG is offline, Searqon automatically falls back to DuckDuckGo.
+  searqon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    restart: unless-stopped
+
+  # ── SearXNG (Optional, separate microservice) ────────────────────────────────
+  # Searqon auto-detects SearXNG at http://localhost:8080.
+  # Run with: docker compose up searxng
+  # Or standalone: docker run -d --name searxng -p 8080:8080 searxng/searxng
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    profiles:
+      - searxng  # only starts when: docker compose --profile searxng up

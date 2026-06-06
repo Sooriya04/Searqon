@@ -1,27 +1,18 @@
-node_modules/
-*__pycache__/
-*.pyc
-.env
-dataset.jsonl
-storage/
-.venv/
-.pytest_cache/
-.ipynb_checkpoints/
-*.log
-todos/
-oracle.md
-*txt
-testing/
-Talven/
-deployment
+# Compiled binaries — never commit, users compile locally
+searqon
+go_scraper/go_scraper
+go_scraper/go_scraper_bin
 
-# Searqon Binaries & DB
-go_scraper_bin
+# Graphify outputs
+graphify-out/
+
+# Agents config
+.agents/
+
+# Misc
+.DS_Store
+*.log
 *.sqlite
 *.sqlite-journal
-results/
-.DS_Store
-
-# Graphify Outputs & Agents
-graphify-out/
-.agents/
+.env
+others/

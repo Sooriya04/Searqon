@@ -1,70 +1,138 @@
-# Searqon
+# Searqon — Web Intelligence Engine
 
-**Searqon** is an open-source, self-hosted web intelligence engine that searches, crawls, extracts, ranks, and synthesizes information from the internet. Built with a high-performance Go-based extraction engine and a native Node.js orchestration layer.
+Searqon is an open-source, self-hosted web intelligence engine that **searches, crawls, extracts, ranks, and synthesizes** information from the internet. Built in Go for maximum performance and minimum overhead.
 
-## What is Searqon?
+> **Searqon is not a chatbot.** It is the foundational search and web intelligence layer designed to power AI agents, RAG systems, and knowledge-driven applications.
 
-Searqon is **not a chatbot**. It is the foundational search and web intelligence layer designed to power AI agents, RAG (Retrieval-Augmented Generation) systems, and knowledge-driven applications.
+Think of it as a transparent alternative to services like Tavily — where you control the entire pipeline, from how sources are selected to how content is extracted and cleaned.
 
-Think of it as a **transparent alternative to services like Tavily** — where you control the entire pipeline, from how sources are selected to how content is extracted or cleaned.
-
-## Why Searqon Exists
-
-Most AI search APIs operate as black boxes:
-- You don't control which sources are selected
-- You don't see how content is extracted or cleaned
-- You can't customize ranking or relevance algorithms
-- You can't verify how answers are generated
-
-**Searqon changes this.** Every component is transparent, modular, and customizable.
-
-## Searqon processes web searches through five core stages:
-
-1. **Route** — Classifies the query using a native **Semantic Intent Engine** (weighted scoring, no LLM) to identify relevant domain sources in under 1ms.
-2. **Search** — Queries specialized sources (GitHub, PubMed, Reddit, YouTube, etc.) based on intent and always includes DuckDuckGo as a baseline.
-3. **Crawl** — Fetches webpage content efficiently using a concurrent **Go-based scraper** with parallel deep extraction per source.
-4. **Extract** — Removes noise (ads, navigation, scripts) and delivers clean, flattened plain text or high-fidelity Markdown.
-5. **Synthesize** — Provides raw, structured JSON intelligence directly to the client — optional synthesis can be performed client-side or via integrated LLM streaming.
+---
 
 ## Architecture
 
-Searqon uses a efficient **2-process architecture**:
+Searqon processes web searches through five core stages:
 
-- **Node.js (Port 3001)** — API orchestration, native semantic routing, and response assembly.
-- **Go (Port 3002)** — High-performance parallel scraper binary using Goroutines.
+```
+Query
+  │
+  ├─ 1. ROUTE      → Classify query intent (tech/medical/news/general...)
+  │
+  ├─ 2. SEARCH     → SearXNG (primary) → DDG JSON API (fallback)
+  │                  Returns: title, URL, snippet
+  │
+  ├─ 3. CRAWL      → Concurrent goroutines fetch each result page
+  │                  Respects robots.txt
+  │
+  ├─ 4. EXTRACT    → go-readability + goquery strip noise,
+  │                  output clean plain text + Markdown
+  │
+  └─ 5. DELIVER    → Structured JSON to client (LLM, RAG, agent, etc.)
+                     Snippet fallback if page is blocked by Cloudflare
+```
 
-**Total idle RAM: ~50MB.** Optimized for bare-metal and resource-constrained environments.
+**Single Go process. Port 3001. ~20MB idle RAM.**
 
-## Technology Stack
+---
 
-- **Backend**: Node.js & Express.js
-- **Intelligent Routing**: Native JavaScript (Semantic Intent Engine, < 1ms)
-- **Extraction Engine**: Go 1.22+ (GoQuery & Go-Readability)
-- **Orchestration**: Node.js + Compiled Go Binary
-- **Configuration**: YAML-based settings
+## Endpoints
 
-## Getting Started
+| Method | Endpoint       | Description                                                        |
+|--------|----------------|--------------------------------------------------------------------|
+| POST   | /search        | Full pipeline: search → scrape → structured JSON                  |
+| GET    | /search?q=...  | Same via query string                                              |
+| POST   | /scrape        | Scrape a single URL → markdown/text                               |
+| POST   | /scrape/batch  | Scrape multiple URLs concurrently                                 |
+| POST   | /scrape/html   | Parse raw HTML → clean markdown                                   |
+| POST   | /crawl         | Crawl an entire site (depth + page limit)                         |
+| POST   | /map           | Discover all URLs on a site                                       |
+| GET    | /health        | Health check                                                      |
 
-To get started with Searqon, please follow the detailed [Setup Guide](./docs/setup.md).
+---
+
+## Search Provider Chain
+
+1. **SearXNG** (primary) — Run locally via Docker. Aggregates Google, Bing, Qwant, DuckDuckGo without getting blocked. Returns clean JSON. Zero latency overhead.
+2. **DuckDuckGo JSON API** (fallback) — Uses DDG's internal `d.js` endpoint (not HTML scraping). Automatically used if SearXNG is offline.
+
+---
+
+## Run
+
+### Option 1: Start without SearXNG (DDG fallback mode)
+```bash
+cd go_scraper
+go run .
+```
+
+### Option 2: Start with SearXNG (recommended)
+```bash
+# Terminal 1: Start SearXNG
+docker run -d --name searxng -p 8080:8080 searxng/searxng
+
+# Terminal 2: Start Searqon
+cd go_scraper
+go run .
+```
+
+### Build binary
+```bash
+cd go_scraper
+go build -o ../searqon .
+./searqon
+```
+
+---
+
+## Usage Examples
+
+```bash
+# Full search + scrape pipeline (uses SearXNG if running, DDG otherwise)
+curl -X POST http://localhost:4001/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "what is ycombinator", "limit": 5, "scrape": true}'
+
+# Search only — no page scraping, just titles/URLs/snippets
+curl -X POST http://localhost:4001/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "anthropic claude 3.5", "limit": 5, "scrape": false}'
+
+# Scrape a specific page
+curl -X POST http://localhost:4001/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://anthropic.com/news/claude-3-5-sonnet"}'
+
+# Crawl an entire documentation site
+curl -X POST http://localhost:4001/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://docs.anthropic.com", "limit": 30, "depth": 2}'
+```
+
+---
 
 ## Project Philosophy
 
-> **Build the system first. Add intelligence later.**
+> Build the system first. Add intelligence later.
 
-Searqon prioritizes transparency, modularity, and control. Every decision in the pipeline is visible and customizable — no black boxes, no magic.
+Searqon prioritizes **transparency, modularity, and control**. Every decision in the pipeline is visible and customizable — no black boxes, no magic.
+
+---
 
 ## Roadmap
 
-**Phase 1** — Core Engine (Completed)
-- High-performance **Go-based** parallel scraping binary
-- Native JS-based intent classification
-- Unified Search API (JSON-only mode)
+### Phase 1 — Core Engine ✅
+- High-performance Go-based parallel scraping
+- SearXNG + DDG JSON fallback provider chain
+- Robots.txt compliance
+- Snippet fallback when pages are blocked
 
-**Phase 2** — Intelligent Orchestration (In Progress)
-- Agent planning and self-reflection
-- Multi-turn conversational interface
-- Structured Knowledge Panel extraction
+### Phase 2 — Intelligent Orchestration (In Progress)
+- Native query intent classifier (< 1ms, no LLM)
+- BM25 + semantic hybrid reranking
+- Structured knowledge panel extraction
+- Agent planning interface
+
+---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See LICENSE for details.
