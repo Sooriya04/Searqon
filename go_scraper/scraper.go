@@ -21,7 +21,7 @@ import (
 // ─── Stealth HTTP Client ─────────────────────────────────────────────────────
 
 var httpClient = &http.Client{
-	Timeout: 8 * time.Second,
+	Timeout: 3 * time.Second, // fast-fail: blocked/slow pages fall back to snippets
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return fmt.Errorf("too many redirects")
@@ -50,7 +50,7 @@ func fetchHTML(targetURL string, userAgent string) (string, *url.URL, int, error
 		return "", nil, 0, fmt.Errorf("invalid URL")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
