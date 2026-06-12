@@ -1,24 +1,44 @@
 services:
   # ── Searqon Web Intelligence Engine ─────────────────────────────────────────
-  # Independent service. Runs on port 4001.
-  # SearXNG is optional — run it separately if you want it as a search provider.
-  # When SearXNG is offline, Searqon automatically falls back to DuckDuckGo.
   searqon:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/app/Dockerfile
     ports:
       - "4001:4001"
     restart: unless-stopped
+    environment:
+      - SEARXNG_URL=http://host.docker.internal:4002
+      - DATABASE_URL=postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable
+    depends_on:
+      - searqon-db
 
-  # ── SearXNG (Optional, separate microservice) ────────────────────────────────
-  # Searqon auto-detects SearXNG at http://localhost:8080.
-  # Run with: docker compose up searxng
-  # Or standalone: docker run -d --name searxng -p 8080:8080 searxng/searxng
+  # ── PostgreSQL Cache Database ───────────────────────────────────────────────
+  searqon-db:
+    build:
+      context: ./docker/database
+      dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=searqon
+      - POSTGRES_PASSWORD=searqon_pass
+      - POSTGRES_DB=searqon_cache
+    volumes:
+      - searqon-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ── SearXNG (Optional, separate profile) ────────────────────────────────────
+  # Run separately with: docker compose --profile searxng up
   searxng:
     image: searxng/searxng:latest
     ports:
-      - "8080:8080"
+      - "4002:8080"
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
     restart: unless-stopped
     profiles:
-      - searxng  # only starts when: docker compose --profile searxng up
+      - searxng
+
+volumes:
+  searqon-db-data:

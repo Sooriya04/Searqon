@@ -1,10 +1,12 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-COPY go_scraper/go.mod go_scraper/go.sum ./
+
+# Note: The context of this build is assumed to be the root of the project
+COPY src/go.mod src/go.sum ./
 RUN go mod download
 
-COPY go_scraper/ ./
+COPY src/ ./
 RUN go build -ldflags="-s -w" -o /searqon .
 
 # ── Final minimal image ──────────────────────────────────────────────────────

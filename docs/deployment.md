@@ -5,7 +5,7 @@
 ## Option 1: Run Directly (Local)
 
 ```bash
-cd go_scraper
+cd src
 go run .
 # Listening on :4001
 ```

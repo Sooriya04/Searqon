@@ -199,6 +199,13 @@ func scrapeSingleURL(targetURL string, format string) (ScrapeResult, string) {
 	startTime := time.Now()
 	startISO := startTime.UTC().Format(time.RFC3339)
 
+	// ── Stage 0: Check Postgres cache first ────────────────────────────────────
+	if cached, found := getScrapeCache(targetURL); found {
+		log.Printf("[Scrape] [CACHE HIT] URL=%s (%d words)", targetURL, cached.WordCount)
+		cached.Duration = time.Since(startTime).Milliseconds()
+		return cached, ""
+	}
+
 	result := ScrapeResult{URL: targetURL, StartTime: startISO}
 
 	parsedBase, pErr := url.Parse(targetURL)
@@ -213,6 +220,8 @@ func scrapeSingleURL(targetURL string, format string) (ScrapeResult, string) {
 			result.Error = "disallowed by robots.txt"
 			result.EndTime = time.Now().UTC().Format(time.RFC3339)
 			result.Duration = time.Since(startTime).Milliseconds()
+			// Cache the exclusion so we don't crawl it again
+			saveScrapeCache(result)
 			return result, ""
 		}
 		if delay > 0 {
@@ -229,10 +238,16 @@ func scrapeSingleURL(targetURL string, format string) (ScrapeResult, string) {
 		result.Error = err.Error()
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)
 		result.Duration = time.Since(startTime).Milliseconds()
+		// Cache the failure so we don't waste retry limits immediately
+		saveScrapeCache(result)
 		return result, ""
 	}
 
 	scraped := scrapeHTMLContent(htmlContent, targetURL, format, startTime)
+
+	// Save successfully scraped page to DB
+	saveScrapeCache(scraped)
+
 	return scraped, htmlContent
 }
 

@@ -22,7 +22,7 @@ Welcome to the Searqon documentation. Searqon is an open-source, self-hosted **w
 ```bash
 # Clone and run
 git clone https://github.com/Sooriya04/Searqon
-cd searqon/go_scraper
+cd searqon/src
 go run .
 
 # Test it

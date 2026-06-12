@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -35,10 +36,12 @@ type SearchResponse struct {
 	Provider   string         `json:"provider"` // which provider succeeded
 }
 
-// ─── SearXNG Provider ─────────────────────────────────────────────────────────
-// Expects a locally running SearXNG instance (e.g. docker run -p 8080:8080 searxng/searxng)
-
-const searxngBase = "http://localhost:8080"
+func getSearXNGBase() string {
+	if u := os.Getenv("SEARXNG_URL"); u != "" {
+		return u
+	}
+	return "http://localhost:4002"
+}
 
 type searxngResult struct {
 	Title   string `json:"title"`
@@ -51,13 +54,14 @@ type searxngResponse struct {
 }
 
 func searchSearXNG(query string, limit int) ([]SearchResult, error) {
+	base := getSearXNGBase()
 	params := url.Values{}
 	params.Set("q", query)
 	params.Set("format", "json")
 	params.Set("language", "en")
 	params.Set("engines", "google,bing,duckduckgo,qwant")
 
-	reqURL := searxngBase + "/search?" + params.Encode()
+	reqURL := base + "/search?" + params.Encode()
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -69,7 +73,7 @@ func searchSearXNG(query string, limit int) ([]SearchResult, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("searxng unreachable at %s: %v", searxngBase, err)
+		return nil, fmt.Errorf("searxng unreachable at %s: %v", base, err)
 	}
 	defer resp.Body.Close()
 
@@ -176,10 +180,11 @@ func searchDDGFallback(query string, limit int) ([]SearchResult, error) {
 }
 
 // ─── Unified Search Pipeline ──────────────────────────────────────────────────
-// 1. Try SearXNG (local instance) → fast, unblocked, multi-engine
-// 2. Fallback to DDG lite HTML endpoint parsed with goquery
-// 3. Concurrent page scraping (goroutines) — capped at top 3 for speed
-//    Each scrape has a 3s hard timeout; slow pages fall back to snippet.
+// 1. Try PostgreSQL cache first → sub-millisecond response on cache hits
+// 2. Try SearXNG (local instance) → fast, unblocked, multi-engine
+// 3. Fallback to DDG lite HTML endpoint parsed with goquery
+// 4. URL deduplication to prevent duplicate scraping/indexing
+// 5. Concurrent page scraping (goroutines) governed by global 2.5s deadline
 
 func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 	start := time.Now()
@@ -189,7 +194,17 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 
 	response := SearchResponse{Query: query}
 
-	// Stage 1: SearXNG
+	// ── Stage 0: Check Postgres cache first ────────────────────────────────────
+	if cachedResults, provider, found := getSearchCache(query); found {
+		log.Printf("[Search] [CACHE HIT] Query=%q Provider=%s (%d results)", query, provider, len(cachedResults))
+		response.Results = cachedResults
+		response.Total = len(cachedResults)
+		response.Provider = provider
+		response.Duration = time.Since(start).Milliseconds()
+		return response
+	}
+
+	// ── Stage 1: Search Discovery (SearXNG -> DDG) ─────────────────────────────
 	results, err := searchSearXNG(query, limit)
 	if err != nil {
 		log.Printf("[Search] SearXNG failed (%v), falling back to DuckDuckGo", err)
@@ -209,17 +224,27 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 
 	log.Printf("[Search] Provider=%s found %d results for: %q", response.Provider, len(results), query)
 
-	// Stage 3: Concurrent scraping with a GLOBAL 2.5s deadline across all pages.
-	// This means: whatever pages complete within 2.5s are included.
-	// Slow/Cloudflare-blocked pages automatically fall back to their snippets.
-	// Total latency = DDG_search_time + 2.5s (not per_page_timeout × N)
+	// ── Stage 2.5: URL Deduplication ───────────────────────────────────────────
+	var uniqueResults []SearchResult
+	seenURLs := make(map[string]bool)
+	for _, r := range results {
+		cleanURL := strings.TrimRight(r.URL, "/")
+		if !seenURLs[cleanURL] {
+			seenURLs[cleanURL] = true
+			uniqueResults = append(uniqueResults, r)
+		} else {
+			log.Printf("[Search] Deduplicated URL: %s", r.URL)
+		}
+	}
+	results = uniqueResults
+
+	// ── Stage 3: Concurrent scraping with a GLOBAL 2.5s deadline ───────────────
 	scrapeLimit := 3
 	if len(results) < scrapeLimit {
 		scrapeLimit = len(results)
 	}
 
 	if scrape && scrapeLimit > 0 {
-		// Global deadline: all scrapes must finish within 2.5s or are skipped
 		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 2500*time.Millisecond)
 		defer scrapeCancel()
 
@@ -231,7 +256,6 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 			go func(idx int) {
 				defer wg.Done()
 
-				// If the global deadline has already passed, skip this page immediately
 				select {
 				case <-scrapeCtx.Done():
 					log.Printf("[Scrape] ✗ %s (deadline exceeded)", results[idx].URL)
@@ -239,9 +263,9 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 				default:
 				}
 
+				// scrapeSingleURL handles page caching inside scraper.go
 				scraped, _ := scrapeSingleURL(results[idx].URL, "markdown")
 
-				// Check again after scrape returns (in case deadline passed during scrape)
 				select {
 				case <-scrapeCtx.Done():
 					log.Printf("[Scrape] ✗ %s (deadline exceeded after fetch)", results[idx].URL)
@@ -262,7 +286,6 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 			}(i)
 		}
 
-		// Wait for all goroutines OR the global deadline, whichever comes first
 		done := make(chan struct{})
 		go func() {
 			wg.Wait()
@@ -279,6 +302,10 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 	response.Results = results
 	response.Total = len(results)
 	response.Duration = time.Since(start).Milliseconds()
+
+	// ── Stage 4: Cache results for subsequent queries ──────────────────────────
+	saveSearchCache(query, results, response.Provider)
+
 	return response
 }
 

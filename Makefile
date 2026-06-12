@@ -1,7 +1,7 @@
 # ─── Searqon Makefile ──────────────────────────────────────────────────────────
 
 APP      := searqon
-SRC_DIR  := ./go_scraper
+SRC_DIR  := ./src
 BIN      := ./${APP}
 PORT     := 4001
 

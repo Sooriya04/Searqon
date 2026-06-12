@@ -9,6 +9,10 @@ import (
 func main() {
 	port := "4001"
 
+	// Initialize Postgres Cache
+	InitDB()
+	defer CloseDB()
+
 	mux := http.NewServeMux()
 
 	// ── Search Aggregator ────────────────────────────────────────────────────

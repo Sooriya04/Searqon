@@ -32,7 +32,7 @@ cd searqon
 Go modules handle all dependencies automatically:
 
 ```bash
-cd go_scraper
+cd src
 go mod download
 ```
 
@@ -48,7 +48,7 @@ Dependencies pulled:
 
 ### Development (no build step)
 ```bash
-cd go_scraper
+cd src
 go run .
 ```
 
@@ -71,7 +71,7 @@ You should see:
 
 ```bash
 curl http://localhost:4001/health
-# {"status":"ok","engine":"go_scraper",...}
+# {"status":"ok","engine":"src",...}
 ```
 
 Run a real search:
@@ -104,7 +104,7 @@ make searxng
 
 ```bash
 git pull
-cd go_scraper
+cd src
 go mod download
 make build
 ```

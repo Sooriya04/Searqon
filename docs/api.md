@@ -255,7 +255,7 @@ Health check endpoint.
 ```json
 {
   "status": "ok",
-  "engine": "go_scraper",
+  "engine": "src",
   "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health"]
 }
 ```

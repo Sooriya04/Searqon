@@ -100,7 +100,7 @@ For the best results and reliability:
 docker run -d --name searxng --restart unless-stopped -p 8080:8080 searxng/searxng
 
 # Run Searqon
-cd go_scraper && go run .
+cd src && go run .
 ```
 
 Both are completely independent services — stopping one does not affect the other.

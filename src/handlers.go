@@ -265,5 +265,5 @@ func crawlHandler(w http.ResponseWriter, r *http.Request) {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status":"ok","engine":"go_scraper","endpoints":["/scrape","/scrape/html","/scrape/batch","/map","/crawl","/health"]}`)
+	fmt.Fprintf(w, `{"status":"ok","engine":"src","endpoints":["/scrape","/scrape/html","/scrape/batch","/map","/crawl","/health"]}`)
 }

@@ -1,0 +1,15 @@
+# SearXNG configuration for Searqon
+
+use_default_settings: true
+
+server:
+  port: 4002
+  bind_address: "0.0.0.0"
+  secret_key: "searqon_secret_key_change_me"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json

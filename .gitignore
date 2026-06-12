@@ -1,7 +1,7 @@
 # Compiled binaries — never commit, users compile locally
 searqon
-go_scraper/go_scraper
-go_scraper/go_scraper_bin
+src/src
+src/src_bin
 
 # Graphify outputs
 graphify-out/
