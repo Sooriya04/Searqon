@@ -336,7 +336,7 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				var scraped ScrapeResult
 				var htmlContent string
 
-				scraped, htmlContent = scrapeSingleURL(task.url, format)
+				scraped, htmlContent = scrapeSingleURL(task.url, format, false)
 
 				mu.Lock()
 				pages = append(pages, scraped)

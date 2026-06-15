@@ -195,15 +195,17 @@ func scrapeHTMLContent(htmlContent string, targetURL string, format string, star
 	return result
 }
 
-func scrapeSingleURL(targetURL string, format string) (ScrapeResult, string) {
+func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeResult, string) {
 	startTime := time.Now()
 	startISO := startTime.UTC().Format(time.RFC3339)
 
 	// ── Stage 0: Check Postgres cache first ────────────────────────────────────
-	if cached, found := getScrapeCache(targetURL); found {
-		log.Printf("[Scrape] [CACHE HIT] URL=%s (%d words)", targetURL, cached.WordCount)
-		cached.Duration = time.Since(startTime).Milliseconds()
-		return cached, ""
+	if !bypassCache {
+		if cached, found := getScrapeCache(targetURL); found {
+			log.Printf("[Scrape] [CACHE HIT] URL=%s (%d words)", targetURL, cached.WordCount)
+			cached.Duration = time.Since(startTime).Milliseconds()
+			return cached, ""
+		}
 	}
 
 	result := ScrapeResult{URL: targetURL, StartTime: startISO}

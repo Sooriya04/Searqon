@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -11,13 +12,15 @@ import (
 // ─── Request / Response Models ───────────────────────────────────────────────
 
 type ScrapeRequest struct {
-	URL    string `json:"url"`
-	Format string `json:"format"` // "markdown" (default) | "text"
+	URL         string `json:"url"`
+	Format      string `json:"format"` // "markdown" (default) | "text"
+	BypassCache bool   `json:"bypass_cache"`
 }
 
 type BatchScrapeRequest struct {
-	URLs   []string `json:"urls"`
-	Format string   `json:"format"`
+	URLs        []string `json:"urls"`
+	Format      string   `json:"format"`
+	BypassCache bool     `json:"bypass_cache"`
 }
 
 type MapRequest struct {
@@ -90,7 +93,7 @@ func scrapeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, _ := scrapeSingleURL(req.URL, req.Format)
+	result, _ := scrapeSingleURL(req.URL, req.Format, req.BypassCache)
 
 	w.Header().Set("Content-Type", "application/json")
 	if result.Error != "" {
@@ -174,7 +177,7 @@ func batchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			scraped, _ := scrapeSingleURL(targetURL, req.Format)
+			scraped, _ := scrapeSingleURL(targetURL, req.Format, req.BypassCache)
 			results[index] = scraped
 		}(i, u)
 	}
@@ -265,5 +268,81 @@ func crawlHandler(w http.ResponseWriter, r *http.Request) {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status":"ok","engine":"src","endpoints":["/scrape","/scrape/html","/scrape/batch","/map","/crawl","/health"]}`)
+	fmt.Fprintf(w, `{"status":"ok","engine":"src","endpoints":["/scrape","/scrape/html","/scrape/batch","/map","/crawl","/health","/r/"]}`)
+}
+
+func jinaReaderHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method != http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract target URL
+	var targetURL string
+	// Support /r/https://example.com
+	if len(r.URL.Path) > len("/r/") {
+		targetURL = r.URL.Path[len("/r/"):]
+	} else {
+		// Support /r?url=https://example.com
+		targetURL = r.URL.Query().Get("url")
+	}
+
+	if targetURL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"url query parameter or path segment is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Jina Reader also supports cache bypassing (usually done by header or param)
+	// We can support `bypass_cache=true` query parameter
+	bypassCache := r.URL.Query().Get("bypass_cache") == "true"
+
+	// Scrape URL (force markdown format)
+	scraped, _ := scrapeSingleURL(targetURL, "markdown", bypassCache)
+
+	// Check if JSON response is requested (Accept header contains application/json)
+	acceptHeader := r.Header.Get("Accept")
+	if strings.Contains(acceptHeader, "application/json") || r.URL.Query().Get("json") == "true" {
+		w.Header().Set("Content-Type", "application/json")
+		if scraped.Error != "" {
+			w.WriteHeader(http.StatusGatewayTimeout)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":   http.StatusGatewayTimeout,
+				"status": "failed",
+				"error":  scraped.Error,
+				"data": map[string]interface{}{
+					"url": targetURL,
+				},
+			})
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":   200,
+			"status": "success",
+			"data": map[string]interface{}{
+				"title":    scraped.Title,
+				"url":      scraped.URL,
+				"content":  scraped.Markdown, // Jina Reader typically returns markdown as content
+				"raw":      scraped.Content,
+				"usage": map[string]interface{}{
+					"tokens": scraped.WordCount, // fallback token usage
+				},
+			},
+		})
+	} else {
+		// Return raw Markdown string
+		if scraped.Error != "" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusGatewayTimeout)
+			fmt.Fprintf(w, "Error scraping page: %s", scraped.Error)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, scraped.Markdown)
+	}
 }

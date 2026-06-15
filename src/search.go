@@ -22,18 +22,18 @@ type SearchResult struct {
 	Title    string `json:"title"`
 	URL      string `json:"url"`
 	Snippet  string `json:"snippet"`
-	Source   string `json:"source"`            // "searxng" | "duckduckgo"
-	Content  string `json:"content,omitempty"` // scraped plain text
+	Source   string `json:"source"`             // "searxng" | "duckduckgo"
+	Content  string `json:"content,omitempty"`  // scraped plain text
 	Markdown string `json:"markdown,omitempty"` // scraped markdown
 	Scraped  bool   `json:"scraped"`
 }
 
 type SearchResponse struct {
-	Query      string         `json:"query"`
-	Results    []SearchResult `json:"results"`
-	Total      int            `json:"total"`
-	Duration   int64          `json:"duration"`
-	Provider   string         `json:"provider"` // which provider succeeded
+	Query    string         `json:"query"`
+	Results  []SearchResult `json:"results"`
+	Total    int            `json:"total"`
+	Duration int64          `json:"duration"`
+	Provider string         `json:"provider"` // which provider succeeded
 }
 
 func getSearXNGBase() string {
@@ -116,7 +116,7 @@ func searchSearXNG(query string, limit int) ([]SearchResult, error) {
 
 func searchDDGFallback(query string, limit int) ([]SearchResult, error) {
 	params := url.Values{"q": {query}}
-	reqURL := "https://html.duckduckgo.com/html/?"+params.Encode()
+	reqURL := "https://html.duckduckgo.com/html/?" + params.Encode()
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -186,7 +186,7 @@ func searchDDGFallback(query string, limit int) ([]SearchResult, error) {
 // 4. URL deduplication to prevent duplicate scraping/indexing
 // 5. Concurrent page scraping (goroutines) governed by global 2.5s deadline
 
-func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
+func runSearchPipeline(query string, limit int, scrape bool, bypassCache bool) SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
@@ -195,13 +195,15 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 	response := SearchResponse{Query: query}
 
 	// ── Stage 0: Check Postgres cache first ────────────────────────────────────
-	if cachedResults, provider, found := getSearchCache(query); found {
-		log.Printf("[Search] [CACHE HIT] Query=%q Provider=%s (%d results)", query, provider, len(cachedResults))
-		response.Results = cachedResults
-		response.Total = len(cachedResults)
-		response.Provider = provider
-		response.Duration = time.Since(start).Milliseconds()
-		return response
+	if !bypassCache {
+		if cachedResults, provider, found := getSearchCache(query); found {
+			log.Printf("[Search] [CACHE HIT] Query=%q Provider=%s (%d results)", query, provider, len(cachedResults))
+			response.Results = cachedResults
+			response.Total = len(cachedResults)
+			response.Provider = provider
+			response.Duration = time.Since(start).Milliseconds()
+			return response
+		}
 	}
 
 	// ── Stage 1: Search Discovery (SearXNG -> DDG) ─────────────────────────────
@@ -264,7 +266,7 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 				}
 
 				// scrapeSingleURL handles page caching inside scraper.go
-				scraped, _ := scrapeSingleURL(results[idx].URL, "markdown")
+				scraped, _ := scrapeSingleURL(results[idx].URL, "markdown", bypassCache)
 
 				select {
 				case <-scrapeCtx.Done():
@@ -312,9 +314,10 @@ func runSearchPipeline(query string, limit int, scrape bool) SearchResponse {
 // ─── HTTP Handler ─────────────────────────────────────────────────────────────
 
 type SearchRequest struct {
-	Query  string `json:"query"`
-	Limit  int    `json:"limit"`
-	Scrape *bool  `json:"scrape"` // pointer so we can detect if it was set
+	Query       string `json:"query"`
+	Limit       int    `json:"limit"`
+	Scrape      *bool  `json:"scrape"` // pointer so we can detect if it was set
+	BypassCache bool   `json:"bypass_cache"`
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
@@ -334,6 +337,9 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		req.Limit = 5
 		if s := r.URL.Query().Get("scrape"); s == "false" {
 			defaultScrape = false
+		}
+		if b := r.URL.Query().Get("bypass_cache"); b == "true" {
+			req.BypassCache = true
 		}
 	} else if r.Method == http.MethodPost {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -356,7 +362,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Search] Query=%q Limit=%d Scrape=%v", req.Query, req.Limit, defaultScrape)
-	result := runSearchPipeline(req.Query, req.Limit, defaultScrape)
+	log.Printf("[Search] Query=%q Limit=%d Scrape=%v BypassCache=%v", req.Query, req.Limit, defaultScrape, req.BypassCache)
+	result := runSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache)
 	json.NewEncoder(w).Encode(result)
 }

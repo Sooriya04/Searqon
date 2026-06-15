@@ -22,6 +22,7 @@ func main() {
 	mux.HandleFunc("/scrape", scrapeHandler)         // POST { "url": "..." }
 	mux.HandleFunc("/scrape/batch", batchScrapeHandler) // POST { "urls": [...] }
 	mux.HandleFunc("/scrape/html", scrapeHTMLHandler)   // POST { "html": "...", "url": "..." }
+	mux.HandleFunc("/r/", jinaReaderHandler)            // GET /r/<url> (Jina Reader compatibility)
 
 	// ── Crawler / Mapper ─────────────────────────────────────────────────────
 	mux.HandleFunc("/crawl", crawlHandler) // POST { "url": "...", "limit": 30, "depth": 2 }
@@ -39,7 +40,7 @@ func main() {
 	}
 
 	log.Printf("[Searqon] Starting on :%s", port)
-	log.Printf("[Searqon] Endpoints: POST /search, POST /scrape, POST /scrape/batch, POST /scrape/html, POST /crawl, POST /map, GET /health")
+	log.Printf("[Searqon] Endpoints: POST /search, POST /scrape, POST /scrape/batch, POST /scrape/html, GET /r/<url>, POST /crawl, POST /map, GET /health")
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("[Searqon] Failed to start: %v", err)

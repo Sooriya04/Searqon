@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,9 +15,12 @@ import (
 )
 
 var (
-	dbPool    *pgxpool.Pool
-	dbEnabled bool
-	dbMu      sync.RWMutex
+	dbPool         *pgxpool.Pool
+	dbEnabled      bool
+	dbMu           sync.RWMutex
+	searchCacheTTL time.Duration = 24 * time.Hour
+	scrapeCacheTTL time.Duration = 7 * 24 * time.Hour
+	cleanupCancel  context.CancelFunc
 )
 
 // InitDB initializes the PostgreSQL connection pool.
@@ -66,14 +70,36 @@ func InitDB() {
 	dbEnabled = true
 	log.Println("[Database] Connection pool initialized successfully. Cache database is ENABLED.")
 
+	// Load TTL configs
+	if searchTTLHours := os.Getenv("SEARCH_CACHE_TTL_HOURS"); searchTTLHours != "" {
+		if hours, err := strconv.Atoi(searchTTLHours); err == nil && hours > 0 {
+			searchCacheTTL = time.Duration(hours) * time.Hour
+			log.Printf("[Database] Configured search cache TTL to %d hours", hours)
+		}
+	}
+	if scrapeTTLDays := os.Getenv("SCRAPE_CACHE_TTL_DAYS"); scrapeTTLDays != "" {
+		if days, err := strconv.Atoi(scrapeTTLDays); err == nil && days > 0 {
+			scrapeCacheTTL = time.Duration(days) * 24 * time.Hour
+			log.Printf("[Database] Configured scrape cache TTL to %d days", days)
+		}
+	}
+
 	// Auto-initialize tables if they do not exist
 	initTables()
+
+	// Start cache cleanup background worker
+	cleanupCtx, cleanupCancelFunc := context.WithCancel(context.Background())
+	cleanupCancel = cleanupCancelFunc
+	StartCacheCleanupWorker(cleanupCtx)
 }
 
 // CloseDB closes the database connection pool safely.
 func CloseDB() {
 	dbMu.Lock()
 	defer dbMu.Unlock()
+	if cleanupCancel != nil {
+		cleanupCancel()
+	}
 	if dbEnabled && dbPool != nil {
 		dbPool.Close()
 		log.Println("[Database] Connection pool closed.")
@@ -121,6 +147,7 @@ func getSearchCache(query string) ([]SearchResult, string, bool) {
 	dbMu.RLock()
 	enabled := dbEnabled
 	pool := dbPool
+	ttl := searchCacheTTL
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
@@ -133,8 +160,9 @@ func getSearchCache(query string) ([]SearchResult, string, bool) {
 	var resultsJSON []byte
 	var provider string
 
-	// Look up in db
-	err := pool.QueryRow(ctx, "SELECT results, provider FROM search_cache WHERE query = $1 LIMIT 1", query).Scan(&resultsJSON, &provider)
+	// Look up in db - only return if created within TTL
+	minCreatedAt := time.Now().Add(-ttl)
+	err := pool.QueryRow(ctx, "SELECT results, provider FROM search_cache WHERE query = $1 AND created_at > $2 LIMIT 1", query, minCreatedAt).Scan(&resultsJSON, &provider)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			log.Printf("[Database] Error querying search_cache for %q: %v", query, err)
@@ -189,6 +217,7 @@ func getScrapeCache(targetURL string) (ScrapeResult, bool) {
 	dbMu.RLock()
 	enabled := dbEnabled
 	pool := dbPool
+	ttl := scrapeCacheTTL
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
@@ -202,10 +231,11 @@ func getScrapeCache(targetURL string) (ScrapeResult, bool) {
 	var errorMsg *string
 	var isScraped bool
 
+	minCreatedAt := time.Now().Add(-ttl)
 	err := pool.QueryRow(ctx, `
 		SELECT title, content, markdown, word_count, scraped, error_msg, created_at
-		FROM scrape_cache WHERE url = $1 LIMIT 1
-	`, targetURL).Scan(&res.Title, &res.Content, &res.Markdown, &res.WordCount, &isScraped, &errorMsg, &res.StartTime)
+		FROM scrape_cache WHERE url = $1 AND created_at > $2 LIMIT 1
+	`, targetURL, minCreatedAt).Scan(&res.Title, &res.Content, &res.Markdown, &res.WordCount, &isScraped, &errorMsg, &res.StartTime)
 
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -253,5 +283,61 @@ func saveScrapeCache(res ScrapeResult) {
 
 	if err != nil {
 		log.Printf("[Database] Error saving scrape cache for %q: %v", res.URL, err)
+	}
+}
+
+// ─── Cache Cleanup Background Worker ──────────────────────────────────────────
+
+func StartCacheCleanupWorker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Hour)
+	go func() {
+		log.Println("[Database] Started cache cleanup background worker (interval: 1 hour).")
+		// Run initial cleanup on startup
+		cleanupExpiredCache()
+
+		for {
+			select {
+			case <-ticker.C:
+				cleanupExpiredCache()
+			case <-ctx.Done():
+				ticker.Stop()
+				log.Println("[Database] Stopped cache cleanup background worker.")
+				return
+			}
+		}
+	}()
+}
+
+func cleanupExpiredCache() {
+	dbMu.RLock()
+	enabled := dbEnabled
+	pool := dbPool
+	searchTTL := searchCacheTTL
+	scrapeTTL := scrapeCacheTTL
+	dbMu.RUnlock()
+
+	if !enabled || pool == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Delete expired search cache entries
+	searchLimit := time.Now().Add(-searchTTL)
+	searchTag, err := pool.Exec(ctx, "DELETE FROM search_cache WHERE created_at < $1", searchLimit)
+	if err != nil {
+		log.Printf("[Database] Error cleaning expired search_cache entries: %v", err)
+	} else if affected := searchTag.RowsAffected(); affected > 0 {
+		log.Printf("[Database] Evicted %d expired search cache entries.", affected)
+	}
+
+	// Delete expired scrape cache entries
+	scrapeLimit := time.Now().Add(-scrapeTTL)
+	scrapeTag, err := pool.Exec(ctx, "DELETE FROM scrape_cache WHERE created_at < $1", scrapeLimit)
+	if err != nil {
+		log.Printf("[Database] Error cleaning expired scrape_cache entries: %v", err)
+	} else if affected := scrapeTag.RowsAffected(); affected > 0 {
+		log.Printf("[Database] Evicted %d expired scrape cache entries.", affected)
 	}
 }

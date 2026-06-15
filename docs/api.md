@@ -16,7 +16,8 @@ The main pipeline endpoint. Runs a web search and optionally scrapes the top res
 {
   "query": "what is ycombinator",
   "limit": 5,
-  "scrape": true
+  "scrape": true,
+  "bypass_cache": false
 }
 ```
 
@@ -25,6 +26,7 @@ The main pipeline endpoint. Runs a web search and optionally scrapes the top res
 | `query` | string | required | Search query |
 | `limit` | int | `5` | Max results to return (1–10) |
 | `scrape` | bool | `true` | Whether to fetch and extract full page content |
+| `bypass_cache` | bool | `false` | If `true`, bypasses cache and performs live search/scrapes |
 
 ### Response
 
@@ -80,7 +82,8 @@ Scrape a single URL and return clean text + markdown.
 ```json
 {
   "url": "https://en.wikipedia.org/wiki/Y_Combinator",
-  "format": "markdown"
+  "format": "markdown",
+  "bypass_cache": false
 }
 ```
 
@@ -88,6 +91,7 @@ Scrape a single URL and return clean text + markdown.
 |---|---|---|---|
 | `url` | string | required | Target URL to scrape |
 | `format` | string | `"markdown"` | `"markdown"` or `"text"` |
+| `bypass_cache` | bool | `false` | If `true`, bypasses cache and performs a live scrape |
 
 ### Response
 
@@ -127,7 +131,8 @@ Scrape multiple URLs concurrently (up to 20 at once).
     "https://en.wikipedia.org/wiki/Y_Combinator",
     "https://www.ycombinator.com/about/"
   ],
-  "format": "markdown"
+  "format": "markdown",
+  "bypass_cache": false
 }
 ```
 
@@ -161,6 +166,58 @@ Parse raw HTML you already have. No network request is made.
 ### Response
 
 Same as `/scrape`.
+
+---
+
+## `GET /r/<url>`
+
+Jina Reader compatibility endpoint. Scrapes the given URL and returns its content as raw Markdown (default) or JSON.
+
+### Request
+
+```bash
+# Get raw markdown
+curl http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
+
+# Get raw markdown (query parameter style)
+curl "http://localhost:4001/r?url=https://en.wikipedia.org/wiki/Y_Combinator"
+
+# Get JSON format
+curl -H "Accept: application/json" http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
+```
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `bypass_cache` | string | `"false"` | Pass `"true"` to bypass database scrape cache. |
+| `json` | string | `"false"` | Pass `"true"` to force a JSON response. |
+
+### Response (Default: text/markdown)
+
+```markdown
+# Y Combinator
+
+Y Combinator, LLC (YC) is an American technology startup accelerator...
+```
+
+### Response (JSON: Accept header or `json=true`)
+
+```json
+{
+  "code": 200,
+  "status": "success",
+  "data": {
+    "title": "Y Combinator - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Y_Combinator",
+    "content": "# Y Combinator\n\nY Combinator, LLC (YC) is an American...",
+    "raw": "Y Combinator, LLC (YC) is an American technology startup accelerator...",
+    "usage": {
+      "tokens": 1842
+    }
+  }
+}
+```
 
 ---
 
@@ -256,7 +313,7 @@ Health check endpoint.
 {
   "status": "ok",
   "engine": "src",
-  "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health"]
+  "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health", "/r/"]
 }
 ```
 

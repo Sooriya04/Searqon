@@ -2,31 +2,40 @@
 
 APP      := searqon
 SRC_DIR  := ./src
-BIN      := ./${APP}
+BIN      := ./bin/${APP}
 PORT     := 4001
 
-.PHONY: help run build clean test kill restart searxng logs
+# Load .env file if it exists
+ifneq (,$(wildcard .env))
+  include .env
+  export
+endif
+
+.PHONY: help run build clean test kill restart logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "  SearXNG: docker run -d --name searxng -p 8080:8080 searxng/searxng"
+	@echo "  Env: Configure SEARXNG_URL and DATABASE_URL in .env"
 
-run: ## Run server in dev mode (go run .)
+run: ## Run server in dev mode (go run .), loads .env automatically
+	@-kill $$(lsof -t -i:$(PORT)) 2>/dev/null || true
 	@echo "→ Starting Searqon on :$(PORT)..."
+	@echo "→ SearXNG → $(SEARXNG_URL)"
 	cd $(SRC_DIR) && go run .
 
-build: ## Compile-check only (output discarded — users run via 'make run')
-	@echo "→ Build check..."
-	cd $(SRC_DIR) && go build -o /dev/null .
-	@echo "✓ Build OK"
+build: ## Compile binary → bin/searqon
+	@echo "→ Building $(APP)..."
+	@mkdir -p bin
+	cd $(SRC_DIR) && go build -o ../bin/$(APP) .
+	@echo "✓ Binary ready: bin/$(APP)"
 
 clean: ## Remove compiled binary
 	rm -f $(BIN)
 	@echo "✓ Cleaned"
 
-kill: ## Kill any process on port 3001
+kill: ## Kill any process on port 4001
 	@-kill $$(lsof -t -i:$(PORT)) 2>/dev/null && echo "✓ Killed process on :$(PORT)" || echo "No process on :$(PORT)"
 
 restart: kill ## Kill existing server and rerun
@@ -38,15 +47,6 @@ test: ## Run all go tests
 
 lint: ## Run go vet
 	cd $(SRC_DIR) && go vet ./...
-
-searxng: ## Start SearXNG via Docker (primary search provider)
-	@echo "→ Starting SearXNG on :8080..."
-	docker run -d --name searxng -p 8080:8080 searxng/searxng || \
-		docker start searxng
-	@echo "✓ SearXNG running at http://localhost:8080"
-
-searxng-stop: ## Stop SearXNG
-	docker stop searxng && echo "✓ SearXNG stopped"
 
 logs: ## Show server logs (for background process)
 	@lsof -t -i:$(PORT) | xargs -I{} tail -f /proc/{}/fd/1 2>/dev/null || \
