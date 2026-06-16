@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Searqon — Open-Source Web Intelligence & Search Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #030712;
+            --bg-card: rgba(17, 24, 39, 0.65);
+            --border-glow: rgba(99, 102, 241, 0.15);
+            --border-muted: rgba(255, 255, 255, 0.07);
+
+            --accent-blue: #3b82f6;
+            --accent-indigo: #6366f1;
+            --accent-emerald: #10b981;
+
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Background elements */
+        .ambient-glow-top {
+            position: absolute;
+            width: 800px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .ambient-glow-bottom {
+            position: absolute;
+            width: 600px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+            bottom: 10%;
+            right: -100px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Layout & Containers */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Navigation Header */
+        header {
+            border-bottom: 1px solid var(--border-muted);
+            backdrop-filter: blur(12px);
+            background: rgba(3, 7, 18, 0.7);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 40%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-indigo);
+            box-shadow: 0 0 10px var(--accent-indigo);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover {
+            color: #ffffff;
+        }
+
+        .btn-github {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-muted);
+            color: #ffffff !important;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600 !important;
+            font-size: 0.85rem !important;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .btn-github:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 7rem 0 5rem 0;
+            display: grid;
+            grid-template-columns: 1.15fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            position: relative;
+        }
+
+        @media (max-width: 960px) {
+            .hero {
+                grid-template-columns: 1fr;
+                text-align: center;
+                padding-top: 4rem;
+                gap: 3rem;
+            }
+        }
+
+        .hero-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .badge {
+            align-self: flex-start;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--border-glow);
+            color: #818cf8;
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.02em;
+        }
+
+        @media (max-width: 960px) {
+            .badge {
+                align-self: center;
+            }
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.15;
+            margin-bottom: 1.5rem;
+            color: #ffffff;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(to right, #6366f1, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            font-weight: 400;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        @media (max-width: 960px) {
+            .cta-buttons {
+                justify-content: center;
+            }
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-indigo) 0%, var(--accent-blue) 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 0.75rem 1.75rem;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-secondary {
+            border: 1px solid var(--border-muted);
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.75rem 1.75rem;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+        }
+
+        /* Live Terminal Simulator */
+        .terminal {
+            background: #0d0f1a;
+            border: 1px solid var(--border-muted);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            height: 380px;
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+        }
+
+        .terminal-header {
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-muted);
+            padding: 0.75rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .terminal-actions {
+            display: flex;
+            gap: 0.45rem;
+        }
+
+        .terminal-action {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+
+        .terminal-action.red {
+            background-color: #ef4444;
+        }
+
+        .terminal-action.yellow {
+            background-color: #f59e0b;
+        }
+
+        .terminal-action.green {
+            background-color: #10b981;
+        }
+
+        .terminal-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .terminal-body {
+            flex-grow: 1;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #ffffff;
+            overflow-y: auto;
+        }
+
+        .term-prompt {
+            color: var(--accent-indigo);
+            font-weight: 700;
+        }
+
+        .term-cmd {
+            color: #e5e7eb;
+        }
+
+        .term-log {
+            color: #9ca3af;
+            display: none;
+            margin-top: 0.5rem;
+        }
+
+        .term-success {
+            color: var(--accent-emerald);
+        }
+
+        .term-info {
+            color: var(--accent-blue);
+        }
+
+        .term-output {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: #34d399;
+            margin-top: 0.75rem;
+            display: none;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        /* Product Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 4rem;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-muted);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: border-color 0.3s, transform 0.3s;
+            position: relative;
+            backdrop-filter: blur(12px);
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon-container {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            color: var(--accent-indigo);
+        }
+
+        .feature-card h3 {
+            font-size: 1.15rem;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Crawler & Compliance Section */
+        .spec-section {
+            padding: 6rem 0;
+            border-top: 1px solid var(--border-muted);
+            margin-top: 5rem;
+        }
+
+        .spec-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 4rem;
+            align-items: start;
+        }
+
+        @media (max-width: 960px) {
+            .spec-layout {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+            }
+        }
+
+        .spec-details h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.25rem;
+            color: #ffffff;
+        }
+
+        .spec-details p {
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+            font-size: 1.05rem;
+        }
+
+        .spec-item {
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .spec-item::before {
+            content: "✓";
+            color: var(--accent-emerald);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .spec-item h4 {
+            color: #ffffff;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        .spec-item p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        /* Interactive Code Tabs for Webmasters */
+        .code-console {
+            background: #0d0f1a;
+            border: 1px solid var(--border-muted);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .console-header {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-muted);
+            padding: 0.25rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .recipe-tabs {
+            display: flex;
+        }
+
+        .recipe-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 1rem 1.25rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .recipe-tab:hover {
+            color: #ffffff;
+        }
+
+        .recipe-tab.active {
+            color: var(--accent-indigo);
+            border-bottom-color: var(--accent-indigo);
+        }
+
+        .recipe-body {
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #f3f4f6;
+            min-height: 200px;
+            position: relative;
+        }
+
+        .recipe-body pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .recipe-comment {
+            color: #4b5563;
+        }
+
+        .recipe-key {
+            color: var(--accent-indigo);
+        }
+
+        .recipe-val {
+            color: var(--accent-emerald);
+        }
+
+        .recipe-copy-floating {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-muted);
+            border-radius: 6px;
+            color: var(--text-muted);
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .recipe-copy-floating:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .recipe-copy-floating svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        .ua-box {
+            background: rgba(99, 102, 241, 0.03);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .ua-box-label {
+            font-size: 0.75rem;
+            color: var(--accent-indigo);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.25rem;
+        }
+
+        .ua-string {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: #ffffff;
+            word-break: break-all;
+        }
+
+        .copy-button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-muted);
+            color: var(--text-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .copy-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Toast Alert */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--accent-indigo);
+            color: #ffffff;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 2000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Footer Section */
+        footer {
+            border-top: 1px solid var(--border-muted);
+            padding: 4rem 0 3rem 0;
+            background-color: #020617;
+            text-align: center;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            position: relative;
+        }
+
+        footer a {
+            color: var(--accent-indigo);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .footer-logo {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="ambient-glow-top"></div>
+    <div class="ambient-glow-bottom"></div>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container nav-wrapper">
+            <div class="logo">
+                Searqon
+                <div class="logo-dot"></div>
+            </div>
+            <nav class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#botinfo">SearqonBot</a>
+                <a href="https://github.com/Sooriya04/Searqon" target="_blank" class="btn-github">
+                    <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"
+                        style="display:inline-block;vertical-align:middle;margin-right:4px;">
+                        <path
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                        </path>
+                    </svg>
+                    GitHub
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <span class="badge">Open-Source Web Intelligence</span>
+                <h1>The Search & Web Retrieval Layer Built for <span>AI Agents</span></h1>
+                <p>
+                    Searqon searches, crawls, extracts, and purifies raw web pages into clean markdown. Self-hosted,
+                    privacy-first, and highly performant.
+                </p>
+                <div class="cta-buttons">
+                    <a href="https://github.com/Sooriya04/Searqon" target="_blank" class="btn-primary">Get Started</a>
+                    <a href="#botinfo" class="btn-secondary">View Bot Info</a>
+                </div>
+            </div>
+
+            <!-- Terminal Live Demonstration Mockup -->
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-actions">
+                        <span class="terminal-action red"></span>
+                        <span class="terminal-action yellow"></span>
+                        <span class="terminal-action green"></span>
+                    </div>
+                    <span class="terminal-label">searqon-server logs</span>
+                </div>
+                <div class="terminal-body" id="term-body">
+                    <span class="term-prompt">sooriya@searqon:~$</span> <span class="term-cmd"
+                        id="typed-cmd"></span><span id="term-cursor">|</span>
+
+                    <div class="term-log" id="log-1">2026/06/16 07:58:44 <span class="term-info">[Search]</span>
+                        Query="deepseek models" Limit=3 Scrape=true</div>
+                    <div class="term-log" id="log-2">2026/06/16 07:58:47 <span class="term-info">[Search]</span>
+                        Provider=searxng found 3 results</div>
+                    <div class="term-log" id="log-3">2026/06/16 07:58:47 <span class="term-info">[Scrape]</span> Match
+                        agent policy for "https://deepseek.com" -> <span class="term-success">Allowed</span></div>
+                    <div class="term-log" id="log-4">2026/06/16 07:58:47 <span class="term-info">[Scrape]</span>
+                        Attempting Lightpanda fetch: https://deepseek.com</div>
+                    <div class="term-log" id="log-5">2026/06/16 07:58:49 <span class="term-success">[Lightpanda]</span>
+                        Scraped page success (824 words, 2055ms)</div>
+
+                    <div class="term-output" id="output-block">
+                        <span class="recipe-comment"># Markdown Response</span>
+                        # DeepSeek
+
+                        DeepSeek is an artificial intelligence company specializing in large-scale language models.
+
+                        ## Open Source Models
+                        - DeepSeek-V3: Mixture-of-Experts language model
+                        - DeepSeek-Coder: Specialized software development agent
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Product Features -->
+        <section id="features" class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon-container">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                <h3>Dual-Provider Search</h3>
+                <p>Queries a local SearXNG cluster as the primary engine, falling back gracefully to DuckDuckGo Lite
+                    HTML if SearXNG is rate-limited or down.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon-container">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+                    </svg>
+                </div>
+                <h3>Sub-5ms Cache Check</h3>
+                <p>Maintains a dual-layer PostgreSQL cache pool. Search results (24h TTL) and page scrapes (7-day TTL)
+                    load instantly for recurring requests.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon-container">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                        <line x1="7" y1="2" x2="7" y2="22"></line>
+                        <line x1="17" y1="2" x2="17" y2="22"></line>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <line x1="2" y1="7" x2="7" y2="7"></line>
+                        <line x1="2" y1="17" x2="7" y2="17"></line>
+                        <line x1="17" y1="17" x2="22" y2="17"></line>
+                        <line x1="17" y1="7" x2="22" y2="7"></line>
+                    </svg>
+                </div>
+                <h3>Lightpanda Rendering</h3>
+                <p>Spawns the Lightpanda headless browser dynamically to render client-side JavaScript (React, Next.js)
+                    for deep text extraction.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon-container">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M12 2a10 10 0 0 0-7.38 16.75c.18.2.38.3.61.3h13.54c.23 0 .43-.1.61-.3A10 10 0 0 0 12 2z">
+                        </path>
+                        <path d="M12 6v6"></path>
+                        <path d="M12 16h.01"></path>
+                    </svg>
+                </div>
+                <h3>Robots.txt Obedience</h3>
+                <p>Audits remote rules, respects crawling limits, respects crawl-delays, and gracefully switches
+                    User-Agents according to site policies.</p>
+            </div>
+        </section>
+
+        <!-- Crawler Specification (SearqonBot) -->
+        <section id="botinfo" class="spec-section">
+            <div class="spec-layout">
+                <div class="spec-details">
+                    <h2>SearqonBot Verification</h2>
+                    <p>
+                        <strong>SearqonBot/1.0</strong> is the web crawler utilized by self-hosted Searqon search
+                        installations. It compiles public web content to provide structured text data for users and AI
+                        summarization apps.
+                    </p>
+                    <p>
+                        We value webmaster policies and work hard to ensure the bot behaves politely:
+                    </p>
+
+                    <div class="spec-item">
+                        <h4>Anti-Overload Safeguards</h4>
+                        <p>Honors crawl delays specified in robots.txt and restricts timeouts to 7-8 seconds to avoid
+                            pinning server threads.</p>
+                    </div>
+
+                    <div class="spec-item">
+                        <h4>Opt-Out Capabilities</h4>
+                        <p>Allows webmasters to completely block or route SearqonBot using standard instructions in
+                            their robots.txt file.</p>
+                    </div>
+
+                    <div class="spec-item">
+                        <h4>Zero Security Intrusion</h4>
+                        <p>We only scrape public webpages. We never scan paths for vulnerabilities or bypass security
+                            payloads.</p>
+                    </div>
+
+                    <div class="ua-box">
+                        <div class="ua-content">
+                            <div class="ua-box-label">Official User-Agent string</div>
+                            <div class="ua-string" id="ua-text">SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)
+                            </div>
+                        </div>
+                        <button class="copy-button" onclick="copyUA()">Copy Agent</button>
+                    </div>
+                </div>
+
+                <!-- Webmaster Configuration Visual Console -->
+                <div class="code-console">
+                    <div class="console-header">
+                        <div class="recipe-tabs">
+                            <button class="recipe-tab active" onclick="switchTab('block')">Block Bot</button>
+                            <button class="recipe-tab" onclick="switchTab('limit')">Limit Rate</button>
+                            <button class="recipe-tab" onclick="switchTab('allow')">Allow Only</button>
+                        </div>
+                        <div class="terminal-actions">
+                            <span class="terminal-action red"></span>
+                            <span class="terminal-action yellow"></span>
+                            <span class="terminal-action green"></span>
+                        </div>
+                    </div>
+                    <div class="recipe-body">
+                        <span class="recipe-copy-floating" title="Copy Configuration" onclick="copyRecipe()">
+                            <svg viewBox="0 0 24 24" width="14" height="14">
+                                <path
+                                    d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+                            </svg>
+                        </span>
+                        <pre id="recipe-code"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Toast Alert -->
+    <div class="toast" id="toast-alert">Text copied to clipboard!</div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-logo">
+                Searqon
+                <div class="logo-dot"></div>
+            </div>
+            <p>
+                Released under the <a href="https://github.com/Sooriya04/Searqon/blob/dev/LICENSE" target="_blank">MIT
+                    License</a>.
+                Maintained by <a href="https://github.com/Sooriya04" target="_blank">Sooriya</a>.
+            </p>
+        </div>
+    </footer>
+
+    <!-- Interactive Scripting -->
+    <script>
+        // Command Prompt typing simulator
+        const cmdText = "bin/searqon --query \"deepseek models\" --scrape";
+        const typedCmd = document.getElementById("typed-cmd");
+        const cursor = document.getElementById("term-cursor");
+        let charIndex = 0;
+
+        function typeCommand() {
+            if (charIndex < cmdText.length) {
+                typedCmd.textContent += cmdText.charAt(charIndex);
+                charIndex++;
+                setTimeout(typeCommand, 70);
+            } else {
+                cursor.style.display = "none";
+                triggerLogs();
+            }
+        }
+
+        function triggerLogs() {
+            setTimeout(() => { document.getElementById("log-1").style.display = "block"; }, 300);
+            setTimeout(() => { document.getElementById("log-2").style.display = "block"; }, 800);
+            setTimeout(() => { document.getElementById("log-3").style.display = "block"; }, 1400);
+            setTimeout(() => { document.getElementById("log-4").style.display = "block"; }, 1900);
+            setTimeout(() => { document.getElementById("log-5").style.display = "block"; }, 3200);
+            setTimeout(() => { document.getElementById("output-block").style.display = "block"; }, 3800);
+        }
+
+        // Run typing simulation on mount
+        setTimeout(typeCommand, 800);
+
+        // Tab Recipes mapping
+        const recipes = {
+            block: `<span class="recipe-comment"># Block SearqonBot from indexing anything</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/</span>`,
+            limit: `<span class="recipe-comment"># Permit SearqonBot but set rate delay (seconds)</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/wp-admin/</span>\n<span class="recipe-key">Crawl-delay:</span> <span class="recipe-val">5</span>`,
+            allow: `<span class="recipe-comment"># block all bots, permit only SearqonBot</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">*</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/</span>\n\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span>`
+        };
+
+        let activeTab = 'block';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.recipe-tab').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            activeTab = tab;
+            document.getElementById('recipe-code').innerHTML = recipes[tab];
+        }
+
+        // Initialize first tab
+        document.getElementById('recipe-code').innerHTML = recipes['block'];
+
+        // Copy functionality
+        const toast = document.getElementById("toast-alert");
+        function triggerToast(message) {
+            toast.textContent = message;
+            toast.classList.add("show");
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 2000);
+        }
+
+        function copyUA() {
+            const ua = document.getElementById("ua-text").textContent;
+            navigator.clipboard.writeText(ua).then(() => {
+                triggerToast("User-Agent copied to clipboard!");
+            });
+        }
+
+        function copyRecipe() {
+            // Strip HTML tags for clean text copying
+            const container = document.createElement("div");
+            container.innerHTML = recipes[activeTab];
+            const cleanText = container.textContent || container.innerText || "";
+            navigator.clipboard.writeText(cleanText).then(() => {
+                triggerToast("robots.txt recipe copied!");
+            });
+        }
+    </script>
+</body>
+
+</html>

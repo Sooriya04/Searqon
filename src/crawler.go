@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -39,6 +40,24 @@ var agentUserAgents = map[string]string{
 	"yandexbot":   "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
 }
 
+var rotatingUserAgents = []string{
+	// Chrome Windows
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+	// Chrome macOS
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+	// Firefox Windows
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+	// Firefox macOS
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
+	// Safari macOS
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+	// Safari iOS
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/605.1.15",
+	// Chrome Android
+	"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+}
+
 func getRobotsData(baseURL *url.URL) *RobotsData {
 	host := baseURL.Host
 	robotsMu.RLock()
@@ -58,7 +77,7 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", robotsURL, nil)
 	if err == nil {
-		req.Header.Set("User-Agent", "Searqon/1.0")
+		req.Header.Set("User-Agent", "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)")
 		resp, rerr := httpClient.Do(req)
 		if rerr == nil {
 			defer resp.Body.Close()
@@ -168,8 +187,18 @@ func isAgentAllowed(targetURL string, agent string, robotsData *RobotsData) (boo
 }
 
 func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Duration, bool) {
+	// 1. If wildcard "*" is allowed, rotate realistic browser User-Agents!
+	if allowed, delay := isAgentAllowed(targetURL, "*", robotsData); allowed {
+		ua := rotatingUserAgents[rand.Intn(len(rotatingUserAgents))]
+		return ua, delay, true
+	}
+
+	// 2. If wildcard is blocked but 'searqonbot' or 'searqon' is explicitly whitelisted, use it
+	if allowed, delay := isAgentAllowed(targetURL, "searqonbot", robotsData); allowed {
+		return "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)", delay, true
+	}
 	if allowed, delay := isAgentAllowed(targetURL, "searqon", robotsData); allowed {
-		return "Searqon/1.0", delay, true
+		return "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)", delay, true
 	}
 
 	searchAgents := []string{"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot"}
@@ -180,10 +209,6 @@ func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Du
 				return ua, delay, true
 			}
 		}
-	}
-
-	if allowed, delay := isAgentAllowed(targetURL, "*", robotsData); allowed {
-		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36", delay, true
 	}
 
 	for agent, ua := range agentUserAgents {

@@ -34,7 +34,7 @@ To prevent resource exhaustion and request hangs:
 ### Stage 4: robots.txt Parser & Compliance
 For each URL dispatched, the scraper first checks compliance with the host's crawling policy:
 1. **Fetch & Cache**: Fetches the host's `robots.txt` and caches the rule payload (`robotsCache`) to avoid repetitive overhead.
-2. **Agent Matching**: Searches for matching directives (`searqon`, generic search bots, or `*`).
+2. **Stealth Agent Matching & Rotation**: Searches for matching directives. If general crawlers (`*`) are allowed, the scraper randomly rotates among a pool of realistic browser User-Agent strings (Chrome, Firefox, Safari on Windows, macOS, iOS, Android) to bypass Cloudflare/Imperva blocks. If `*` is blocked but `searqon` is explicitly whitelisted, it uses `Searqon/1.0`.
 3. **Crawl Delay Compliance**: Respects optional `Crawl-delay` timers via `time.Sleep`. If disallowed, execution stops immediately and writes a "disallowed by robots.txt" status directly to the database.
 
 ### Stage 4.5: Lightpanda Headless Scraper (Optional)

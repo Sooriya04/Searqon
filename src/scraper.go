@@ -32,7 +32,7 @@ var httpClient = &http.Client{
 }
 
 var defaultHeaders = map[string]string{
-	"User-Agent":                "Searqon/1.0",
+	"User-Agent":                "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)",
 	"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 	"Accept-Language":           "en-US,en;q=0.9",
 	"Cache-Control":             "no-cache",
@@ -239,7 +239,7 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 	// ── Stage 0.5: Try Lightpanda Scraper if enabled ──────────────────────────
 	if enabled, binaryPath := loadLightpandaConfig(); enabled && binaryPath != "" {
 		log.Printf("[Scrape] Attempting Lightpanda fetch: %s", targetURL)
-		scraped, rawOut, err := scrapeWithLightpanda(targetURL, binaryPath, format, startTime)
+		scraped, rawOut, err := scrapeWithLightpanda(targetURL, userAgent, binaryPath, format, startTime)
 		if err == nil {
 			// Save successfully scraped page to DB
 			saveScrapeCache(scraped)
@@ -267,7 +267,7 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 }
 
 // scrapeWithLightpanda runs the Lightpanda CLI to execute JS and fetch markdown.
-func scrapeWithLightpanda(targetURL string, binaryPath string, format string, startTime time.Time) (ScrapeResult, string, error) {
+func scrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time) (ScrapeResult, string, error) {
 	startISO := startTime.UTC().Format(time.RFC3339)
 	result := ScrapeResult{URL: targetURL, StartTime: startISO}
 
@@ -278,6 +278,10 @@ func scrapeWithLightpanda(targetURL string, binaryPath string, format string, st
 		"--dump", "markdown",
 		"--wait-until", "networkalmostidle",
 		"--strip-mode", "js,ui,css",
+	}
+
+	if userAgent != "" {
+		args = append(args, "--user-agent", userAgent)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
