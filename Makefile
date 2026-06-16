@@ -11,7 +11,7 @@ ifneq (,$(wildcard .env))
   export
 endif
 
-.PHONY: help run build clean test kill restart logs
+.PHONY: help run build clean test kill restart logs install-lightpanda
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -47,6 +47,13 @@ test: ## Run all go tests
 
 lint: ## Run go vet
 	cd $(SRC_DIR) && go vet ./...
+
+install-lightpanda: ## Download and install the Lightpanda headless browser binary locally
+	@echo "→ Installing Lightpanda nightly binary..."
+	@mkdir -p lightpanda
+	curl -L -o ./lightpanda/lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux
+	chmod a+x ./lightpanda/lightpanda
+	@echo "✓ Lightpanda binary installed successfully at ./lightpanda/lightpanda"
 
 logs: ## Show server logs (for background process)
 	@lsof -t -i:$(PORT) | xargs -I{} tail -f /proc/{}/fd/1 2>/dev/null || \

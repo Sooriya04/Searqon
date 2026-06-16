@@ -1,11 +1,11 @@
-# SearXNG configuration for Searqon
 
 use_default_settings: true
 
 server:
-  port: 4002
+  port: 8080
   bind_address: "0.0.0.0"
   secret_key: "searqon_secret_key_change_me"
+  limiter: false
 
 search:
   safe_search: 0

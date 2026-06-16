@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -83,4 +84,66 @@ func extractTitleFromHTML(html string) string {
 		title = "No Title"
 	}
 	return title
+}
+
+// loadLightpandaConfig parses config.yaml to determine if Lightpanda is enabled
+// and returns (enabled, binaryPath).
+func loadLightpandaConfig() (bool, string) {
+	if envVal := os.Getenv("LIGHTPANDA_ENABLED"); envVal != "" {
+		return envVal == "true", os.Getenv("LIGHTPANDA_PATH")
+	}
+
+	paths := []string{
+		"lightpanda/config.yaml", "../lightpanda/config.yaml",
+		"lightpanda/config.yml", "../lightpanda/config.yml",
+		"config.yaml", "../config.yaml",
+	}
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(string(data), "\n")
+		var enabled bool
+		path := "./lightpanda/lightpanda" // default fallback path
+
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			// Strip YAML comments
+			if idx := strings.Index(trimmed, "#"); idx != -1 {
+				trimmed = strings.TrimSpace(trimmed[:idx])
+			}
+			if trimmed == "" {
+				continue
+			}
+
+			// Parse simple flat key-value pairs or sections
+			if strings.HasPrefix(trimmed, "enabled:") {
+				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "enabled:"))
+				enabled = (val == "true" || val == "yes" || val == "1")
+			}
+			if strings.HasPrefix(trimmed, "path:") {
+				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
+				path = strings.Trim(val, `"'`)
+				
+				// Smart relative path resolution:
+				// If path is relative (does not start with /) and doesn't exist at the current CWD,
+				// check if it exists in the parent directory (which is common when running from src/)
+				if !strings.HasPrefix(path, "/") {
+					if _, err := os.Stat(path); err != nil {
+						parentPath := "../" + strings.TrimPrefix(path, "./")
+						if _, err := os.Stat(parentPath); err == nil {
+							path = parentPath
+						}
+					}
+				}
+			}
+			// Inline checks for key: val formats
+			if strings.Contains(trimmed, "lightpanda:") {
+				continue
+			}
+		}
+		return enabled, path
+	}
+	return false, ""
 }

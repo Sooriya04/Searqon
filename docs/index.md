@@ -8,8 +8,10 @@ Welcome to the Searqon documentation. Searqon is an open-source, self-hosted **w
 
 | Document | Description |
 |---|---|
-| [Installation](./installation.md) | Prerequisites, setup, and running locally |
-| [Architecture](./architecture.md) | System design, data flow, and component breakdown |
+| [Installation](./installation.md) | Prerequisites, database setup, and running locally |
+| [Architecture](./architecture.md) | System design, database schemas, and configuration reference |
+| [Orchestration Workflow](./workflow/workflow.md) | High-level request lifecycle, discovery chains, and fallbacks |
+| [Scraping Pipeline](./workflow/scraping.md) | Parallel crawling, robots.txt, and Lightpanda integration |
 | [API Reference](./api.md) | All endpoints with request/response examples |
 | [Search Providers](./providers.md) | SearXNG vs DuckDuckGo — when to use what |
 | [Configuration](./configuration.md) | Ports, timeouts, limits, and tuning |
@@ -45,14 +47,15 @@ Think of it as a transparent alternative to services like **Tavily** — where y
 
 ---
 
-## Five-Stage Pipeline
+## Technical Pipeline Overview
 
 ```
-Query → Route → Search → Crawl → Extract → Deliver
+Query → Cache Check → Search Providers → Concurrency Queue → Crawl (Go or Lightpanda) → Extract → Cache Save → Deliver
 ```
 
-1. **Route** — Classify query intent
-2. **Search** — SearXNG (primary) or DuckDuckGo (fallback) returns URLs + snippets
-3. **Crawl** — Go goroutines fetch the top pages concurrently
-4. **Extract** — go-readability + goquery strip noise, return clean Markdown
-5. **Deliver** — Structured JSON to your client, LLM, or agent
+1. **Cache Check** — PostgreSQL query cache (24h TTL) returns hits in <5ms.
+2. **Search Providers** — SearXNG (primary) or DuckDuckGo Lite (fallback) returns search matches.
+3. **Crawl Queue** — Enforces 3 concurrent worker limits and global timeouts.
+4. **Scraping** — HTML parsed natively or rendered dynamically using the **Lightpanda** browser.
+5. **Purifier** — Mozilla Readability strips noise and converts to clean Markdown.
+6. **Persistence & Return** — Saves results in the cache database and returns structured JSON to the client.

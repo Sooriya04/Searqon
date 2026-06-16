@@ -240,14 +240,14 @@ func runSearchPipeline(query string, limit int, scrape bool, bypassCache bool) S
 	}
 	results = uniqueResults
 
-	// ── Stage 3: Concurrent scraping with a GLOBAL 2.5s deadline ───────────────
+	// ── Stage 3: Concurrent scraping with a GLOBAL 8s deadline ───────────────
 	scrapeLimit := 3
 	if len(results) < scrapeLimit {
 		scrapeLimit = len(results)
 	}
 
 	if scrape && scrapeLimit > 0 {
-		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 2500*time.Millisecond)
+		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 8000*time.Millisecond)
 		defer scrapeCancel()
 
 		var mu sync.Mutex

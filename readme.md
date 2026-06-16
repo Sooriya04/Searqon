@@ -12,20 +12,21 @@ Think of it as a transparent alternative to services like Tavily — where you c
 
 Complete, in-depth documentation is available in the [`docs/`](./docs/index.md) directory:
 
-- [**Installation Guide**](./docs/installation.md) — How to set up and run Searqon locally.
-- [**Architecture**](./docs/architecture.md) — Five-stage pipeline, component breakdown, and concurrency flow.
+- [**Orchestration Workflow**](./docs/workflow/workflow.md) — High-level query pipeline, fallback chains, and lifecycle.
+- [**Scraping Specification**](./docs/workflow/scraping.md) — Concurrency queues, robots.txt compliance, and Lightpanda.
+- [**Architecture & Config**](./docs/architecture.md) — Database schema, variables, and error policies.
+- [**Installation Guide**](./docs/installation.md) — PostgreSQL, SearXNG, and Lightpanda installation.
 - [**API Reference**](./docs/api.md) — Request/Response structures for all endpoints.
-- [**Search Providers**](./docs/providers.md) — Details on SearXNG and DuckDuckGo Lite.
-- [**Configuration**](./docs/configuration.md) — Tunable port, timeouts, limits, and user-agents.
-- [**Deployment**](./docs/deployment.md) — Docker, systemd, and reverse proxy setup.
 
 ---
 
 ## Key Features
 
 - **Decoupled Architecture:** Single compiled Go binary. Port `4001`. ~20MB idle RAM.
+- **Persistent Caching:** Dual-layer PostgreSQL cache records search results (24h TTL) and page scrapes (7-day TTL) for sub-5ms recurring query speeds.
 - **Dual-Provider Search Chain:** Queries a local SearXNG instance (primary) and automatically falls back to DuckDuckGo Lite HTML (no-JS, parsed via `goquery`) if SearXNG is unavailable.
-- **Concurrent Scraper:** Goroutines fetch result pages in parallel under a global 2.5-second context timeout, falling back gracefully to search snippets if a page blocks or hangs.
+- **Dynamic Scrapers:** Toggles between native Go fetching (high-performance) and a **Lightpanda** headless browser subprocess (for client-side JavaScript execution).
+- **Parallel Scraping Controls:** Concurrently fetches top results in parallel with an 8-second global context timeout and mutex locks, falling back gracefully to search snippets on failure.
 - **Robots.txt Auditing:** Respects website crawling rules and handles domain politeness.
 - **Site Crawling & Mapping:** Includes endpoints to index entire sites (with SSE streaming support) and map link structures.
 
