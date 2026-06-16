@@ -43,15 +43,27 @@ type HTMLScrapeRequest struct {
 }
 
 type ScrapeResult struct {
-	Title     string `json:"title"`
-	Content   string `json:"content"`            // plain text (always present)
-	Markdown  string `json:"markdown,omitempty"` // markdown formatted version
-	URL       string `json:"url"`
-	WordCount int    `json:"wordCount"`
-	StartTime string `json:"startTime"`
-	EndTime   string `json:"endTime"`
-	Duration  int64  `json:"duration"` // ms
-	Error     string `json:"error,omitempty"`
+	Title            string     `json:"title"`
+	Content          string     `json:"content"`            // plain text (always present)
+	Markdown         string     `json:"markdown,omitempty"` // markdown formatted version
+	URL              string     `json:"url"`
+	WordCount        int        `json:"wordCount"`
+	StartTime        string     `json:"startTime"`
+	EndTime          string     `json:"endTime"`
+	Duration         int64      `json:"duration"` // ms
+	Error            string     `json:"error,omitempty"`
+	CanonicalURL     string     `json:"canonicalUrl,omitempty"`
+	Domain           string     `json:"domain"`
+	Description      string     `json:"description,omitempty"`
+	Author           string     `json:"author,omitempty"`
+	PublishedAt      *time.Time `json:"publishedAt,omitempty"`
+	Language         string     `json:"language,omitempty"`
+	OutboundLinks    []string   `json:"outboundLinks,omitempty"`
+	StatusCode       int        `json:"statusCode,omitempty"`
+	ContentType      string     `json:"contentType,omitempty"`
+	Scraped          bool       `json:"scraped"`
+	ExtractionMethod string     `json:"extractionMethod,omitempty"`
+	FetchDurationMS  int        `json:"fetchDurationMs,omitempty"`
 }
 
 type MapLink struct {
@@ -122,7 +134,7 @@ func scrapeHTMLHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startTime := time.Now()
-	result := scrapeHTMLContent(req.HTML, req.URL, req.Format, startTime)
+	result := scrapeHTMLContent(req.HTML, req.URL, req.URL, req.Format, startTime)
 
 	w.Header().Set("Content-Type", "application/json")
 	if result.Error != "" {
