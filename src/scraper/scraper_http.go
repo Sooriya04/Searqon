@@ -1,4 +1,4 @@
-package main
+package scraper
 
 import (
 	"compress/flate"
@@ -14,10 +14,8 @@ import (
 	"github.com/andybalholm/brotli"
 )
 
-// ─── Stealth HTTP Client ─────────────────────────────────────────────────────
-
 var httpClient = &http.Client{
-	Timeout: 3 * time.Second, // fast-fail: blocked/slow pages fall back to snippets
+	Timeout: 3 * time.Second,
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return fmt.Errorf("too many redirects")
@@ -38,9 +36,8 @@ var defaultHeaders = map[string]string{
 	"Upgrade-Insecure-Requests": "1",
 }
 
-// ─── HTML Fetch Helper ───────────────────────────────────────────────────────
-
-func fetchHTML(targetURL string, userAgent string) (string, *url.URL, int, string, error) {
+// FetchHTML retrieves raw HTML from a target URL with a stealth user-agent.
+func FetchHTML(targetURL string, userAgent string) (string, *url.URL, int, string, error) {
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil || parsedURL.Scheme == "" {
 		return "", nil, 0, "", fmt.Errorf("invalid URL")

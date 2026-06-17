@@ -4,32 +4,52 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"src/db"
+	"src/handlers"
+	"src/scraper"
+	"src/utils"
 )
 
 func main() {
 	port := "4001"
 
-	// Initialize Postgres Cache
-	InitDB()
-	defer CloseDB()
+	// 1. Initialize core system modules
+	utils.InitLogger()
+	scraper.InitProxyPool()
+	db.InitDB()
+	defer db.CloseDB()
 
+	// 2. Setup HTTP router
 	mux := http.NewServeMux()
 
-	// ── Search Aggregator ────────────────────────────────────────────────────
-	mux.HandleFunc("/search", searchHandler)   // POST { "query": "..." } → search DDG + scrape top results
+	// Discovery and Search
+	mux.HandleFunc("/search", handlers.SearchHandler)
+	mux.HandleFunc("/search/index", handlers.SearchIndexHandler)
 
-	// ── Raw Scraper ──────────────────────────────────────────────────────────
-	mux.HandleFunc("/scrape", scrapeHandler)         // POST { "url": "..." }
-	mux.HandleFunc("/scrape/batch", batchScrapeHandler) // POST { "urls": [...] }
-	mux.HandleFunc("/scrape/html", scrapeHTMLHandler)   // POST { "html": "...", "url": "..." }
-	mux.HandleFunc("/r/", jinaReaderHandler)            // GET /r/<url> (Jina Reader compatibility)
+	// Scraper API
+	mux.HandleFunc("/scrape", handlers.ScrapeHandler)
+	mux.HandleFunc("/scrape/batch", handlers.BatchScrapeHandler)
+	mux.HandleFunc("/scrape/html", handlers.HTMLScrapeHandler)
+	mux.HandleFunc("/r/", handlers.JinaReaderHandler)
 
-	// ── Crawler / Mapper ─────────────────────────────────────────────────────
-	mux.HandleFunc("/crawl", crawlHandler) // POST { "url": "...", "limit": 30, "depth": 2 }
-	mux.HandleFunc("/map", mapHandler)     // POST { "url": "...", "limit": 50 }
+	// Crawler and Site Mapper
+	mux.HandleFunc("/crawl", handlers.CrawlHandler)
+	mux.HandleFunc("/map", handlers.MapHandler)
 
-	// ── Health ───────────────────────────────────────────────────────────────
-	mux.HandleFunc("/health", healthHandler)
+	// Utility and Telemetry
+	mux.HandleFunc("/screenshot", handlers.ScreenshotHandler)
+	mux.HandleFunc("/summarize", handlers.SummarizeHandler)
+	mux.HandleFunc("/extract", handlers.ExtractHandler)
+	mux.HandleFunc("/feed", handlers.FeedHandler)
+	mux.HandleFunc("/stats", handlers.StatsHandler)
+
+	// OpenAPI API Documentation
+	mux.HandleFunc("/openapi.json", handlers.OpenAPIHandler)
+	mux.HandleFunc("/docs", handlers.SwaggerUIHandler)
+
+	// System Health
+	mux.HandleFunc("/health", handlers.HealthHandler)
 
 	server := &http.Server{
 		Addr:         ":" + port,
@@ -39,10 +59,9 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("[Searqon] Starting on :%s", port)
-	log.Printf("[Searqon] Endpoints: POST /search, POST /scrape, POST /scrape/batch, POST /scrape/html, GET /r/<url>, POST /crawl, POST /map, GET /health")
+	log.Printf("[Searqon] Server starting on port %s", port)
 
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("[Searqon] Failed to start: %v", err)
+		log.Fatalf("[Searqon] Server failed to start: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package scraper
 
 import (
 	"context"
@@ -8,15 +8,16 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"src/models"
+	"src/utils"
 )
 
-// scrapeWithLightpanda runs the Lightpanda CLI to execute JS and fetch markdown.
-func scrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time) (ScrapeResult, string, error) {
+// ScrapeWithLightpanda runs the Lightpanda CLI to execute JS and fetch markdown.
+func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time) (models.ScrapeResult, string, error) {
 	startISO := startTime.UTC().Format(time.RFC3339)
-	result := ScrapeResult{URL: targetURL, StartTime: startISO}
+	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
-	// Fetch targetURL evaluating JavaScript, stripping script/ui/css, and dumping markdown.
-	// We use networkalmostidle so it finishes as soon as resources load, rather than hard waiting.
 	args := []string{
 		"fetch", targetURL,
 		"--dump", "markdown",
@@ -42,7 +43,6 @@ func scrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 		return result, "", fmt.Errorf("empty output from lightpanda")
 	}
 
-	// Attempt to extract title from the first heading in the markdown
 	title := "Scraped Page"
 	lines := strings.Split(markdownOutput, "\n")
 	for _, line := range lines {
@@ -53,13 +53,12 @@ func scrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 		}
 	}
 
-	// Clean markdown formatting to produce standard plain text content
 	plainText := markdownToPlainText(markdownOutput)
 
 	result.Title = title
 	result.Content = plainText
 	result.Markdown = markdownOutput
-	result.WordCount = countWords(plainText)
+	result.WordCount = utils.CountWords(plainText)
 	result.EndTime = time.Now().UTC().Format(time.RFC3339)
 	result.Duration = time.Since(startTime).Milliseconds()
 
@@ -77,7 +76,6 @@ func scrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 	return result, markdownOutput, nil
 }
 
-// markdownToPlainText removes common markdown symbols to construct standard clean content.
 func markdownToPlainText(md string) string {
 	lines := strings.Split(md, "\n")
 	var cleaned []string
@@ -86,10 +84,8 @@ func markdownToPlainText(md string) string {
 		if line == "" {
 			continue
 		}
-		// Strip headings
 		line = strings.TrimLeft(line, "#")
 		line = strings.TrimSpace(line)
-		// Strip bold/italic/links
 		line = strings.ReplaceAll(line, "**", "")
 		line = strings.ReplaceAll(line, "*", "")
 		line = strings.ReplaceAll(line, "`", "")

@@ -1,4 +1,4 @@
-package main
+package scraper
 
 import (
 	"context"
@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-// ─── Robots.txt Structures and Cache ─────────────────────────────────────────
-
 type AgentRules struct {
 	DisallowedPaths []string
 	AllowedPaths    []string
@@ -21,11 +19,15 @@ type AgentRules struct {
 }
 
 type RobotsData struct {
-	Rules map[string]*AgentRules // key: lowercase user-agent name
+	Rules map[string]*AgentRules
 }
 
 var robotsCache = make(map[string]*RobotsData)
 var robotsMu sync.RWMutex
+
+var robotsHttpClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
 
 var agentUserAgents = map[string]string{
 	"googlebot":   "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
@@ -37,20 +39,13 @@ var agentUserAgents = map[string]string{
 }
 
 var rotatingUserAgents = []string{
-	// Chrome Windows
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-	// Chrome macOS
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-	// Firefox Windows
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-	// Firefox macOS
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-	// Safari macOS
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
-	// Safari iOS
 	"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/605.1.15",
-	// Chrome Android
 	"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
 }
 
@@ -74,7 +69,7 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 	req, err := http.NewRequestWithContext(ctx, "GET", robotsURL, nil)
 	if err == nil {
 		req.Header.Set("User-Agent", "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)")
-		resp, rerr := httpClient.Do(req)
+		resp, rerr := robotsHttpClient.Do(req)
 		if rerr == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == 200 {
@@ -183,13 +178,11 @@ func isAgentAllowed(targetURL string, agent string, robotsData *RobotsData) (boo
 }
 
 func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Duration, bool) {
-	// 1. If wildcard "*" is allowed, rotate realistic browser User-Agents!
 	if allowed, delay := isAgentAllowed(targetURL, "*", robotsData); allowed {
 		ua := rotatingUserAgents[rand.Intn(len(rotatingUserAgents))]
 		return ua, delay, true
 	}
 
-	// 2. If wildcard is blocked but 'searqonbot' or 'searqon' is explicitly whitelisted, use it
 	if allowed, delay := isAgentAllowed(targetURL, "searqonbot", robotsData); allowed {
 		return "SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)", delay, true
 	}
@@ -216,7 +209,23 @@ func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Du
 	return "", 0, false
 }
 
-func isAllowed(targetURL string, robotsData *RobotsData) bool {
+// IsAllowed checks if a target URL is allowed by robots.txt.
+func IsAllowed(targetURL string) bool {
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return false
+	}
+	robotsData := getRobotsData(parsed)
 	_, _, allowed := findAllowedAgent(targetURL, robotsData)
 	return allowed
+}
+
+// GetRobotsDataAndAgent parses the robots.txt rules for the domain and returns the appropriate User-Agent, delay, and whether scraping is allowed.
+func GetRobotsDataAndAgent(targetURL string) (string, time.Duration, bool) {
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return "", 0, false
+	}
+	robotsData := getRobotsData(parsed)
+	return findAllowedAgent(targetURL, robotsData)
 }

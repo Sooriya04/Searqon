@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"os"
@@ -7,9 +7,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// ─── Noise Removal Selectors ─────────────────────────────────────────────────
-
-var noiseSelectors = []string{
+var NoiseSelectors = []string{
 	"script", "style", "noscript", "iframe", "svg",
 	"nav", "header", "footer", "aside",
 	"form", "button", "input", "select", "textarea",
@@ -27,9 +25,8 @@ var noiseSelectors = []string{
 	"[role='complementary']", "[aria-hidden='true']",
 }
 
-// ─── Text Cleaning ───────────────────────────────────────────────────────────
-
-func cleanText(text string) string {
+// CleanText removes formatting and noise characters from raw text.
+func CleanText(text string) string {
 	boxChars := []string{"┌", "┬", "┐", "├", "┼", "┤", "└", "┴", "┘", "│", "─", "━", "┏", "┳", "┓", "┣", "╋", "┫", "┗", "┻", "┛", "┃"}
 	for _, char := range boxChars {
 		text = strings.ReplaceAll(text, char, "")
@@ -67,11 +64,13 @@ func cleanText(text string) string {
 	return strings.TrimSpace(result)
 }
 
-func countWords(text string) int {
+// CountWords returns the number of words in a string.
+func CountWords(text string) int {
 	return len(strings.Fields(text))
 }
 
-func extractTitleFromHTML(html string) string {
+// ExtractTitleFromHTML parses HTML content to find the page title.
+func ExtractTitleFromHTML(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return "No Title"
@@ -86,9 +85,8 @@ func extractTitleFromHTML(html string) string {
 	return title
 }
 
-// loadLightpandaConfig parses config.yaml to determine if Lightpanda is enabled
-// and returns (enabled, binaryPath).
-func loadLightpandaConfig() (bool, string) {
+// LoadLightpandaConfig parses config.yaml to determine if Lightpanda is enabled.
+func LoadLightpandaConfig() (bool, string) {
 	if envVal := os.Getenv("LIGHTPANDA_ENABLED"); envVal != "" {
 		return envVal == "true", os.Getenv("LIGHTPANDA_PATH")
 	}
@@ -105,11 +103,10 @@ func loadLightpandaConfig() (bool, string) {
 		}
 		lines := strings.Split(string(data), "\n")
 		var enabled bool
-		path := "./lightpanda/lightpanda" // default fallback path
+		path := "./lightpanda/lightpanda"
 
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
-			// Strip YAML comments
 			if idx := strings.Index(trimmed, "#"); idx != -1 {
 				trimmed = strings.TrimSpace(trimmed[:idx])
 			}
@@ -117,7 +114,6 @@ func loadLightpandaConfig() (bool, string) {
 				continue
 			}
 
-			// Parse simple flat key-value pairs or sections
 			if strings.HasPrefix(trimmed, "enabled:") {
 				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "enabled:"))
 				enabled = (val == "true" || val == "yes" || val == "1")
@@ -126,9 +122,6 @@ func loadLightpandaConfig() (bool, string) {
 				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
 				path = strings.Trim(val, `"'`)
 				
-				// Smart relative path resolution:
-				// If path is relative (does not start with /) and doesn't exist at the current CWD,
-				// check if it exists in the parent directory (which is common when running from src/)
 				if !strings.HasPrefix(path, "/") {
 					if _, err := os.Stat(path); err != nil {
 						parentPath := "../" + strings.TrimPrefix(path, "./")
@@ -137,10 +130,6 @@ func loadLightpandaConfig() (bool, string) {
 						}
 					}
 				}
-			}
-			// Inline checks for key: val formats
-			if strings.Contains(trimmed, "lightpanda:") {
-				continue
 			}
 		}
 		return enabled, path

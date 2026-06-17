@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"log"
@@ -9,13 +9,15 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"src/models"
+	"src/scraper"
 )
 
-// ─── Site Mapper ─────────────────────────────────────────────────────────────
-
-func mapSiteURLs(targetURL string, limit int) MapResult {
+// MapSiteURLs maps all internal links on a given website domain.
+func MapSiteURLs(targetURL string, limit int) models.MapResult {
 	startTime := time.Now()
-	result := MapResult{SourceURL: targetURL}
+	result := models.MapResult{SourceURL: targetURL}
 
 	if limit <= 0 {
 		limit = 100
@@ -27,9 +29,7 @@ func mapSiteURLs(targetURL string, limit int) MapResult {
 	}
 	baseDomain := parsedBase.Hostname()
 
-	// Get robots.txt
-	robotsData := getRobotsData(parsedBase)
-	userAgent, delay, allowed := findAllowedAgent(targetURL, robotsData)
+	userAgent, delay, allowed := scraper.GetRobotsDataAndAgent(targetURL)
 	if !allowed {
 		result.Error = "disallowed by robots.txt"
 		return result
@@ -37,11 +37,8 @@ func mapSiteURLs(targetURL string, limit int) MapResult {
 	if delay > 0 {
 		time.Sleep(delay)
 	}
-	if userAgent == "" {
-		userAgent = defaultHeaders["User-Agent"]
-	}
 
-	htmlContent, _, _, _, err := fetchHTML(targetURL, userAgent)
+	htmlContent, _, _, _, err := scraper.FetchHTML(targetURL, userAgent)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -53,7 +50,7 @@ func mapSiteURLs(targetURL string, limit int) MapResult {
 		return result
 	}
 
-	var links []MapLink
+	var links []models.MapLink
 	seen := map[string]bool{targetURL: true}
 
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
@@ -82,19 +79,18 @@ func mapSiteURLs(targetURL string, limit int) MapResult {
 			title, _ = s.Attr("title")
 		}
 
-		links = append(links, MapLink{URL: cleanURL, Title: title})
+		links = append(links, models.MapLink{URL: cleanURL, Title: title})
 	})
 
 	result.Links = links
 	result.Count = len(links)
 	result.Duration = time.Since(startTime).Milliseconds()
-	log.Printf("[Go Scraper] Map: %s → %d links (%dms)", targetURL, result.Count, result.Duration)
+	log.Printf("[Crawler] Map complete: %s → %d links (%dms)", targetURL, result.Count, result.Duration)
 	return result
 }
 
-// ─── Recursive Crawler ───────────────────────────────────────────────────────
-
-func crawlSite(targetURL string, limit, depth int, format string, onPageScraped func(ScrapeResult)) CrawlResult {
+// CrawlSite crawls a target URL recursively.
+func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped func(models.ScrapeResult)) models.CrawlResult {
 	startTime := time.Now()
 
 	if limit <= 0 {
@@ -104,7 +100,7 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 		depth = 2
 	}
 
-	result := CrawlResult{SourceURL: targetURL}
+	result := models.CrawlResult{SourceURL: targetURL}
 
 	parsedBase, err := url.Parse(targetURL)
 	if err != nil {
@@ -113,9 +109,7 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 	}
 	baseDomain := parsedBase.Hostname()
 
-	// Get robots.txt
-	robotsData := getRobotsData(parsedBase)
-	if !isAllowed(targetURL, robotsData) {
+	if !scraper.IsAllowed(targetURL) {
 		result.Error = "root URL disallowed by robots.txt"
 		return result
 	}
@@ -125,40 +119,32 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 		depth int
 	}
 
-	// Channels
 	jobs := make(chan crawlTask, limit*10)
 	discoveredLinksChan := make(chan []crawlTask, limit*10)
 
 	var mu sync.Mutex
-	var pages []ScrapeResult
+	var pages []models.ScrapeResult
 	visited := map[string]bool{targetURL: true}
 
-	// Counters for tracking progress
 	var activeWorkers int32
-	var pendingTasks int32 = 1 // Starts with the root URL
+	var pendingTasks int32 = 1
 
-	// Limit concurrency to 5 workers (matches Spider worker concurrency setup)
 	numWorkers := 5
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for task := range jobs {
 				atomic.AddInt32(&activeWorkers, 1)
 
-				var scraped ScrapeResult
-				var htmlContent string
-
-				scraped, htmlContent = scrapeSingleURL(task.url, format, false)
+				scraped, htmlContent := scraper.ScrapeSingleURLNative(task.url, format, false)
 
 				mu.Lock()
 				pages = append(pages, scraped)
 				mu.Unlock()
 
-				// Callback to stream result to Node/SSE in real-time
 				if onPageScraped != nil {
 					onPageScraped(scraped)
 				}
 
-				// Discover links
 				var newLinks []crawlTask
 				if task.depth < depth && scraped.Error == "" && htmlContent != "" {
 					doc, derr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
@@ -184,16 +170,13 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				}
 
 				atomic.AddInt32(&activeWorkers, -1)
-				// Decrement pending tasks
 				atomic.AddInt32(&pendingTasks, -1)
 			}
 		}()
 	}
 
-	// Coordinator: Push initial URL
 	jobs <- crawlTask{url: targetURL, depth: 0}
 
-	// Loop to coordinate tasks
 	for atomic.LoadInt32(&pendingTasks) > 0 {
 		select {
 		case newLinks := <-discoveredLinksChan:
@@ -203,7 +186,6 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				if !visited[link.url] && len(visited) < limit {
 					visited[link.url] = true
 					addedCount++
-					// Push to jobs channel
 					jobs <- link
 				}
 			}
@@ -212,16 +194,14 @@ func crawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				atomic.AddInt32(&pendingTasks, addedCount)
 			}
 		case <-time.After(20 * time.Millisecond):
-			// Keep loop checking
 		}
 	}
 
-	// Close jobs to terminate workers
 	close(jobs)
 
 	result.Pages = pages
 	result.Total = len(pages)
 	result.Duration = time.Since(startTime).Milliseconds()
-	log.Printf("[Go Scraper] Crawl: %s → %d pages (%dms)", targetURL, result.Total, result.Duration)
+	log.Printf("[Crawler] Crawl complete: %s → %d pages (%dms)", targetURL, result.Total, result.Duration)
 	return result
 }

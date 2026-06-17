@@ -19,7 +19,7 @@ services:
       context: ./docker/database
       dockerfile: Dockerfile
     ports:
-      - "5433:5432"
+      - "5435:5432"
     environment:
       - POSTGRES_USER=searqon
       - POSTGRES_PASSWORD=searqon_pass
@@ -34,6 +34,9 @@ services:
     image: searxng/searxng:latest
     ports:
       - "8080:8080"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
     restart: unless-stopped

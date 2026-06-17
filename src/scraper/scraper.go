@@ -1,4 +1,4 @@
-package main
+package scraper
 
 import (
 	"fmt"
@@ -10,7 +10,11 @@ import (
 	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/PuerkitoBio/goquery"
 	readability "github.com/go-shiori/go-readability"
+
+	"src/db"
 	"src/extractor"
+	"src/models"
+	"src/utils"
 )
 
 func stripHTMLTagsForMarkdown(htmlStr string) string {
@@ -26,11 +30,10 @@ func stripHTMLTagsForMarkdown(htmlStr string) string {
 	return html
 }
 
-// ─── Core Scraping Function ──────────────────────────────────────────────────
-
-func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) ScrapeResult {
+// ScrapeHTMLContent extracts structural text from HTML content directly.
+func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) models.ScrapeResult {
 	startISO := startTime.UTC().Format(time.RFC3339)
-	result := ScrapeResult{URL: targetURL, StartTime: startISO}
+	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
 	if format == "" {
 		format = "markdown"
@@ -41,7 +44,7 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 		parsedURL = &url.URL{}
 	}
 
-	// ── Stage 1: Extract general page metadata using the modular extractor ──
+	// 1. Extract metadata
 	meta := extractor.ParseMetadata(htmlContent, targetURL, finalURL)
 	result.Title = meta.Title
 	result.CanonicalURL = meta.CanonicalURL
@@ -52,19 +55,24 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 	result.Language = meta.Language
 	result.OutboundLinks = meta.OutboundLinks
 
-	// ── Strategy 1: go-readability ────────────────────────────────────────────
-	article, err := readability.FromReader(strings.NewReader(htmlContent), parsedURL)
+	// 2. Extract media images
+	result.Images = ExtractImages(htmlContent, targetURL)
+
+	// Convert tables to markdown before main text extraction
+	tableCleanedHTML := ConvertTablesToMarkdown(htmlContent)
+
+	// 3. Strategy 1: go-readability
+	article, err := readability.FromReader(strings.NewReader(tableCleanedHTML), parsedURL)
 	if err == nil && len(strings.TrimSpace(article.TextContent)) > 100 {
-		plainText := cleanText(article.TextContent)
+		plainText := utils.CleanText(article.TextContent)
 		if article.Title != "" {
 			result.Title = article.Title
 		}
 
 		result.Content = plainText
-		result.WordCount = countWords(plainText)
+		result.WordCount = utils.CountWords(plainText)
 
 		if format == "markdown" {
-			// Strip tables, images, and code blocks from the HTML before converting to markdown
 			cleanedHTML := stripHTMLTagsForMarkdown(article.Content)
 			if markdownStr, merr := htmlToMarkdown(cleanedHTML, parsedURL.String()); merr == nil {
 				result.Markdown = markdownStr
@@ -78,12 +86,11 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 		result.FetchDurationMS = int(result.Duration)
 		result.ExtractionMethod = "readability"
 		result.Scraped = true
-		log.Printf("[Go Scraper] Readability+MD: %s (%d words, %dms)", targetURL, result.WordCount, result.Duration)
 		return result
 	}
 
-	// ── Strategy 2: goquery fallback ──────────────────────────────────────────
-	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	// 4. Strategy 2: goquery fallback
+	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(tableCleanedHTML))
 	if docErr != nil || doc == nil {
 		result.Error = fmt.Sprintf("parse failed: %v", docErr)
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)
@@ -95,11 +102,10 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 	}
 
 	cleanDoc := doc
-	for _, selector := range noiseSelectors {
+	for _, selector := range utils.NoiseSelectors {
 		cleanDoc.Find(selector).Remove()
 	}
 
-	// Strip tables, images, and code blocks from cleanDoc for content extraction and markdown conversion
 	cleanDoc.Find("table, img, pre, code").Remove()
 
 	if result.Title == "" {
@@ -119,13 +125,13 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 		textParts = append(textParts, text)
 	})
 
-	content := cleanText(strings.Join(textParts, " "))
-	if countWords(content) < 20 {
-		content = cleanText(cleanDoc.Find("body").Text())
+	content := utils.CleanText(strings.Join(textParts, " "))
+	if utils.CountWords(content) < 20 {
+		content = utils.CleanText(cleanDoc.Find("body").Text())
 	}
 
 	result.Content = content
-	result.WordCount = countWords(content)
+	result.WordCount = utils.CountWords(content)
 
 	if format == "markdown" {
 		cleanedHTML, _ := cleanDoc.Find("body").Html()
@@ -141,24 +147,32 @@ func scrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 	result.FetchDurationMS = int(result.Duration)
 	result.ExtractionMethod = "goquery"
 	result.Scraped = true
-	log.Printf("[Go Scraper] GoQuery+MD: %s (%d words, %dms)", targetURL, result.WordCount, result.Duration)
 	return result
 }
 
-func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeResult, string) {
+// ScrapeSingleURL scrapes a single URL, resolving cache and robots.txt.
+func ScrapeSingleURL(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
+	return scrapeSingleURLInternal(targetURL, format, bypassCache, false)
+}
+
+// ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
+func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
+	return scrapeSingleURLInternal(targetURL, format, bypassCache, true)
+}
+
+func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, forceNative bool) (models.ScrapeResult, string) {
 	startTime := time.Now()
 	startISO := startTime.UTC().Format(time.RFC3339)
 
-	// ── Stage 0: Check Postgres cache first ────────────────────────────────────
+	// 1. Check database cache
 	if !bypassCache {
-		if cached, found := getScrapeCache(targetURL); found {
-			log.Printf("[Scrape] [CACHE HIT] URL=%s (%d words)", targetURL, cached.WordCount)
+		if cached, found := db.GetScrapeCache(targetURL); found {
 			cached.Duration = time.Since(startTime).Milliseconds()
 			return cached, ""
 		}
 	}
 
-	result := ScrapeResult{URL: targetURL, StartTime: startISO}
+	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
 	parsedBase, pErr := url.Parse(targetURL)
 	var userAgent string
@@ -178,8 +192,7 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 			result.EndTime = time.Now().UTC().Format(time.RFC3339)
 			result.Duration = time.Since(startTime).Milliseconds()
 			result.FetchDurationMS = int(result.Duration)
-			// Cache the exclusion so we don't crawl it again
-			saveScrapeCache(result)
+			db.SaveScrapeCache(result)
 			return result, ""
 		}
 		if delay > 0 {
@@ -191,19 +204,19 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 		userAgent = defaultHeaders["User-Agent"]
 	}
 
-	// ── Stage 0.5: Try Lightpanda Scraper if enabled ──────────────────────────
-	if enabled, binaryPath := loadLightpandaConfig(); enabled && binaryPath != "" {
-		log.Printf("[Scrape] Attempting Lightpanda fetch: %s", targetURL)
-		scraped, rawOut, err := scrapeWithLightpanda(targetURL, userAgent, binaryPath, format, startTime)
-		if err == nil {
-			// Save successfully scraped page to DB
-			saveScrapeCache(scraped)
-			return scraped, rawOut
+	// 2. Try Lightpanda Scraper if enabled and native mode is not forced
+	if !forceNative {
+		if enabled, binaryPath := utils.LoadLightpandaConfig(); enabled && binaryPath != "" {
+			scraped, rawOut, err := ScrapeWithLightpanda(targetURL, userAgent, binaryPath, format, startTime)
+			if err == nil {
+				db.SaveScrapeCache(scraped)
+				return scraped, rawOut
+			}
+			log.Printf("[Scraper] Lightpanda failed: %v. Falling back to native Go scraper...", err)
 		}
-		log.Printf("[Scrape] Lightpanda failed: %v. Falling back to native Go scraper...", err)
 	}
 
-	htmlContent, parsedURL, statusCode, contentType, err := fetchHTML(targetURL, userAgent)
+	htmlContent, parsedURL, statusCode, contentType, err := FetchHTML(targetURL, userAgent)
 	if err != nil {
 		result.Error = err.Error()
 		if parsedURL != nil {
@@ -218,8 +231,7 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)
 		result.Duration = time.Since(startTime).Milliseconds()
 		result.FetchDurationMS = int(result.Duration)
-		// Cache the failure so we don't waste retry limits immediately
-		saveScrapeCache(result)
+		db.SaveScrapeCache(result)
 		return result, ""
 	}
 
@@ -227,17 +239,14 @@ func scrapeSingleURL(targetURL string, format string, bypassCache bool) (ScrapeR
 	if parsedURL != nil {
 		finalURL = parsedURL.String()
 	}
-	scraped := scrapeHTMLContent(htmlContent, targetURL, finalURL, format, startTime)
+	scraped := ScrapeHTMLContent(htmlContent, targetURL, finalURL, format, startTime)
 	scraped.StatusCode = statusCode
 	scraped.ContentType = contentType
 
-	// Save successfully scraped page to DB
-	saveScrapeCache(scraped)
+	db.SaveScrapeCache(scraped)
 
 	return scraped, htmlContent
 }
-
-// ─── HTML → Markdown ─────────────────────────────────────────────────────────
 
 func htmlToMarkdown(htmlContent string, baseURL string) (string, error) {
 	return md.ConvertString(htmlContent)
