@@ -17,6 +17,12 @@ func GetSearchCache(query string) ([]models.SearchResult, string, bool) {
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
+		memoryMu.Lock()
+		defer memoryMu.Unlock()
+		entry, found := searchMemoryCache[query]
+		if found && time.Since(entry.createdAt) <= searchCacheTTL {
+			return entry.results, entry.provider, true
+		}
 		return nil, "", false
 	}
 
@@ -57,6 +63,13 @@ func SaveSearchCache(query string, results []models.SearchResult, provider strin
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
+		memoryMu.Lock()
+		searchMemoryCache[query] = inMemorySearchEntry{
+			results:   results,
+			provider:  provider,
+			createdAt: time.Now(),
+		}
+		memoryMu.Unlock()
 		return
 	}
 

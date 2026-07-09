@@ -73,6 +73,66 @@ curl "http://localhost:4001/search?q=golang+channels&scrape=false"
 
 ---
 
+## `POST /pipeline`
+
+Unified Search, Fetch, Chunk, and Rank pipeline. Discovers URLs, scrapes pages concurrently (up to 3 in parallel), chunks markdown text into overlapping sentence-boundary chunks, and scores them using BM25.
+
+### Request
+
+```json
+{
+  "query": "golang concurrency",
+  "max_sources": 3,
+  "bypass_cache": false
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `query` | string | required | Query to search and rank chunks against |
+| `max_sources` | int | `5` | Max target URLs to discover and scrape |
+| `bypass_cache` | bool | `false` | Bypass cached scraping content |
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "query": "golang concurrency",
+    "fetched_at": "2026-07-09T11:33:50Z",
+    "sources": [
+      {
+        "url": "https://go.dev/wiki/LearnConcurrency",
+        "title": "Go Wiki: LearnConcurrency",
+        "render_method": "go",
+        "cached": true,
+        "chunks": [
+          {
+            "index": 1,
+            "text": "Go concurrency features are ...",
+            "token_count": 546,
+            "word_count": 411,
+            "bm25_score": 1.2374,
+            "metadata": {
+              "source_url": "https://go.dev/wiki/LearnConcurrency",
+              "source_title": "Go Wiki: LearnConcurrency",
+              "chunk_index": 1,
+              "scraped_at": "2026-07-09T06:03:57Z"
+            }
+          }
+        ]
+      }
+    ],
+    "total_chunks": 6,
+    "duration_ms": 321,
+    "context": "[1] Source: Go Wiki: LearnConcurrency (https://go.dev/wiki/LearnConcurrency)\nGo concurrency features are ...\n\n[2] Source: ... (...)\n..."
+  }
+}
+```
+
+---
+
 ## `POST /scrape`
 
 Scrape a single URL and return clean text + markdown.
@@ -313,7 +373,7 @@ Health check endpoint.
 {
   "status": "ok",
   "engine": "src",
-  "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health", "/r/"]
+  "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"]
 }
 ```
 

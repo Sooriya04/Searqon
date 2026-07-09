@@ -11,6 +11,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	readability "github.com/go-shiori/go-readability"
 
+	"src/chunker"
 	"src/db"
 	"src/extractor"
 	"src/models"
@@ -152,12 +153,48 @@ func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 
 // ScrapeSingleURL scrapes a single URL, resolving cache and robots.txt.
 func ScrapeSingleURL(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	return scrapeSingleURLInternal(targetURL, format, bypassCache, false)
+	res, raw := scrapeSingleURLInternal(targetURL, format, bypassCache, false)
+	if res.Scraped {
+		if res.RenderMethod == "" {
+			if res.ExtractionMethod == "lightpanda" {
+				res.RenderMethod = "lightpanda"
+			} else {
+				res.RenderMethod = "go"
+			}
+		}
+		if res.ScrapedAt == "" {
+			res.ScrapedAt = res.StartTime
+		}
+		if len(res.Chunks) == 0 {
+			textToChunk := res.Markdown
+			if textToChunk == "" {
+				textToChunk = res.Content
+			}
+			res.Chunks = chunker.ChunkMarkdown(textToChunk, res.URL, res.Title, res.ScrapedAt)
+		}
+	}
+	return res, raw
 }
 
 // ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
 func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	return scrapeSingleURLInternal(targetURL, format, bypassCache, true)
+	res, raw := scrapeSingleURLInternal(targetURL, format, bypassCache, true)
+	if res.Scraped {
+		if res.RenderMethod == "" {
+			res.RenderMethod = "go"
+		}
+		if res.ScrapedAt == "" {
+			res.ScrapedAt = res.StartTime
+		}
+		if len(res.Chunks) == 0 {
+			textToChunk := res.Markdown
+			if textToChunk == "" {
+				textToChunk = res.Content
+			}
+			res.Chunks = chunker.ChunkMarkdown(textToChunk, res.URL, res.Title, res.ScrapedAt)
+		}
+	}
+	return res, raw
 }
 
 func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, forceNative bool) (models.ScrapeResult, string) {
@@ -168,6 +205,7 @@ func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, 
 	if !bypassCache {
 		if cached, found := db.GetScrapeCache(targetURL); found {
 			cached.Duration = time.Since(startTime).Milliseconds()
+			cached.Cached = true
 			return cached, ""
 		}
 	}

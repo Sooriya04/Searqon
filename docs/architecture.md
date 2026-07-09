@@ -110,3 +110,24 @@ Below is a configuration guide for tuning the engine parameters:
 | `DATABASE_URL` | Connection String | *None* | Connection URL for PostgreSQL cache. If empty, database caching is disabled. |
 | `SEARCH_CACHE_TTL_HOURS` | Integer | `24` | Cache retention lifetime for search query results in hours. |
 | `SCRAPE_CACHE_TTL_DAYS` | Integer | `7` | Cache retention lifetime for scraped page contents in days. |
+| `LIGHTPANDA_ENABLED` | Boolean | `false` | Enable/disable headless rendering engine fallback. |
+| `LIGHTPANDA_PATH` | Path | *None* | Path to the Lightpanda headless browser executable. |
+
+---
+
+## 7. RAG Chunking Engine & BM25 Relevance Scoring
+
+To support RAG consumption natively, Searqon includes a built-in text-splitting and ranking pipeline.
+
+### Chunker Parameters
+* **Target Window**: `512` tokens (`385` words).
+* **Overlap Window**: `128` tokens (`96` words).
+* **Sentence Boundary Aware**: Text is only split at punctuation boundary markers (`.`, `!`, `?`) and paragraph break double newlines. Common abbreviations (e.g. `Mr.`, `i.e.`) are ignored.
+* **Length Filtering**: Boilderplate chunks containing fewer than `60` words are automatically discarded.
+
+### BM25 Reranking
+* **K1 Parameter**: `1.5` (controls term frequency saturation).
+* **B Parameter**: `0.75` (controls document length normalization).
+* **Smoothing**: IDF scores are smoothed using `math.Log((N-df+0.5)/(df+0.5) + 1.0)` with a `0.0001` floor value to prevent negative term weighting.
+* **Safety Guards**: If `N <= 0` or total words are 0, average document length (`avgdl`) defaults to `1.0` to avoid `NaN` division. If the overall fetch yields 0 successful sources, a `502 Bad Gateway` error is returned.
+

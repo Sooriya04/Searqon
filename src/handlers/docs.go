@@ -1,131 +1,13 @@
 package handlers
 
 import (
+	_ "embed"
 	"fmt"
 	"net/http"
 )
 
-const openAPISpec = `{
-  "openapi": "3.0.3",
-  "info": {
-    "title": "Searqon API",
-    "description": "Unified Search and Scrape Web Intelligence Engine",
-    "version": "2.0.0"
-  },
-  "paths": {
-    "/search": {
-      "post": {
-        "summary": "Search the web and scrape top result pages",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Search and scrape results",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/scrape": {
-      "post": {
-        "summary": "Scrape a single URL",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScrapeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Scraped page content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/stats": {
-      "get": {
-        "summary": "Get system performance and cache metrics",
-        "responses": {
-          "200": {
-            "description": "Performance statistics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "components": {
-    "schemas": {
-      "APIResponse": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "data": { "type": "object" },
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": { "type": "string" },
-              "message": { "type": "string" }
-            }
-          }
-        }
-      },
-      "SearchRequest": {
-        "type": "object",
-        "required": ["query"],
-        "properties": {
-          "query": { "type": "string" },
-          "limit": { "type": "integer", "default": 5 },
-          "scrape": { "type": "boolean", "default": true },
-          "bypass_cache": { "type": "boolean", "default": false },
-          "max_words": { "type": "integer" },
-          "summarize": { "type": "boolean", "default": false }
-        }
-      },
-      "ScrapeRequest": {
-        "type": "object",
-        "required": ["url"],
-        "properties": {
-          "url": { "type": "string" },
-          "format": { "type": "string", "default": "markdown" },
-          "bypass_cache": { "type": "boolean", "default": false },
-          "max_words": { "type": "integer" }
-        }
-      }
-    }
-  }
-}`
+//go:embed openapi.json
+var openAPISpec []byte
 
 const swaggerUIHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -159,11 +41,15 @@ const swaggerUIHTML = `<!DOCTYPE html>
 func OpenAPIHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	fmt.Fprint(w, openAPISpec)
+	w.Write(openAPISpec)
 }
 
-// SwaggerUIHandler serves the OpenAPI interactive UI page.
+// SwaggerUIHandler serves the OpenAPI interactive UI page at the root homepage.
 func SwaggerUIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, swaggerUIHTML)
 }

@@ -17,6 +17,14 @@ func GetScrapeCache(targetURL string) (models.ScrapeResult, bool) {
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
+		memoryMu.Lock()
+		defer memoryMu.Unlock()
+		entry, found := scrapeMemoryCache[targetURL]
+		if found && time.Now().Before(entry.expiresAt) {
+			// Mark it as cached
+			entry.result.Cached = true
+			return entry.result, true
+		}
 		return models.ScrapeResult{}, false
 	}
 
@@ -64,6 +72,12 @@ func SaveScrapeCache(r models.ScrapeResult) {
 	dbMu.RUnlock()
 
 	if !enabled || pool == nil {
+		memoryMu.Lock()
+		scrapeMemoryCache[r.URL] = inMemoryScrapeEntry{
+			result:    r,
+			expiresAt: time.Now().Add(scrapeCacheTTL),
+		}
+		memoryMu.Unlock()
 		return
 	}
 

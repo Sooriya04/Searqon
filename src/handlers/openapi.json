@@ -1,0 +1,209 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Searqon API",
+    "description": "Unified Search and Scrape Web Intelligence Engine",
+    "version": "2.0.0"
+  },
+  "paths": {
+    "/search": {
+      "post": {
+        "summary": "Search the web and scrape top result pages",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search and scrape results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pipeline": {
+      "post": {
+        "summary": "Unified Search, Fetch, Chunk, and Rank pipeline",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unified pipeline chunks response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scrape": {
+      "post": {
+        "summary": "Scrape a single URL",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrapeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scraped page content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Get system performance and cache metrics",
+        "responses": {
+          "200": {
+            "description": "Performance statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "APIResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SearchRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 5
+          },
+          "scrape": {
+            "type": "boolean",
+            "default": true
+          },
+          "bypass_cache": {
+            "type": "boolean",
+            "default": false
+          },
+          "max_words": {
+            "type": "integer"
+          },
+          "summarize": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ScrapeRequest": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "default": "markdown"
+          },
+          "bypass_cache": {
+            "type": "boolean",
+            "default": false
+          },
+          "max_words": {
+            "type": "integer"
+          },
+          "chunk": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "PipelineRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "max_sources": {
+            "type": "integer",
+            "default": 5
+          },
+          "bypass_cache": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  }
+}

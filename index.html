@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Searqon is a self-hosted, privacy-first, highly performant open-source web intelligence and search retrieval engine designed for AI agents.">
     <title>Searqon — Open-Source Web Intelligence & Search Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,6 +43,7 @@
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
+            position: relative;
         }
 
         /* Background elements */
@@ -167,6 +169,10 @@
                 text-align: center;
                 padding-top: 4rem;
                 gap: 3rem;
+            }
+            .terminal {
+                height: auto;
+                min-height: 320px;
             }
         }
 
@@ -683,7 +689,7 @@
             <nav class="nav-links">
                 <a href="#features">Features</a>
                 <a href="#botinfo">SearqonBot</a>
-                <a href="https://github.com/Sooriya04/Searqon" target="_blank" class="btn-github">
+                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-github">
                     <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"
                         style="display:inline-block;vertical-align:middle;margin-right:4px;">
                         <path
@@ -709,7 +715,7 @@
                     privacy-first, and highly performant.
                 </p>
                 <div class="cta-buttons">
-                    <a href="https://github.com/Sooriya04/Searqon" target="_blank" class="btn-primary">Get Started</a>
+                    <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-primary">Get Started</a>
                     <a href="#botinfo" class="btn-secondary">View Bot Info</a>
                 </div>
             </div>
@@ -864,9 +870,9 @@
                 <div class="code-console">
                     <div class="console-header">
                         <div class="recipe-tabs">
-                            <button class="recipe-tab active" onclick="switchTab('block')">Block Bot</button>
-                            <button class="recipe-tab" onclick="switchTab('limit')">Limit Rate</button>
-                            <button class="recipe-tab" onclick="switchTab('allow')">Allow Only</button>
+                            <button class="recipe-tab active" onclick="switchTab(event, 'block')">Block Bot</button>
+                            <button class="recipe-tab" onclick="switchTab(event, 'limit')">Limit Rate</button>
+                            <button class="recipe-tab" onclick="switchTab(event, 'allow')">Allow Only</button>
                         </div>
                         <div class="terminal-actions">
                             <span class="terminal-action red"></span>
@@ -900,9 +906,9 @@
                 <div class="logo-dot"></div>
             </div>
             <p>
-                Released under the <a href="https://github.com/Sooriya04/Searqon/blob/dev/LICENSE" target="_blank">MIT
+                Released under the <a href="https://github.com/Sooriya04/Searqon/blob/dev/LICENSE" target="_blank" rel="noopener noreferrer">MIT
                     License</a>.
-                Maintained by <a href="https://github.com/Sooriya04" target="_blank">Sooriya</a>.
+                Maintained by <a href="https://github.com/Sooriya04" target="_blank" rel="noopener noreferrer">Sooriya</a>.
             </p>
         </div>
     </footer>
@@ -942,14 +948,14 @@
         const recipes = {
             block: `<span class="recipe-comment"># Block SearqonBot from indexing anything</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/</span>`,
             limit: `<span class="recipe-comment"># Permit SearqonBot but set rate delay (seconds)</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/wp-admin/</span>\n<span class="recipe-key">Crawl-delay:</span> <span class="recipe-val">5</span>`,
-            allow: `<span class="recipe-comment"># block all bots, permit only SearqonBot</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">*</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/</span>\n\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span>`
+            allow: `<span class="recipe-comment"># block all bots, permit only SearqonBot</span>\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">*</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val">/</span>\n\n<span class="recipe-key">User-agent:</span> <span class="recipe-val">SearqonBot</span>\n<span class="recipe-key">Disallow:</span> <span class="recipe-val"></span>`
         };
 
         let activeTab = 'block';
 
-        function switchTab(tab) {
+        function switchTab(event, tab) {
             document.querySelectorAll('.recipe-tab').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            event.currentTarget.classList.add('active');
             activeTab = tab;
             document.getElementById('recipe-code').innerHTML = recipes[tab];
         }

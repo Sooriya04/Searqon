@@ -79,6 +79,9 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusGatewayTimeout, utils.ErrCodeScrapeFailed, result.Error)
 		return
 	}
+	if !req.Chunk {
+		result.Chunks = nil
+	}
 
 	utils.WriteSuccess(w, result)
 }
@@ -94,6 +97,6 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, map[string]interface{}{
 		"status":    "ok",
 		"engine":    "src",
-		"endpoints": []string{"/search", "/scrape", "/scrape/batch", "/map", "/crawl", "/health", "/r/"},
+		"endpoints": []string{"/search", "/scrape", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"},
 	})
 }

@@ -9,15 +9,31 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"src/models"
 )
 
+type inMemorySearchEntry struct {
+	results   []models.SearchResult
+	provider  string
+	createdAt time.Time
+}
+
+type inMemoryScrapeEntry struct {
+	result    models.ScrapeResult
+	expiresAt time.Time
+}
+
 var (
-	dbPool         *pgxpool.Pool
-	dbEnabled      bool
-	dbMu           sync.RWMutex
-	searchCacheTTL time.Duration = 24 * time.Hour
-	scrapeCacheTTL time.Duration = 7 * 24 * time.Hour
-	cleanupCancel  context.CancelFunc
+	dbPool            *pgxpool.Pool
+	dbEnabled         bool
+	dbMu              sync.RWMutex
+	searchCacheTTL    time.Duration = 24 * time.Hour
+	scrapeCacheTTL    time.Duration = 7 * 24 * time.Hour
+	cleanupCancel     context.CancelFunc
+	searchMemoryCache = make(map[string]inMemorySearchEntry)
+	scrapeMemoryCache = make(map[string]inMemoryScrapeEntry)
+	memoryMu          sync.Mutex
 )
 
 // InitDB initializes the database connection pool and schema.

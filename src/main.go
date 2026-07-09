@@ -26,6 +26,7 @@ func main() {
 	// Discovery and Search
 	mux.HandleFunc("/search", handlers.SearchHandler)
 	mux.HandleFunc("/search/index", handlers.SearchIndexHandler)
+	mux.HandleFunc("/pipeline", handlers.PipelineHandler)
 
 	// Scraper API
 	mux.HandleFunc("/scrape", handlers.ScrapeHandler)
@@ -46,7 +47,7 @@ func main() {
 
 	// OpenAPI API Documentation
 	mux.HandleFunc("/openapi.json", handlers.OpenAPIHandler)
-	mux.HandleFunc("/docs", handlers.SwaggerUIHandler)
+	mux.HandleFunc("/", handlers.SwaggerUIHandler)
 
 	// System Health
 	mux.HandleFunc("/health", handlers.HealthHandler)

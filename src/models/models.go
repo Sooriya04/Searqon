@@ -47,12 +47,34 @@ type ScrapeResult struct {
 	ExtractionMethod string         `json:"extractionMethod,omitempty"`
 	FetchDurationMS  int            `json:"fetchDurationMs,omitempty"`
 	Images           []ScrapedImage `json:"images,omitempty"`
+	Chunks           []Chunk        `json:"chunks,omitempty"`
+	RenderMethod     string         `json:"render_method,omitempty"`
+	ScrapedAt        string         `json:"scraped_at,omitempty"`
+	Cached           bool           `json:"cached"`
 }
 
 // ScrapedImage holds details about an extracted image.
 type ScrapedImage struct {
 	URL string `json:"url"`
 	Alt string `json:"alt,omitempty"`
+}
+
+// ChunkMetadata holds details for citations and attribution.
+type ChunkMetadata struct {
+	SourceURL   string `json:"source_url,omitempty"`
+	SourceTitle string `json:"source_title,omitempty"`
+	ChunkIndex  int    `json:"chunk_index"`
+	ScrapedAt   string `json:"scraped_at,omitempty"`
+}
+
+// Chunk represents a pre-chunked window of text content.
+type Chunk struct {
+	Index      int           `json:"index"`
+	Text       string        `json:"text"`
+	TokenCount int           `json:"token_count"`
+	WordCount  int           `json:"word_count"`
+	BM25Score  float64       `json:"bm25_score,omitempty"`
+	Metadata   ChunkMetadata `json:"metadata"`
 }
 
 // MapLink is a discovered link URL and its anchor text.
@@ -94,6 +116,7 @@ type ScrapeRequest struct {
 	Format      string `json:"format"`
 	BypassCache bool   `json:"bypass_cache"`
 	MaxWords    int    `json:"max_words"`
+	Chunk       bool   `json:"chunk"`
 }
 
 type BatchScrapeRequest struct {
@@ -122,4 +145,30 @@ type HTMLScrapeRequest struct {
 	URL      string `json:"url"`
 	Format   string `json:"format"`
 	MaxWords int    `json:"max_words"`
+}
+
+// PipelineRequest is the request contract for the /pipeline endpoint.
+type PipelineRequest struct {
+	Query       string `json:"query"`
+	MaxSources  int    `json:"max_sources"`
+	BypassCache bool   `json:"bypass_cache"`
+}
+
+// PipelineSource represents a scraped source returned in pipeline response.
+type PipelineSource struct {
+	URL          string  `json:"url"`
+	Title        string  `json:"title"`
+	RenderMethod string  `json:"render_method"`
+	Cached       bool    `json:"cached"`
+	Chunks       []Chunk `json:"chunks"`
+}
+
+// PipelineResponse is the stable JSON contract for RAG consumption.
+type PipelineResponse struct {
+	Query       string           `json:"query"`
+	FetchedAt   string           `json:"fetched_at"`
+	Sources     []PipelineSource `json:"sources"`
+	TotalChunks int              `json:"total_chunks"`
+	DurationMS  int64            `json:"duration_ms"`
+	Context     string           `json:"context,omitempty"`
 }

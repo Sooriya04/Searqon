@@ -50,7 +50,7 @@ Think of it as a transparent alternative to services like **Tavily** — where y
 ## Technical Pipeline Overview
 
 ```
-Query → Cache Check → Search Providers → Concurrency Queue → Crawl (Go or Lightpanda) → Extract → Cache Save → Deliver
+Query → Cache Check → Search Providers → Concurrency Queue → Crawl (Go or Lightpanda) → Extract → Chunk & Score (BM25) → Cache Save → Deliver
 ```
 
 1. **Cache Check** — PostgreSQL query cache (24h TTL) returns hits in <5ms.
@@ -58,4 +58,5 @@ Query → Cache Check → Search Providers → Concurrency Queue → Crawl (Go o
 3. **Crawl Queue** — Enforces 3 concurrent worker limits and global timeouts.
 4. **Scraping** — HTML parsed natively or rendered dynamically using the **Lightpanda** browser.
 5. **Purifier** — Mozilla Readability strips noise and converts to clean Markdown.
-6. **Persistence & Return** — Saves results in the cache database and returns structured JSON to the client.
+6. **Chunk & Score** — Chunks markdown text on sentence boundaries (512 tokens / 128 overlap) and scores them using BM25.
+7. **Persistence & Return** — Saves results in the cache database and returns structured JSON to the client.
