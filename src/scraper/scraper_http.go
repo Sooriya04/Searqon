@@ -12,16 +12,23 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
+	"src/utils"
 )
 
-var httpClient = &http.Client{
-	Timeout: 3 * time.Second,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 5 {
-			return fmt.Errorf("too many redirects")
-		}
-		return nil
-	},
+var httpClient *http.Client
+
+func init() {
+	jar, _ := utils.NewPersistentCookieJar()
+	httpClient = &http.Client{
+		Timeout: 3 * time.Second,
+		Jar:     jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
 }
 
 var defaultHeaders = map[string]string{

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"log/slog"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -201,14 +202,19 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	}
 	results = uniqueResults
 
-	// 4. Concurrent Scrape with 8s Deadline
-	scrapeLimit := 3
+	slog.Info("Search Pipeline Discovered URLs", "query", query, "count", len(results), "provider", response.Provider)
+	for _, r := range results {
+		slog.Info("Discovered URL", "url", r.URL, "title", r.Title, "source", r.Source)
+	}
+
+	// 4. Concurrent Scrape with 15s Deadline
+	scrapeLimit := 10
 	if len(results) < scrapeLimit {
 		scrapeLimit = len(results)
 	}
 
 	if scrape && scrapeLimit > 0 {
-		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 8000*time.Millisecond)
+		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 15000*time.Millisecond)
 		defer scrapeCancel()
 
 		var mu sync.Mutex
@@ -229,6 +235,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 
 				select {
 				case <-scrapeCtx.Done():
+					slog.Warn("Scrape Timeout", "url", results[idx].URL)
 					return
 				default:
 				}
@@ -246,12 +253,25 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 					results[idx].Scraped = true
 					mu.Unlock()
 
+					slog.Info("Scrape Success", "url", results[idx].URL, "word_count", scraped.WordCount, "duration_ms", scraped.Duration)
+
 					// Async save embeddings if vector database is active
 					go func(urlStr, txt string) {
 						if emb, err := GetVectorEmbedding(txt); err == nil {
 							db.SavePageEmbedding(urlStr, emb)
 						}
 					}(results[idx].URL, scraped.Content)
+				} else {
+					mu.Lock()
+					results[idx].Scraped = false
+					errReason := scraped.Error
+					if errReason == "" {
+						errReason = "Content too short (word count < 50)"
+					}
+					results[idx].ScrapeError = errReason
+					mu.Unlock()
+					
+					slog.Error("Scrape Failed", "url", results[idx].URL, "error", errReason, "duration_ms", scraped.Duration)
 				}
 			}(i)
 		}

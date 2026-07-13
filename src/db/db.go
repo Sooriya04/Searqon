@@ -183,6 +183,13 @@ func initTables() {
 
 	CREATE INDEX IF NOT EXISTS idx_scrape_cache_domain ON scrape_cache(domain);
 	CREATE INDEX IF NOT EXISTS idx_scrape_cache_expires_at ON scrape_cache(expires_at);
+
+	CREATE TABLE IF NOT EXISTS sessions (
+		domain TEXT PRIMARY KEY,
+		cookies JSONB NOT NULL DEFAULT '[]',
+		user_agent TEXT,
+		updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	_, err := dbPool.Exec(ctx, schema)

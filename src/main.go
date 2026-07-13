@@ -52,9 +52,12 @@ func main() {
 	// System Health
 	mux.HandleFunc("/health", handlers.HealthHandler)
 
+	// Wrap mux with our HTTPLogger middleware
+	loggedMux := utils.HTTPLogger(mux)
+
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      mux,
+		Handler:      loggedMux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  120 * time.Second,

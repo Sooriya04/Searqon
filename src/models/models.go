@@ -8,10 +8,11 @@ type SearchResult struct {
 	URL      string  `json:"url"`
 	Snippet  string  `json:"snippet"`
 	Source   string  `json:"source"`             // "searxng" | "duckduckgo" | "local_index"
-	Content  string  `json:"content,omitempty"`  // scraped plain text
-	Markdown string  `json:"markdown,omitempty"` // scraped markdown
-	Scraped  bool    `json:"scraped"`
-	Score    float64 `json:"score"`              // relevance score from ranker
+	Content     string  `json:"content,omitempty"`  // scraped plain text
+	Markdown    string  `json:"markdown,omitempty"` // scraped markdown
+	Scraped     bool    `json:"scraped"`
+	ScrapeError string  `json:"scrape_error,omitempty"`
+	Score       float64 `json:"score"`              // relevance score from ranker
 }
 
 // SearchResponse is the final search aggregation response.
