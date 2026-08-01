@@ -33,17 +33,19 @@ func GetScrapeCache(targetURL string) (models.ScrapeResult, bool) {
 
 	var r models.ScrapeResult
 	var outboundLinksJSON []byte
+	var metadataJSON []byte
+	var structuredDataJSON []byte
 	var errorMsg *string
 
 	err := pool.QueryRow(ctx, `
-		SELECT url, canonical_url, domain, title, content, markdown, word_count,
+		SELECT url, canonical_url, domain, title, content, markdown, metadata, structured_data, word_count,
 		       description, author, published_at, language, outbound_links,
 		       status_code, content_type, scraped, extraction_method, error_msg,
 		       fetch_duration_ms
 		FROM scrape_cache
 		WHERE url = $1 AND expires_at > CURRENT_TIMESTAMP
 	`, targetURL).Scan(
-		&r.URL, &r.CanonicalURL, &r.Domain, &r.Title, &r.Content, &r.Markdown, &r.WordCount,
+		&r.URL, &r.CanonicalURL, &r.Domain, &r.Title, &r.Content, &r.Markdown, &metadataJSON, &structuredDataJSON, &r.WordCount,
 		&r.Description, &r.Author, &r.PublishedAt, &r.Language, &outboundLinksJSON,
 		&r.StatusCode, &r.ContentType, &r.Scraped, &r.ExtractionMethod, &errorMsg,
 		&r.FetchDurationMS,
@@ -59,6 +61,12 @@ func GetScrapeCache(targetURL string) (models.ScrapeResult, bool) {
 
 	if len(outboundLinksJSON) > 0 {
 		_ = json.Unmarshal(outboundLinksJSON, &r.OutboundLinks)
+	}
+	if len(metadataJSON) > 0 {
+		_ = json.Unmarshal(metadataJSON, &r.Metadata)
+	}
+	if len(structuredDataJSON) > 0 {
+		r.StructuredData = append(json.RawMessage(nil), structuredDataJSON...)
 	}
 
 	return r, true
@@ -88,6 +96,14 @@ func SaveScrapeCache(r models.ScrapeResult) {
 	if err != nil {
 		outboundLinksJSON = []byte("[]")
 	}
+	metadataJSON, err := json.Marshal(r.Metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
+	}
+	structuredDataJSON := []byte("null")
+	if len(r.StructuredData) > 0 {
+		structuredDataJSON = append([]byte(nil), r.StructuredData...)
+	}
 
 	var errorMsg *string
 	if r.Error != "" {
@@ -98,17 +114,19 @@ func SaveScrapeCache(r models.ScrapeResult) {
 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO scrape_cache (
-			url, canonical_url, domain, title, content, markdown, word_count,
+			url, canonical_url, domain, title, content, markdown, metadata, structured_data, word_count,
 			description, author, published_at, language, outbound_links,
 			status_code, content_type, scraped, extraction_method, error_msg,
 			fetch_duration_ms, created_at, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, $19)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, $21)
 		ON CONFLICT (url) DO UPDATE SET
 			canonical_url       = EXCLUDED.canonical_url,
 			domain              = EXCLUDED.domain,
 			title               = EXCLUDED.title,
 			content             = EXCLUDED.content,
 			markdown            = EXCLUDED.markdown,
+			metadata            = EXCLUDED.metadata,
+			structured_data     = EXCLUDED.structured_data,
 			word_count          = EXCLUDED.word_count,
 			description         = EXCLUDED.description,
 			author              = EXCLUDED.author,
@@ -124,7 +142,7 @@ func SaveScrapeCache(r models.ScrapeResult) {
 			created_at          = CURRENT_TIMESTAMP,
 			expires_at          = EXCLUDED.expires_at
 	`,
-		r.URL, r.CanonicalURL, r.Domain, r.Title, r.Content, r.Markdown, r.WordCount,
+		r.URL, r.CanonicalURL, r.Domain, r.Title, r.Content, r.Markdown, metadataJSON, structuredDataJSON, r.WordCount,
 		r.Description, r.Author, r.PublishedAt, r.Language, outboundLinksJSON,
 		r.StatusCode, r.ContentType, r.Scraped, r.ExtractionMethod, errorMsg,
 		r.FetchDurationMS, expiresAt,

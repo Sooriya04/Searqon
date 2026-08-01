@@ -1,7 +1,6 @@
 package scraper
 
 import (
-	"crypto/tls"
 	"log"
 	"net/http"
 	"net/url"
@@ -11,7 +10,7 @@ import (
 )
 
 var (
-	proxies []string
+	proxies    []string
 	proxyIndex uint32
 )
 
@@ -48,13 +47,7 @@ func InitProxyPool() {
 
 	if len(proxies) > 0 {
 		log.Printf("[Proxy] Loaded %d proxies in rotating pool", len(proxies))
-		
-		httpClient.Transport = &http.Transport{
-			Proxy: getNextProxy,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
+		httpClient.Transport = newBrowserTransport(getNextProxy)
 	}
 }
 

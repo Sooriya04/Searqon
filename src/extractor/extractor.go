@@ -7,22 +7,13 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"src/models"
 )
 
-// PageMetadata holds all elements scraped and parsed from an HTML document.
-type PageMetadata struct {
-	Title            string
-	CanonicalURL     string
-	Description      string
-	Author           string
-	PublishedAt      *time.Time
-	Language         string
-	OutboundLinks    []string
-}
-
 // ParseMetadata extracts SEO, metadata, JSON-LD, and outbound links from an HTML document.
-func ParseMetadata(htmlContent string, targetURL string, finalURL string) PageMetadata {
-	var meta PageMetadata
+func ParseMetadata(htmlContent string, targetURL string, finalURL string) models.DocumentMetadata {
+	var meta models.DocumentMetadata
 	meta.CanonicalURL = finalURL
 	if meta.CanonicalURL == "" {
 		meta.CanonicalURL = targetURL
@@ -176,7 +167,7 @@ func parseDateString(str string) *time.Time {
 }
 
 // extractFromJSONLD recursively traverses JSON-LD data looking for publication dates and author info.
-func extractFromJSONLD(val interface{}, meta *PageMetadata) {
+func extractFromJSONLD(val interface{}, meta *models.DocumentMetadata) {
 	switch m := val.(type) {
 	case map[string]interface{}:
 		// Date published

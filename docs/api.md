@@ -2,13 +2,13 @@
 
 Base URL: `http://localhost:4001`
 
-All request bodies are JSON. All responses are JSON with `Content-Type: application/json`.
+All request bodies are JSON. All successful responses are JSON unless noted otherwise.
 
 ---
 
 ## `POST /search`
 
-The main pipeline endpoint. Runs a web search and optionally scrapes the top result pages.
+Multi-engine search pipeline. Expands the query, merges results across providers, optionally scrapes the top matches, and can return a synthesized summary.
 
 ### Request
 
@@ -17,40 +17,57 @@ The main pipeline endpoint. Runs a web search and optionally scrapes the top res
   "query": "what is ycombinator",
   "limit": 5,
   "scrape": true,
-  "bypass_cache": false
+  "bypass_cache": false,
+  "max_words": 800,
+  "summarize": false,
+  "extract_schema": "{ \"name\": \"string\", \"summary\": \"string\" }"
 }
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `query` | string | required | Search query |
-| `limit` | int | `5` | Max results to return (1–10) |
+| `limit` | int | `5` | Max results to return, clamped to 1-10 |
 | `scrape` | bool | `true` | Whether to fetch and extract full page content |
-| `bypass_cache` | bool | `false` | If `true`, bypasses cache and performs live search/scrapes |
+| `bypass_cache` | bool | `false` | If `true`, bypasses query and scrape cache |
+| `max_words` | int | `0` | Truncate scraped content to this many words when `> 0` |
+| `summarize` | bool | `false` | If `true`, returns an LLM summary of the ranked results |
+| `extract_schema` | string | empty | Optional schema-guided structured extraction prompt |
 
 ### Response
 
 ```json
 {
   "query": "what is ycombinator",
-  "provider": "duckduckgo",
-  "total": 5,
+  "provider": "multi",
+  "total": 2,
   "duration": 3980,
+  "summary": "Y Combinator is a startup accelerator that funds early-stage companies.",
   "results": [
     {
       "title": "Y Combinator - Wikipedia",
       "url": "https://en.wikipedia.org/wiki/Y_Combinator",
       "snippet": "Y Combinator is an American startup accelerator...",
-      "source": "duckduckgo",
+      "source": "multi:searxng,wikipedia",
       "scraped": true,
-      "content": "Y Combinator, LLC (YC) is an American technology startup...",
-      "markdown": "# Y Combinator\n\nY Combinator, LLC (YC) is an American..."
+      "content": "Y Combinator, LLC (YC) is an American technology startup accelerator...",
+      "markdown": "# Y Combinator\n\nY Combinator, LLC (YC) is an American...",
+      "metadata": {
+        "title": "Y Combinator",
+        "canonical_url": "https://www.ycombinator.com/",
+        "description": "Startup accelerator",
+        "author": "Y Combinator",
+        "language": "en",
+        "outbound_links": [
+          "https://www.ycombinator.com/"
+        ]
+      }
     },
     {
       "title": "Y Combinator",
       "url": "https://www.ycombinator.com",
       "snippet": "Y Combinator created a new model for funding early stage startups.",
-      "source": "duckduckgo",
+      "source": "multi:duckduckgo",
       "scraped": false
     }
   ]
@@ -59,11 +76,13 @@ The main pipeline endpoint. Runs a web search and optionally scrapes the top res
 
 | Field | Type | Description |
 |---|---|---|
-| `provider` | string | `"searxng"` or `"duckduckgo"` or `"none"` |
+| `provider` | string | `multi` or `none` |
 | `duration` | int | Total pipeline time in milliseconds |
-| `results[].scraped` | bool | `true` = full content extracted, `false` = snippet only |
-| `results[].content` | string | Plain text extracted from page (only when `scraped: true`) |
-| `results[].markdown` | string | Markdown-formatted page content (only when `scraped: true`) |
+| `summary` | string | Optional synthesized answer when `summarize=true` |
+| `results[].scraped` | bool | `true` means full content was extracted |
+| `results[].content` | string | Plain text extracted from page |
+| `results[].markdown` | string | Markdown-formatted page content |
+| `results[].metadata` | object | Normalized document metadata |
 
 ### GET variant
 
@@ -75,7 +94,7 @@ curl "http://localhost:4001/search?q=golang+channels&scrape=false"
 
 ## `POST /pipeline`
 
-Unified Search, Fetch, Chunk, and Rank pipeline. Discovers URLs, scrapes pages concurrently (up to 3 in parallel), chunks markdown text into overlapping sentence-boundary chunks, and scores them using BM25.
+Unified Search, Fetch, Chunk, and Rank pipeline. Discovers URLs, scrapes pages concurrently, chunks markdown text into overlapping sentence-boundary chunks, and scores them using BM25.
 
 ### Request
 
@@ -135,7 +154,7 @@ Unified Search, Fetch, Chunk, and Rank pipeline. Discovers URLs, scrapes pages c
 
 ## `POST /scrape`
 
-Scrape a single URL and return clean text + markdown.
+Scrape a single URL and return clean text, markdown, metadata, and optional structured extraction.
 
 ### Request
 
@@ -143,15 +162,19 @@ Scrape a single URL and return clean text + markdown.
 {
   "url": "https://en.wikipedia.org/wiki/Y_Combinator",
   "format": "markdown",
-  "bypass_cache": false
+  "bypass_cache": false,
+  "chunk": false,
+  "extract_schema": "{ \"name\": \"string\", \"summary\": \"string\" }"
 }
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `url` | string | required | Target URL to scrape |
-| `format` | string | `"markdown"` | `"markdown"` or `"text"` |
+| `format` | string | `markdown` | `markdown` or `text` |
 | `bypass_cache` | bool | `false` | If `true`, bypasses cache and performs a live scrape |
+| `chunk` | bool | `false` | If `true`, includes chunks in the response |
+| `extract_schema` | string | empty | Optional structured extraction schema for the page |
 
 ### Response
 
@@ -164,11 +187,22 @@ Scrape a single URL and return clean text + markdown.
   "wordCount": 1842,
   "startTime": "2026-06-06T17:30:00Z",
   "endTime": "2026-06-06T17:30:01Z",
-  "duration": 980
+  "duration": 980,
+  "metadata": {
+    "title": "Y Combinator - Wikipedia",
+    "canonical_url": "https://en.wikipedia.org/wiki/Y_Combinator",
+    "description": "American startup accelerator",
+    "author": "Y Combinator",
+    "language": "en",
+    "outbound_links": [
+      "https://www.ycombinator.com/"
+    ]
+  }
 }
 ```
 
-If scraping fails (blocked, timeout, robots.txt disallowed):
+If scraping fails:
+
 ```json
 {
   "url": "https://example.com",
@@ -179,9 +213,37 @@ If scraping fails (blocked, timeout, robots.txt disallowed):
 
 ---
 
+## `POST /scrape/chunked`
+
+Scrape a single URL with chunking enabled for downstream RAG ingestion.
+
+### Request
+
+```json
+{
+  "url": "https://en.wikipedia.org/wiki/Y_Combinator",
+  "format": "markdown",
+  "bypass_cache": false,
+  "extract_schema": "{ \"title\": \"string\", \"summary\": \"string\" }"
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `url` | string | required | Target URL to scrape |
+| `format` | string | `markdown` | `markdown` or `text` |
+| `bypass_cache` | bool | `false` | If `true`, bypasses cache and performs a live scrape |
+| `extract_schema` | string | empty | Optional structured extraction schema for the page |
+
+### Response
+
+Same structure as `/scrape`, with chunks preserved in the payload.
+
+---
+
 ## `POST /scrape/batch`
 
-Scrape multiple URLs concurrently (up to 20 at once).
+Scrape multiple URLs concurrently, up to 20 at once.
 
 ### Request
 
@@ -198,12 +260,12 @@ Scrape multiple URLs concurrently (up to 20 at once).
 
 ### Response
 
-Returns an **array** of scrape results in the same order as input URLs:
+Returns an array of scrape results in the same order as input URLs.
 
 ```json
 [
-  { "title": "Y Combinator - Wikipedia", "url": "...", "scraped": true, ... },
-  { "title": "About - Y Combinator", "url": "...", "scraped": true, ... }
+  { "title": "Y Combinator - Wikipedia", "url": "...", "scraped": true },
+  { "title": "About - Y Combinator", "url": "...", "scraped": true }
 ]
 ```
 
@@ -211,7 +273,7 @@ Returns an **array** of scrape results in the same order as input URLs:
 
 ## `POST /scrape/html`
 
-Parse raw HTML you already have. No network request is made.
+Parse raw HTML directly. No network request is made.
 
 ### Request
 
@@ -219,30 +281,31 @@ Parse raw HTML you already have. No network request is made.
 {
   "html": "<html><body><h1>Hello</h1><p>World</p></body></html>",
   "url": "https://example.com",
-  "format": "markdown"
+  "format": "markdown",
+  "extract_schema": "{ \"title\": \"string\" }"
 }
 ```
 
 ### Response
 
-Same as `/scrape`.
+Same as `/scrape`, including `metadata` and `structured_data` when extraction is requested.
 
 ---
 
 ## `GET /r/<url>`
 
-Jina Reader compatibility endpoint. Scrapes the given URL and returns its content as raw Markdown (default) or JSON.
+Jina Reader compatibility endpoint. Scrapes the given URL and returns raw Markdown by default, or JSON when requested.
 
 ### Request
 
 ```bash
-# Get raw markdown
+# Raw markdown
 curl http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
 
-# Get raw markdown (query parameter style)
+# Query parameter form
 curl "http://localhost:4001/r?url=https://en.wikipedia.org/wiki/Y_Combinator"
 
-# Get JSON format
+# JSON
 curl -H "Accept: application/json" http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
 ```
 
@@ -250,10 +313,12 @@ curl -H "Accept: application/json" http://localhost:4001/r/https://en.wikipedia.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `bypass_cache` | string | `"false"` | Pass `"true"` to bypass database scrape cache. |
-| `json` | string | `"false"` | Pass `"true"` to force a JSON response. |
+| `bypass_cache` | string | `false` | Pass `true` to bypass database scrape cache |
+| `json` | string | `false` | Pass `true` to force a JSON response |
 
-### Response (Default: text/markdown)
+### Response
+
+Default response is `text/markdown`.
 
 ```markdown
 # Y Combinator
@@ -261,7 +326,7 @@ curl -H "Accept: application/json" http://localhost:4001/r/https://en.wikipedia.
 Y Combinator, LLC (YC) is an American technology startup accelerator...
 ```
 
-### Response (JSON: Accept header or `json=true`)
+JSON response:
 
 ```json
 {
@@ -300,12 +365,12 @@ Crawl an entire site starting from a seed URL. Follows internal links up to `dep
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `url` | string | required | Seed URL to start crawling |
-| `limit` | int | `30` | Max pages to crawl (hard cap: 50) |
-| `depth` | int | `2` | Max link depth from seed (hard cap: 3) |
-| `format` | string | `"markdown"` | Output format per page |
+| `limit` | int | `30` | Max pages to crawl, hard cap 50 |
+| `depth` | int | `2` | Max link depth from seed, hard cap 3 |
+| `format` | string | `markdown` | Output format per page |
 | `stream` | bool | `false` | Stream pages as SSE events as they're scraped |
 
-### Response (non-streaming)
+### Response
 
 ```json
 {
@@ -313,17 +378,16 @@ Crawl an entire site starting from a seed URL. Follows internal links up to `dep
   "total": 18,
   "duration": 12400,
   "pages": [
-    { "title": "...", "url": "...", "content": "...", "markdown": "..." },
-    ...
+    { "title": "...", "url": "...", "content": "...", "markdown": "..." }
   ]
 }
 ```
 
-### Streaming Mode (`stream: true`)
+### Streaming mode
 
 Returns Server-Sent Events. Each scraped page is sent as it completes:
 
-```
+```text
 data: {"title":"...","url":"...","content":"..."}
 
 data: {"title":"...","url":"...","content":"..."}
@@ -373,7 +437,7 @@ Health check endpoint.
 {
   "status": "ok",
   "engine": "src",
-  "endpoints": ["/scrape", "/scrape/html", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"]
+  "endpoints": ["/search", "/scrape", "/scrape/chunked", "/scrape/batch", "/scrape/html", "/map", "/crawl", "/health", "/r/", "/pipeline"]
 }
 ```
 
@@ -389,6 +453,6 @@ All errors return a JSON body:
 
 | HTTP Status | Meaning |
 |---|---|
-| `400` | Bad request (missing required field, invalid JSON) |
+| `400` | Bad request, missing required field, or invalid JSON |
 | `405` | Method not allowed |
-| `504` | Scrape failed (timeout, network error) |
+| `504` | Scrape failed, timeout, or network error |

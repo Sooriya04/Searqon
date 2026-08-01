@@ -53,7 +53,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, req.Summarize)
+	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, req.Summarize, req.ExtractSchema)
 	utils.WriteSuccess(w, result)
 }
 
@@ -74,7 +74,11 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, _ := scraper.ScrapeSingleURL(req.URL, req.Format, req.BypassCache)
+	result, _ := scraper.ScrapeSingleURLWithOptions(req.URL, scraper.ScrapeOptions{
+		Format:        req.Format,
+		BypassCache:   req.BypassCache,
+		ExtractSchema: req.ExtractSchema,
+	})
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusGatewayTimeout, utils.ErrCodeScrapeFailed, result.Error)
 		return
@@ -86,17 +90,12 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, result)
 }
 
-// ScrapeHTMLHandler parses in-memory HTML.
-func ScrapeHTMLHandler(w http.ResponseWriter, r *http.Request) {
-	// ... we will put this here or keep it clean
-}
-
 // HealthHandler returns API health status.
 func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	utils.WriteSuccess(w, map[string]interface{}{
 		"status":    "ok",
 		"engine":    "src",
-		"endpoints": []string{"/search", "/scrape", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"},
+		"endpoints": []string{"/search", "/scrape", "/scrape/chunked", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"},
 	})
 }

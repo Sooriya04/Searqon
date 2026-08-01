@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -18,6 +19,13 @@ import (
 	"src/utils"
 )
 
+type ScrapeOptions struct {
+	Format        string
+	BypassCache   bool
+	ForceNative   bool
+	ExtractSchema string
+}
+
 func stripHTMLTagsForMarkdown(htmlStr string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
 	if err != nil || doc == nil {
@@ -33,6 +41,11 @@ func stripHTMLTagsForMarkdown(htmlStr string) string {
 
 // ScrapeHTMLContent extracts structural text from HTML content directly.
 func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) models.ScrapeResult {
+	return ScrapeHTMLContentWithSchema(htmlContent, targetURL, finalURL, format, startTime, "")
+}
+
+// ScrapeHTMLContentWithSchema extracts structural text and optionally runs schema-guided structured extraction.
+func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time, extractSchema string) models.ScrapeResult {
 	startISO := startTime.UTC().Format(time.RFC3339)
 	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
@@ -55,6 +68,7 @@ func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 	result.PublishedAt = meta.PublishedAt
 	result.Language = meta.Language
 	result.OutboundLinks = meta.OutboundLinks
+	result.Metadata = meta
 
 	// 2. Extract media images
 	result.Images = ExtractImages(htmlContent, targetURL)
@@ -87,6 +101,11 @@ func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 		result.FetchDurationMS = int(result.Duration)
 		result.ExtractionMethod = "readability"
 		result.Scraped = true
+		if extractSchema != "" {
+			if structured, err := extractStructuredData(extractSchema, result); err == nil {
+				result.StructuredData = structured
+			}
+		}
 		return result
 	}
 
@@ -148,12 +167,23 @@ func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, fo
 	result.FetchDurationMS = int(result.Duration)
 	result.ExtractionMethod = "goquery"
 	result.Scraped = true
+	if extractSchema != "" {
+		if structured, err := extractStructuredData(extractSchema, result); err == nil {
+			result.StructuredData = structured
+		}
+	}
 	return result
 }
 
 // ScrapeSingleURL scrapes a single URL, resolving cache and robots.txt.
 func ScrapeSingleURL(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternal(targetURL, format, bypassCache, false)
+	res, raw := ScrapeSingleURLWithOptions(targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache})
+	return res, raw
+}
+
+// ScrapeSingleURLWithOptions scrapes a single URL using optional schema extraction and native-render overrides.
+func ScrapeSingleURLWithOptions(targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
+	res, raw := scrapeSingleURLInternal(targetURL, opts)
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			if res.ExtractionMethod == "lightpanda" {
@@ -178,7 +208,7 @@ func ScrapeSingleURL(targetURL string, format string, bypassCache bool) (models.
 
 // ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
 func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternal(targetURL, format, bypassCache, true)
+	res, raw := scrapeSingleURLInternal(targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			res.RenderMethod = "go"
@@ -197,15 +227,16 @@ func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (m
 	return res, raw
 }
 
-func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, forceNative bool) (models.ScrapeResult, string) {
+func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
 	startTime := time.Now()
 	startISO := startTime.UTC().Format(time.RFC3339)
 
 	// 1. Check database cache
-	if !bypassCache {
+	if !opts.BypassCache {
 		if cached, found := db.GetScrapeCache(targetURL); found {
 			cached.Duration = time.Since(startTime).Milliseconds()
 			cached.Cached = true
+			populateScrapeMetadata(&cached)
 			return cached, ""
 		}
 	}
@@ -243,9 +274,9 @@ func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, 
 	}
 
 	// 2. Try Lightpanda Scraper if enabled and native mode is not forced
-	if !forceNative {
+	if !opts.ForceNative {
 		if enabled, binaryPath := utils.LoadLightpandaConfig(); enabled && binaryPath != "" {
-			scraped, rawOut, err := ScrapeWithLightpanda(targetURL, userAgent, binaryPath, format, startTime)
+			scraped, rawOut, err := ScrapeWithLightpanda(targetURL, userAgent, binaryPath, opts.Format, startTime, opts.ExtractSchema)
 			if err == nil {
 				db.SaveScrapeCache(scraped)
 				return scraped, rawOut
@@ -277,7 +308,7 @@ func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, 
 	if parsedURL != nil {
 		finalURL = parsedURL.String()
 	}
-	scraped := ScrapeHTMLContent(htmlContent, targetURL, finalURL, format, startTime)
+	scraped := ScrapeHTMLContentWithSchema(htmlContent, targetURL, finalURL, opts.Format, startTime, opts.ExtractSchema)
 	scraped.StatusCode = statusCode
 	scraped.ContentType = contentType
 
@@ -288,4 +319,68 @@ func scrapeSingleURLInternal(targetURL string, format string, bypassCache bool, 
 
 func htmlToMarkdown(htmlContent string, baseURL string) (string, error) {
 	return md.ConvertString(htmlContent)
+}
+
+func extractStructuredData(schema string, result models.ScrapeResult) (json.RawMessage, error) {
+	prompt := fmt.Sprintf(`Extract the requested structured data from the page content.
+Return only valid JSON. If a field is unavailable, use null or an empty array/object.
+
+Requested schema:
+%s
+
+Page title: %s
+URL: %s
+Description: %s
+Author: %s
+Language: %s
+
+Content:
+%s`, schema, result.Title, result.URL, result.Description, result.Author, result.Language, truncateForExtraction(result.Markdown, result.Content))
+
+	raw, err := queryOllamaJSON(prompt)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("empty structured extraction response")
+	}
+	return raw, nil
+}
+
+func truncateForExtraction(markdown string, content string) string {
+	text := markdown
+	if text == "" {
+		text = content
+	}
+	if len(text) > 6000 {
+		text = text[:6000]
+	}
+	return text
+}
+
+func populateScrapeMetadata(result *models.ScrapeResult) {
+	if result == nil {
+		return
+	}
+	if result.Metadata.Title == "" {
+		result.Metadata.Title = result.Title
+	}
+	if result.Metadata.CanonicalURL == "" {
+		result.Metadata.CanonicalURL = result.CanonicalURL
+	}
+	if result.Metadata.Description == "" {
+		result.Metadata.Description = result.Description
+	}
+	if result.Metadata.Author == "" {
+		result.Metadata.Author = result.Author
+	}
+	if result.Metadata.PublishedAt == nil {
+		result.Metadata.PublishedAt = result.PublishedAt
+	}
+	if result.Metadata.Language == "" {
+		result.Metadata.Language = result.Language
+	}
+	if len(result.Metadata.OutboundLinks) == 0 {
+		result.Metadata.OutboundLinks = append([]string(nil), result.OutboundLinks...)
+	}
 }

@@ -29,6 +29,7 @@ func init() {
 			return nil
 		},
 	}
+	initBrowserTransport()
 }
 
 var defaultHeaders = map[string]string{
@@ -36,6 +37,7 @@ var defaultHeaders = map[string]string{
 	"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 	"Accept-Language":           "en-US,en;q=0.9",
 	"Cache-Control":             "no-cache",
+	"Pragma":                    "no-cache",
 	"Sec-Fetch-Dest":            "document",
 	"Sec-Fetch-Mode":            "navigate",
 	"Sec-Fetch-Site":            "none",
@@ -57,11 +59,8 @@ func FetchHTML(targetURL string, userAgent string) (string, *url.URL, int, strin
 	if err != nil {
 		return "", nil, 0, "", fmt.Errorf("request creation failed: %v", err)
 	}
-	for key, value := range defaultHeaders {
+	for key, value := range pickBrowserHeaders(userAgent) {
 		req.Header.Set(key, value)
-	}
-	if userAgent != "" {
-		req.Header.Set("User-Agent", userAgent)
 	}
 
 	resp, err := httpClient.Do(req)

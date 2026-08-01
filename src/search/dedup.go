@@ -64,16 +64,20 @@ func DeduplicateResults(results []models.SearchResult) []models.SearchResult {
 	var hashes []uint64
 
 	for _, r := range results {
-		if !r.Scraped || r.Content == "" {
+		text := r.Content
+		if text == "" {
+			text = r.Snippet + " " + r.Title
+		}
+		if text == "" {
 			clean = append(clean, r)
 			continue
 		}
 
-		sh := SimHash(r.Content)
+		sh := SimHash(text)
 		isDuplicate := false
 
 		for _, existingHash := range hashes {
-			if HammingDistance(sh, existingHash) <= 3 {
+			if HammingDistance(sh, existingHash) <= 4 {
 				isDuplicate = true
 				break
 			}

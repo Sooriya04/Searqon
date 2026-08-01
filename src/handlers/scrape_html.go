@@ -31,7 +31,7 @@ func HTMLScrapeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startTime := time.Now()
-	result := scraper.ScrapeHTMLContent(req.HTML, req.URL, req.URL, req.Format, startTime)
+	result := scraper.ScrapeHTMLContentWithSchema(req.HTML, req.URL, req.URL, req.Format, startTime, req.ExtractSchema)
 
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, result.Error)

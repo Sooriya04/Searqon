@@ -12,7 +12,7 @@ import (
 )
 
 // ScrapeWithLightpanda runs the Lightpanda CLI to execute JS and fetch HTML.
-func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time) (models.ScrapeResult, string, error) {
+func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time, extractSchema string) (models.ScrapeResult, string, error) {
 	startISO := startTime.UTC().Format(time.RFC3339)
 	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
@@ -41,7 +41,7 @@ func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 	}
 
 	// Feed rendered HTML into the unified content scraping/cleaning engine
-	parsedResult := ScrapeHTMLContent(htmlOutput, targetURL, targetURL, format, startTime)
+	parsedResult := ScrapeHTMLContentWithSchema(htmlOutput, targetURL, targetURL, format, startTime, extractSchema)
 	parsedResult.StatusCode = 200
 	parsedResult.ContentType = "text/html"
 	parsedResult.ExtractionMethod = "lightpanda"

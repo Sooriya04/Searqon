@@ -30,6 +30,7 @@ func main() {
 
 	// Scraper API
 	mux.HandleFunc("/scrape", handlers.ScrapeHandler)
+	mux.HandleFunc("/scrape/chunked", handlers.ChunkedScrapeHandler)
 	mux.HandleFunc("/scrape/batch", handlers.BatchScrapeHandler)
 	mux.HandleFunc("/scrape/html", handlers.HTMLScrapeHandler)
 	mux.HandleFunc("/r/", handlers.JinaReaderHandler)

@@ -147,6 +147,8 @@ func initTables() {
 		title               TEXT,
 		content             TEXT,
 		markdown            TEXT,
+		metadata            JSONB,
+		structured_data     JSONB,
 		word_count          INTEGER DEFAULT 0,
 		description         TEXT,
 		author              TEXT,
@@ -168,6 +170,8 @@ func initTables() {
 
 	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS canonical_url TEXT;
 	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS domain TEXT NOT NULL DEFAULT 'unknown';
+	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS metadata JSONB;
+	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS structured_data JSONB;
 	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS description TEXT;
 	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS author TEXT;
 	ALTER TABLE scrape_cache ADD COLUMN IF NOT EXISTS published_at TIMESTAMP WITH TIME ZONE;

@@ -197,3 +197,12 @@ func rankResults(results []models.SearchResult, query string) []models.SearchRes
 
 	return ranked
 }
+
+// HybridRankResults applies lexical scoring first, then semantic reranking if embeddings are available.
+func HybridRankResults(results []models.SearchResult, query string) []models.SearchResult {
+	if len(results) <= 1 {
+		return results
+	}
+	results = rankResults(results, query)
+	return semanticRankResults(results, query)
+}

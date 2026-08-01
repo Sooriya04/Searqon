@@ -1,18 +1,34 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+// DocumentMetadata captures normalized page metadata for downstream agents.
+type DocumentMetadata struct {
+	Title         string          `json:"title,omitempty"`
+	CanonicalURL  string          `json:"canonical_url,omitempty"`
+	Description   string          `json:"description,omitempty"`
+	Author        string          `json:"author,omitempty"`
+	PublishedAt   *time.Time      `json:"published_at,omitempty"`
+	Language      string          `json:"language,omitempty"`
+	OutboundLinks []string        `json:"outbound_links,omitempty"`
+	Structured    json.RawMessage `json:"structured,omitempty"`
+}
 
 // SearchResult represents a single discovered search result.
 type SearchResult struct {
-	Title    string  `json:"title"`
-	URL      string  `json:"url"`
-	Snippet  string  `json:"snippet"`
-	Source   string  `json:"source"`             // "searxng" | "duckduckgo" | "local_index"
-	Content     string  `json:"content,omitempty"`  // scraped plain text
-	Markdown    string  `json:"markdown,omitempty"` // scraped markdown
-	Scraped     bool    `json:"scraped"`
-	ScrapeError string  `json:"scrape_error,omitempty"`
-	Score       float64 `json:"score"`              // relevance score from ranker
+	Title       string           `json:"title"`
+	URL         string           `json:"url"`
+	Snippet     string           `json:"snippet"`
+	Source      string           `json:"source"`             // "searxng" | "duckduckgo" | "local_index"
+	Content     string           `json:"content,omitempty"`  // scraped plain text
+	Markdown    string           `json:"markdown,omitempty"` // scraped markdown
+	Scraped     bool             `json:"scraped"`
+	ScrapeError string           `json:"scrape_error,omitempty"`
+	Score       float64          `json:"score"` // relevance score from ranker
+	Metadata    DocumentMetadata `json:"metadata,omitempty"`
 }
 
 // SearchResponse is the final search aggregation response.
@@ -22,36 +38,39 @@ type SearchResponse struct {
 	Total    int            `json:"total"`
 	Duration int64          `json:"duration"`
 	Provider string         `json:"provider"`
+	Summary  string         `json:"summary,omitempty"`
 }
 
 // ScrapeResult is the structure of a single page's full extraction.
 type ScrapeResult struct {
-	Title            string         `json:"title"`
-	Content          string         `json:"content"`            // plain text (always present)
-	Markdown         string         `json:"markdown,omitempty"` // markdown formatted version
-	URL              string         `json:"url"`
-	WordCount        int            `json:"wordCount"`
-	StartTime        string         `json:"startTime"`
-	EndTime          string         `json:"endTime"`
-	Duration         int64          `json:"duration"` // ms
-	Error            string         `json:"error,omitempty"`
-	CanonicalURL     string         `json:"canonicalUrl,omitempty"`
-	Domain           string         `json:"domain"`
-	Description      string         `json:"description,omitempty"`
-	Author           string         `json:"author,omitempty"`
-	PublishedAt      *time.Time     `json:"publishedAt,omitempty"`
-	Language         string         `json:"language,omitempty"`
-	OutboundLinks    []string       `json:"outboundLinks,omitempty"`
-	StatusCode       int            `json:"statusCode,omitempty"`
-	ContentType      string         `json:"contentType,omitempty"`
-	Scraped          bool           `json:"scraped"`
-	ExtractionMethod string         `json:"extractionMethod,omitempty"`
-	FetchDurationMS  int            `json:"fetchDurationMs,omitempty"`
-	Images           []ScrapedImage `json:"images,omitempty"`
-	Chunks           []Chunk        `json:"chunks,omitempty"`
-	RenderMethod     string         `json:"render_method,omitempty"`
-	ScrapedAt        string         `json:"scraped_at,omitempty"`
-	Cached           bool           `json:"cached"`
+	Title            string           `json:"title"`
+	Content          string           `json:"content"`            // plain text (always present)
+	Markdown         string           `json:"markdown,omitempty"` // markdown formatted version
+	URL              string           `json:"url"`
+	WordCount        int              `json:"wordCount"`
+	StartTime        string           `json:"startTime"`
+	EndTime          string           `json:"endTime"`
+	Duration         int64            `json:"duration"` // ms
+	Error            string           `json:"error,omitempty"`
+	CanonicalURL     string           `json:"canonicalUrl,omitempty"`
+	Domain           string           `json:"domain"`
+	Description      string           `json:"description,omitempty"`
+	Author           string           `json:"author,omitempty"`
+	PublishedAt      *time.Time       `json:"publishedAt,omitempty"`
+	Language         string           `json:"language,omitempty"`
+	OutboundLinks    []string         `json:"outboundLinks,omitempty"`
+	StatusCode       int              `json:"statusCode,omitempty"`
+	ContentType      string           `json:"contentType,omitempty"`
+	Scraped          bool             `json:"scraped"`
+	ExtractionMethod string           `json:"extractionMethod,omitempty"`
+	FetchDurationMS  int              `json:"fetchDurationMs,omitempty"`
+	Images           []ScrapedImage   `json:"images,omitempty"`
+	Chunks           []Chunk          `json:"chunks,omitempty"`
+	RenderMethod     string           `json:"render_method,omitempty"`
+	ScrapedAt        string           `json:"scraped_at,omitempty"`
+	Cached           bool             `json:"cached"`
+	Metadata         DocumentMetadata `json:"metadata,omitempty"`
+	StructuredData   json.RawMessage  `json:"structured_data,omitempty"`
 }
 
 // ScrapedImage holds details about an extracted image.
@@ -104,20 +123,22 @@ type CrawlResult struct {
 
 // API Requests
 type SearchRequest struct {
-	Query       string `json:"query"`
-	Limit       int    `json:"limit"`
-	Scrape      *bool  `json:"scrape"`
-	BypassCache bool   `json:"bypass_cache"`
-	MaxWords    int    `json:"max_words"`
-	Summarize   bool   `json:"summarize"`
+	Query         string `json:"query"`
+	Limit         int    `json:"limit"`
+	Scrape        *bool  `json:"scrape"`
+	BypassCache   bool   `json:"bypass_cache"`
+	MaxWords      int    `json:"max_words"`
+	Summarize     bool   `json:"summarize"`
+	ExtractSchema string `json:"extract_schema,omitempty"`
 }
 
 type ScrapeRequest struct {
-	URL         string `json:"url"`
-	Format      string `json:"format"`
-	BypassCache bool   `json:"bypass_cache"`
-	MaxWords    int    `json:"max_words"`
-	Chunk       bool   `json:"chunk"`
+	URL           string `json:"url"`
+	Format        string `json:"format"`
+	BypassCache   bool   `json:"bypass_cache"`
+	MaxWords      int    `json:"max_words"`
+	Chunk         bool   `json:"chunk"`
+	ExtractSchema string `json:"extract_schema,omitempty"`
 }
 
 type BatchScrapeRequest struct {
@@ -142,10 +163,11 @@ type CrawlRequest struct {
 }
 
 type HTMLScrapeRequest struct {
-	HTML     string `json:"html"`
-	URL      string `json:"url"`
-	Format   string `json:"format"`
-	MaxWords int    `json:"max_words"`
+	HTML          string `json:"html"`
+	URL           string `json:"url"`
+	Format        string `json:"format"`
+	MaxWords      int    `json:"max_words"`
+	ExtractSchema string `json:"extract_schema,omitempty"`
 }
 
 // PipelineRequest is the request contract for the /pipeline endpoint.

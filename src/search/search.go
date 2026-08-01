@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
-	"log/slog"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -152,7 +152,7 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 }
 
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
-func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool) models.SearchResponse {
+func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
@@ -177,17 +177,12 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	limit, scrape = AdjustParamsByIntent(intent, limit, scrape)
 
 	// 3. Web Discovery
-	results, err := searchSearXNG(expandedQuery, limit)
-	if err != nil {
-		results, err = searchDDGFallback(expandedQuery, limit)
-		if err != nil {
-			response.Duration = time.Since(start).Milliseconds()
-			response.Provider = "none"
-			return response
-		}
-		response.Provider = "duckduckgo"
-	} else {
-		response.Provider = "searxng"
+	results, provider := discoverSearchResults(expandedQuery, limit)
+	response.Provider = provider
+	if len(results) == 0 {
+		response.Duration = time.Since(start).Milliseconds()
+		response.Provider = "none"
+		return response
 	}
 
 	// Deduplicate discovery URLs
@@ -231,7 +226,11 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 				default:
 				}
 
-				scraped, _ := scraper.ScrapeSingleURLNative(results[idx].URL, "markdown", bypassCache)
+				scraped, _ := scraper.ScrapeSingleURLWithOptions(results[idx].URL, scraper.ScrapeOptions{
+					Format:        "markdown",
+					BypassCache:   bypassCache,
+					ExtractSchema: extractSchema,
+				})
 
 				select {
 				case <-scrapeCtx.Done():
@@ -250,6 +249,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 					mu.Lock()
 					results[idx].Content = content
 					results[idx].Markdown = scraped.Markdown
+					results[idx].Metadata = scraped.Metadata
 					results[idx].Scraped = true
 					mu.Unlock()
 
@@ -270,7 +270,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 					}
 					results[idx].ScrapeError = errReason
 					mu.Unlock()
-					
+
 					slog.Error("Scrape Failed", "url", results[idx].URL, "error", errReason, "duration_ms", scraped.Duration)
 				}
 			}(i)
@@ -290,10 +290,15 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 
 	// 5. Content Deduplication & Relevance Ranking
 	results = DeduplicateResults(results)
-	results = rankResults(results, query)
+	results = HybridRankResults(results, query)
 
 	response.Results = results
 	response.Total = len(results)
+	if summarize && len(results) > 0 {
+		if summary, err := SynthesizeAnswer(query, results); err == nil {
+			response.Summary = summary
+		}
+	}
 	response.Duration = time.Since(start).Milliseconds()
 
 	// 6. Save cache (only if we got results, to prevent caching transient timeouts)
