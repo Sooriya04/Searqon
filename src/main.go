@@ -25,6 +25,8 @@ func main() {
 
 	// Discovery and Search
 	mux.HandleFunc("/search", handlers.SearchHandler)
+	mux.HandleFunc("/search/stream", handlers.SearchStreamHandler)
+	mux.HandleFunc("/search/explain", handlers.SearchExplainHandler)
 	mux.HandleFunc("/search/index", handlers.SearchIndexHandler)
 	mux.HandleFunc("/pipeline", handlers.PipelineHandler)
 
@@ -45,6 +47,7 @@ func main() {
 	mux.HandleFunc("/extract", handlers.ExtractHandler)
 	mux.HandleFunc("/feed", handlers.FeedHandler)
 	mux.HandleFunc("/stats", handlers.StatsHandler)
+	mux.HandleFunc("/metrics", handlers.MetricsHandler)
 
 	// OpenAPI API Documentation
 	mux.HandleFunc("/openapi.json", handlers.OpenAPIHandler)
@@ -53,12 +56,12 @@ func main() {
 	// System Health
 	mux.HandleFunc("/health", handlers.HealthHandler)
 
-	// Wrap mux with our HTTPLogger middleware
-	loggedMux := utils.HTTPLogger(mux)
+	// Wrap mux with Gzip & Logger middleware
+	handlerStack := utils.GzipCompressionMiddleware(utils.HTTPLogger(mux))
 
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      loggedMux,
+		Handler:      handlerStack,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  120 * time.Second,

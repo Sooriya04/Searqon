@@ -177,7 +177,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	limit, scrape = AdjustParamsByIntent(intent, limit, scrape)
 
 	// 3. Web Discovery
-	results, provider := discoverSearchResults(expandedQuery, limit)
+	results, provider := discoverSearchResultsWithIntent(expandedQuery, limit, intent)
 	response.Provider = provider
 	if len(results) == 0 {
 		response.Duration = time.Since(start).Milliseconds()
@@ -209,6 +209,12 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	}
 
 	if scrape && scrapeLimit > 0 {
+		var urlsToPreResolve []string
+		for i := 0; i < scrapeLimit; i++ {
+			urlsToPreResolve = append(urlsToPreResolve, results[i].URL)
+		}
+		scraper.PreResolveDNS(urlsToPreResolve)
+
 		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 15000*time.Millisecond)
 		defer scrapeCancel()
 

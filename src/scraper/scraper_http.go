@@ -6,14 +6,37 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andybalholm/brotli"
 	"src/utils"
 )
+
+// PreResolveDNS performs parallel DNS lookups for target hosts before batch scraping.
+func PreResolveDNS(rawURLs []string) {
+	var wg sync.WaitGroup
+	seen := make(map[string]bool)
+	for _, raw := range rawURLs {
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Hostname() == "" || seen[parsed.Hostname()] {
+			continue
+		}
+		seen[parsed.Hostname()] = true
+		wg.Add(1)
+		go func(host string) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+			defer cancel()
+			_, _ = net.DefaultResolver.LookupIPAddr(ctx, host)
+		}(parsed.Hostname())
+	}
+	wg.Wait()
+}
 
 var httpClient *http.Client
 
@@ -54,6 +77,8 @@ func FetchHTML(targetURL string, userAgent string) (string, *url.URL, int, strin
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+
+	_ = WaitDomainRateLimit(ctx, parsedURL.Hostname())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
 	if err != nil {

@@ -31,9 +31,8 @@ var (
 	searchCacheTTL    time.Duration = 24 * time.Hour
 	scrapeCacheTTL    time.Duration = 7 * 24 * time.Hour
 	cleanupCancel     context.CancelFunc
-	searchMemoryCache = make(map[string]inMemorySearchEntry)
-	scrapeMemoryCache = make(map[string]inMemoryScrapeEntry)
-	memoryMu          sync.Mutex
+	searchMemoryCache sync.Map
+	scrapeMemoryCache sync.Map
 )
 
 // InitDB initializes the database connection pool and schema.

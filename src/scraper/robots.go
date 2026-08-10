@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type AgentRules struct {
@@ -24,6 +26,7 @@ type RobotsData struct {
 
 var robotsCache = make(map[string]*RobotsData)
 var robotsMu sync.RWMutex
+var robotsSF singleflight.Group
 
 var robotsHttpClient = &http.Client{
 	Timeout: 5 * time.Second,
@@ -50,6 +53,36 @@ var rotatingUserAgents = []string{
 }
 
 func getRobotsData(baseURL *url.URL) *RobotsData {
+	host := baseURL.Host
+	robotsMu.RLock()
+	data, exists := robotsCache[host]
+	robotsMu.RUnlock()
+	if exists {
+		return data
+	}
+
+	res, _, _ := robotsSF.Do(host, func() (interface{}, error) {
+		robotsMu.RLock()
+		if data, exists := robotsCache[host]; exists {
+			robotsMu.RUnlock()
+			return data, nil
+		}
+		robotsMu.RUnlock()
+
+		d := fetchRobotsData(baseURL)
+		robotsMu.Lock()
+		robotsCache[host] = d
+		robotsMu.Unlock()
+		return d, nil
+	})
+
+	if rd, ok := res.(*RobotsData); ok {
+		return rd
+	}
+	return &RobotsData{Rules: make(map[string]*AgentRules)}
+}
+
+func fetchRobotsData(baseURL *url.URL) *RobotsData {
 	host := baseURL.Host
 	robotsMu.RLock()
 	data, exists := robotsCache[host]

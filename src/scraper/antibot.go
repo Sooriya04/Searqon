@@ -1,13 +1,28 @@
 package scraper
 
 import (
+	"context"
 	"crypto/tls"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
+
+var domainLimiters sync.Map
+
+// WaitDomainRateLimit enforces token-bucket rate limits per domain (5 req/sec).
+func WaitDomainRateLimit(ctx context.Context, domain string) error {
+	if domain == "" {
+		return nil
+	}
+	val, _ := domainLimiters.LoadOrStore(domain, rate.NewLimiter(rate.Limit(5.0), 5))
+	limiter := val.(*rate.Limiter)
+	return limiter.Wait(ctx)
+}
 
 var browserUserAgents = []string{
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -42,12 +57,13 @@ func newBrowserTransport(proxy func(*http.Request) (*url.URL, error)) *http.Tran
 		Proxy:                 proxy,
 		TLSClientConfig:       browserTLSConfig(),
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          32,
-		MaxConnsPerHost:       8,
-		MaxIdleConnsPerHost:   8,
-		IdleConnTimeout:       45 * time.Second,
-		TLSHandshakeTimeout:   5 * time.Second,
+		MaxIdleConns:          100,
+		MaxConnsPerHost:       10,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   4 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     false,
 	}
 }
 

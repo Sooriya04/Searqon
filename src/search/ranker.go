@@ -5,10 +5,30 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"src/models"
 	"src/utils"
 )
+
+func freshnessScore(result models.SearchResult) float64 {
+	var pubTime time.Time
+	if result.Metadata.PublishedAt != nil {
+		pubTime = *result.Metadata.PublishedAt
+	}
+	if pubTime.IsZero() {
+		return 0
+	}
+	ageDays := time.Since(pubTime).Hours() / 24.0
+	if ageDays <= 1 {
+		return 0.08
+	} else if ageDays <= 7 {
+		return 0.05
+	} else if ageDays <= 30 {
+		return 0.02
+	}
+	return 0
+}
 
 const (
 	weightTitle   = 4.0
@@ -27,14 +47,28 @@ var authoritativeTLDs = []string{".edu", ".gov", ".org"}
 var authoritativeDomains = map[string]float64{
 	"wikipedia.org":         boostWikipedia,
 	"en.wikipedia.org":      boostWikipedia,
+	"wikidata.org":          boostWikipedia,
 	"stackoverflow.com":     boostAuthoritative,
 	"stackexchange.com":     boostAuthoritative,
 	"github.com":            boostAuthoritative,
+	"github.io":             boostAuthoritative,
 	"arxiv.org":             boostAuthoritative,
+	"paperswithcode.com":    boostAuthoritative,
+	"huggingface.co":        boostAuthoritative,
 	"docs.python.org":       boostAuthoritative,
 	"developer.mozilla.org": boostAuthoritative,
 	"go.dev":                boostAuthoritative,
+	"pkg.go.dev":            boostAuthoritative,
 	"rust-lang.org":         boostAuthoritative,
+	"crates.io":             boostAuthoritative,
+	"pypi.org":              boostAuthoritative,
+	"w3.org":                boostAuthoritative,
+	"nature.com":            boostAuthoritative,
+	"science.org":           boostAuthoritative,
+	"reuters.com":           boostAuthoritative,
+	"apnews.com":            boostAuthoritative,
+	"bbc.com":               boostAuthoritative,
+	"news.ycombinator.com":  boostAuthoritative,
 }
 
 func tokenize(text string) []string {
@@ -178,6 +212,7 @@ func rankResults(results []models.SearchResult, query string) []models.SearchRes
 		relevance += exactPhraseBonus(r.Snippet, query) * 0.5
 		relevance += domainBoost(r.URL)
 		relevance += contentQualityScore(r)
+		relevance += freshnessScore(r)
 
 		positionBonus := positionDecayFactor * math.Max(0, float64(len(results)-i)) / float64(len(results))
 		relevance += positionBonus

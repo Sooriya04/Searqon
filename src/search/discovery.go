@@ -23,6 +23,52 @@ type discoveryEngine struct {
 	fn   func(string, int) ([]models.SearchResult, error)
 }
 
+type engineCircuitBreaker struct {
+	mu        sync.Mutex
+	failures  int
+	openUntil time.Time
+}
+
+func (cb *engineCircuitBreaker) Allow() bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	return time.Now().After(cb.openUntil)
+}
+
+func (cb *engineCircuitBreaker) RecordSuccess() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failures = 0
+}
+
+func (cb *engineCircuitBreaker) RecordFailure() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failures++
+	if cb.failures >= 3 {
+		cb.openUntil = time.Now().Add(30 * time.Second)
+	}
+}
+
+var engineBreakersMu sync.Mutex
+var engineBreakers = map[string]*engineCircuitBreaker{
+	"searxng":    {},
+	"wikipedia":  {},
+	"arxiv":      {},
+	"duckduckgo": {},
+}
+
+func getEngineBreaker(name string) *engineCircuitBreaker {
+	engineBreakersMu.Lock()
+	defer engineBreakersMu.Unlock()
+	cb, ok := engineBreakers[name]
+	if !ok {
+		cb = &engineCircuitBreaker{}
+		engineBreakers[name] = cb
+	}
+	return cb
+}
+
 type aggregatedResult struct {
 	result     models.SearchResult
 	score      float64
@@ -30,6 +76,10 @@ type aggregatedResult struct {
 }
 
 func discoverSearchResults(query string, limit int) ([]models.SearchResult, string) {
+	return discoverSearchResultsWithIntent(query, limit, IntentGeneric)
+}
+
+func discoverSearchResultsWithIntent(query string, limit int, intent SearchIntent) ([]models.SearchResult, string) {
 	queries := decomposeQueries(query)
 	if len(queries) == 0 {
 		queries = []string{query}
@@ -38,11 +88,21 @@ func discoverSearchResults(query string, limit int) ([]models.SearchResult, stri
 		queries = queries[:3]
 	}
 
-	engines := []discoveryEngine{
-		{name: "searxng", fn: searchSearXNG},
-		{name: "wikipedia", fn: searchWikipedia},
-		{name: "arxiv", fn: searchArxiv},
-		{name: "duckduckgo", fn: searchDDGFallback},
+	var engines []discoveryEngine
+	if intent == IntentAcademic {
+		engines = []discoveryEngine{
+			{name: "arxiv", fn: searchArxiv},
+			{name: "wikipedia", fn: searchWikipedia},
+			{name: "searxng", fn: searchSearXNG},
+			{name: "duckduckgo", fn: searchDDGFallback},
+		}
+	} else {
+		engines = []discoveryEngine{
+			{name: "searxng", fn: searchSearXNG},
+			{name: "wikipedia", fn: searchWikipedia},
+			{name: "arxiv", fn: searchArxiv},
+			{name: "duckduckgo", fn: searchDDGFallback},
+		}
 	}
 
 	perEngineLimit := limit
@@ -58,19 +118,31 @@ func discoverSearchResults(query string, limit int) ([]models.SearchResult, stri
 		q := q
 		for _, engine := range engines {
 			engine := engine
+			cb := getEngineBreaker(engine.name)
+			if !cb.Allow() {
+				continue
+			}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				results, err := engine.fn(q, perEngineLimit)
 				if err != nil || len(results) == 0 {
+					cb.RecordFailure()
 					return
 				}
+				cb.RecordSuccess()
+
 				for idx, res := range results {
 					key := normalizeDiscoveryURL(res.URL)
 					if key == "" {
 						continue
 					}
 					rrf := 1.0 / (60.0 + float64(idx+1))
+					if intent == IntentAcademic && engine.name == "arxiv" {
+						rrf *= 1.5
+					}
+
 					mu.Lock()
 					entry, found := merged[key]
 					if !found {
