@@ -56,8 +56,8 @@ func main() {
 	// System Health
 	mux.HandleFunc("/health", handlers.HealthHandler)
 
-	// Wrap mux with Gzip & Logger middleware
-	handlerStack := utils.GzipCompressionMiddleware(utils.HTTPLogger(mux))
+	// Wrap mux with RateLimit, Gzip & Logger middleware
+	handlerStack := utils.InboundRateLimitMiddleware(utils.GzipCompressionMiddleware(utils.HTTPLogger(mux)))
 
 	server := &http.Server{
 		Addr:         ":" + port,

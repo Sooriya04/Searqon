@@ -69,6 +69,8 @@ type ScrapeResult struct {
 	RenderMethod     string           `json:"render_method,omitempty"`
 	ScrapedAt        string           `json:"scraped_at,omitempty"`
 	Cached           bool             `json:"cached"`
+	ContentHash      string           `json:"content_hash,omitempty"`
+	ContentChanged   bool             `json:"content_changed"`
 	Metadata         DocumentMetadata `json:"metadata,omitempty"`
 	StructuredData   json.RawMessage  `json:"structured_data,omitempty"`
 }

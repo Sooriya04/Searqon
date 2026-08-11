@@ -4,10 +4,51 @@ import (
 	"compress/gzip"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
+
+var (
+	clientLimiters sync.Map
+)
+
+func getClientLimiter(ip string) *rate.Limiter {
+	if val, found := clientLimiters.Load(ip); found {
+		return val.(*rate.Limiter)
+	}
+	limiter := rate.NewLimiter(rate.Limit(2.0), 30) // 2 req/sec average, burst 30
+	actual, _ := clientLimiters.LoadOrStore(ip, limiter)
+	return actual.(*rate.Limiter)
+}
+
+// InboundRateLimitMiddleware protects Searqon from client API rate limit abuse.
+func InboundRateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		if ip == "" {
+			ip = "127.0.0.1"
+		}
+
+		limiter := getClientLimiter(ip)
+		if !limiter.Allow() {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":"too many requests, rate limit exceeded"}`))
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 type gzipResponseWriter struct {
 	http.ResponseWriter

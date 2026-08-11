@@ -75,54 +75,81 @@ func FetchHTML(targetURL string, userAgent string) (string, *url.URL, int, strin
 		return "", nil, 0, "", fmt.Errorf("invalid URL")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	maxAttempts := 3
+	var lastErr error
+	var contentType string
 
-	_ = WaitDomainRateLimit(ctx, parsedURL.Hostname())
-
-	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
-	if err != nil {
-		return "", nil, 0, "", fmt.Errorf("request creation failed: %v", err)
-	}
-	for key, value := range pickBrowserHeaders(userAgent) {
-		req.Header.Set(key, value)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", nil, 0, "", fmt.Errorf("fetch failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	contentType := resp.Header.Get("Content-Type")
-	contentTypeLower := strings.ToLower(contentType)
-	if resp.StatusCode >= 400 {
-		return "", nil, resp.StatusCode, contentType, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	if contentTypeLower != "" && !strings.Contains(contentTypeLower, "text/") &&
-		!strings.Contains(contentTypeLower, "xml") && !strings.Contains(contentTypeLower, "json") {
-		return "", nil, resp.StatusCode, contentType, fmt.Errorf("binary content-type: %s", contentType)
-	}
-
-	var reader io.Reader = resp.Body
-	switch strings.ToLower(resp.Header.Get("Content-Encoding")) {
-	case "gzip":
-		gzReader, err := gzip.NewReader(resp.Body)
-		if err == nil {
-			defer gzReader.Close()
-			reader = gzReader
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(200*attempt) * time.Millisecond)
 		}
-	case "br":
-		reader = brotli.NewReader(resp.Body)
-	case "deflate":
-		reader = flate.NewReader(resp.Body)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = WaitDomainRateLimit(ctx, parsedURL.Hostname())
+
+		req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+		if err != nil {
+			cancel()
+			return "", nil, 0, "", fmt.Errorf("request creation failed: %v", err)
+		}
+		for key, value := range pickBrowserHeaders(userAgent) {
+			req.Header.Set(key, value)
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = fmt.Errorf("fetch failed: %v", err)
+			continue
+		}
+
+		contentType = resp.Header.Get("Content-Type")
+		if resp.StatusCode >= 500 || resp.StatusCode == 429 {
+			resp.Body.Close()
+			cancel()
+			lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			cancel()
+			return "", nil, resp.StatusCode, contentType, fmt.Errorf("HTTP %d", resp.StatusCode)
+		}
+
+		contentTypeLower := strings.ToLower(contentType)
+		if contentTypeLower != "" && !strings.Contains(contentTypeLower, "text/") &&
+			!strings.Contains(contentTypeLower, "xml") && !strings.Contains(contentTypeLower, "json") {
+			resp.Body.Close()
+			cancel()
+			return "", nil, resp.StatusCode, contentType, fmt.Errorf("binary content-type: %s", contentType)
+		}
+
+		var reader io.Reader = resp.Body
+		switch strings.ToLower(resp.Header.Get("Content-Encoding")) {
+		case "gzip":
+			gzReader, err := gzip.NewReader(resp.Body)
+			if err == nil {
+				defer gzReader.Close()
+				reader = gzReader
+			}
+		case "br":
+			reader = brotli.NewReader(resp.Body)
+		case "deflate":
+			reader = flate.NewReader(resp.Body)
+		}
+
+		body, err := io.ReadAll(io.LimitReader(reader, 5*1024*1024))
+		resp.Body.Close()
+		cancel()
+
+		if err != nil {
+			lastErr = fmt.Errorf("read failed: %v", err)
+			continue
+		}
+
+		return string(body), parsedURL, resp.StatusCode, contentType, nil
 	}
 
-	body, err := io.ReadAll(io.LimitReader(reader, 5*1024*1024))
-	if err != nil {
-		return "", nil, 0, contentType, fmt.Errorf("read failed: %v", err)
-	}
-
-	return string(body), parsedURL, resp.StatusCode, contentType, nil
+	return "", nil, 0, contentType, lastErr
 }

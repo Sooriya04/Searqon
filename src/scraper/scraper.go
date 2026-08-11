@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -101,6 +102,7 @@ func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL 
 		result.FetchDurationMS = int(result.Duration)
 		result.ExtractionMethod = "readability"
 		result.Scraped = true
+		result.ContentHash = computeContentHash(result.Content)
 		if extractSchema != "" {
 			if structured, err := extractStructuredData(extractSchema, result); err == nil {
 				result.StructuredData = structured
@@ -166,13 +168,21 @@ func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL 
 	result.Duration = time.Since(startTime).Milliseconds()
 	result.FetchDurationMS = int(result.Duration)
 	result.ExtractionMethod = "goquery"
-	result.Scraped = true
+	result.ContentHash = computeContentHash(result.Content)
 	if extractSchema != "" {
 		if structured, err := extractStructuredData(extractSchema, result); err == nil {
 			result.StructuredData = structured
 		}
 	}
 	return result
+}
+
+func computeContentHash(text string) string {
+	if text == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(text))
+	return fmt.Sprintf("%x", sum)
 }
 
 // ScrapeSingleURL scrapes a single URL, resolving cache and robots.txt.
@@ -308,9 +318,16 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 	if parsedURL != nil {
 		finalURL = parsedURL.String()
 	}
+
+	prevCached, prevFound := db.GetScrapeCache(targetURL)
+
 	scraped := ScrapeHTMLContentWithSchema(htmlContent, targetURL, finalURL, opts.Format, startTime, opts.ExtractSchema)
 	scraped.StatusCode = statusCode
 	scraped.ContentType = contentType
+
+	if prevFound && prevCached.ContentHash != "" && scraped.ContentHash != "" {
+		scraped.ContentChanged = (scraped.ContentHash != prevCached.ContentHash)
+	}
 
 	db.SaveScrapeCache(scraped)
 
