@@ -13,6 +13,11 @@ import (
 
 // ScrapeWithLightpanda runs the Lightpanda CLI to execute JS and fetch HTML.
 func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string, format string, startTime time.Time, extractSchema string) (models.ScrapeResult, string, error) {
+	return ScrapeWithLightpandaProxy(targetURL, userAgent, "", binaryPath, format, startTime, extractSchema)
+}
+
+// ScrapeWithLightpandaProxy runs the Lightpanda CLI with an optional proxy URL.
+func ScrapeWithLightpandaProxy(targetURL string, userAgent string, proxyURL string, binaryPath string, format string, startTime time.Time, extractSchema string) (models.ScrapeResult, string, error) {
 	startISO := startTime.UTC().Format(time.RFC3339)
 	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
@@ -26,7 +31,11 @@ func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 		args = append(args, "--user-agent", userAgent)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	if proxyURL != "" {
+		args = append(args, "--proxy", proxyURL)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
@@ -45,6 +54,8 @@ func ScrapeWithLightpanda(targetURL string, userAgent string, binaryPath string,
 	parsedResult.StatusCode = 200
 	parsedResult.ContentType = "text/html"
 	parsedResult.ExtractionMethod = "lightpanda"
+	parsedResult.RenderMethod = "lightpanda"
+	parsedResult.EscalationTier = string(TierHeadlessBrowser)
 	parsedResult.Duration = time.Since(startTime).Milliseconds()
 	parsedResult.FetchDurationMS = int(parsedResult.Duration)
 

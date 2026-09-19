@@ -12,6 +12,7 @@ Welcome to the Searqon documentation. Searqon is an open-source, self-hosted **w
 | [Architecture](./architecture.md) | System design, database schemas, and configuration reference |
 | [Orchestration Workflow](./workflow/workflow.md) | High-level request lifecycle, discovery chains, and fallbacks |
 | [Scraping Pipeline](./workflow/scraping.md) | Parallel crawling, robots.txt, and Lightpanda integration |
+| [Stealth & Anti-Bot Escalation](./stealth_escalation.md) | 4-tier progressive escalation (Fast HTTP → Spoofed Headers → Camoufox/Lightpanda → Residential Proxy) |
 | [API Reference](./api.md) | All endpoints with request/response examples |
 | [Search Providers](./providers.md) | SearXNG vs DuckDuckGo — when to use what |
 | [Configuration](./configuration.md) | Ports, timeouts, limits, and tuning |

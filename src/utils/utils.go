@@ -85,10 +85,21 @@ func ExtractTitleFromHTML(html string) string {
 	return title
 }
 
-// LoadLightpandaConfig parses config.yaml to determine if Lightpanda is enabled.
+// LoadLightpandaConfig parses environment variables and config.yaml to determine if Lightpanda is enabled.
 func LoadLightpandaConfig() (bool, string) {
 	if envVal := os.Getenv("LIGHTPANDA_ENABLED"); envVal != "" {
-		return envVal == "true", os.Getenv("LIGHTPANDA_PATH")
+		p := os.Getenv("LIGHTPANDA_PATH")
+		if p == "" {
+			p = os.Getenv("LIGHTPANDA_BINARY_PATH")
+		}
+		return envVal == "true" || envVal == "1", p
+	}
+	if envVal := os.Getenv("LIGHTPANDA_ENABLE"); envVal != "" {
+		p := os.Getenv("LIGHTPANDA_BINARY_PATH")
+		if p == "" {
+			p = os.Getenv("LIGHTPANDA_PATH")
+		}
+		return envVal == "true" || envVal == "1", p
 	}
 
 	paths := []string{

@@ -14,6 +14,7 @@ Complete, in-depth documentation is available in the [`docs/`](./docs/index.md) 
 
 - [**Orchestration Workflow**](./docs/workflow/workflow.md) — High-level query pipeline, fallback chains, and lifecycle.
 - [**Scraping Specification**](./docs/workflow/scraping.md) — Concurrency queues, robots.txt compliance, and Lightpanda.
+- [**Stealth & Anti-Bot Escalation**](./docs/stealth_escalation.md) — 4-tier chained escalation (Fast HTTP → Spoofed Headers → Camoufox/Lightpanda → Residential Proxy).
 - [**Architecture & Config**](./docs/architecture.md) — Database schema, variables, and error policies.
 - [**Installation Guide**](./docs/installation.md) — PostgreSQL, SearXNG, and Lightpanda installation.
 - [**API Reference**](./docs/api.md) — Request/Response structures for all endpoints.

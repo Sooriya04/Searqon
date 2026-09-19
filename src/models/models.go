@@ -67,6 +67,8 @@ type ScrapeResult struct {
 	Images           []ScrapedImage   `json:"images,omitempty"`
 	Chunks           []Chunk          `json:"chunks,omitempty"`
 	RenderMethod     string           `json:"render_method,omitempty"`
+	EscalationTier   string           `json:"escalation_tier,omitempty"`
+	BotDetected      bool             `json:"bot_detected,omitempty"`
 	ScrapedAt        string           `json:"scraped_at,omitempty"`
 	Cached           bool             `json:"cached"`
 	ContentHash      string           `json:"content_hash,omitempty"`
@@ -141,13 +143,15 @@ type ScrapeRequest struct {
 	MaxWords      int    `json:"max_words"`
 	Chunk         bool   `json:"chunk"`
 	ExtractSchema string `json:"extract_schema,omitempty"`
+	StealthLevel  string `json:"stealth_level,omitempty"` // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
 }
 
 type BatchScrapeRequest struct {
-	URLs        []string `json:"urls"`
-	Format      string   `json:"format"`
-	BypassCache bool     `json:"bypass_cache"`
-	MaxWords    int      `json:"max_words"`
+	URLs         []string `json:"urls"`
+	Format       string   `json:"format"`
+	BypassCache  bool     `json:"bypass_cache"`
+	MaxWords     int      `json:"max_words"`
+	StealthLevel string   `json:"stealth_level,omitempty"`
 }
 
 type MapRequest struct {

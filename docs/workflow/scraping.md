@@ -34,24 +34,28 @@ To prevent resource exhaustion and request hangs:
 ### Stage 4: robots.txt Parser & Compliance
 For each URL dispatched, the scraper first checks compliance with the host's crawling policy:
 1. **Fetch & Cache**: Fetches the host's `robots.txt` and caches the rule payload (`robotsCache`) to avoid repetitive overhead.
-2. **Stealth Agent Matching & Rotation**: Searches for matching directives. If general crawlers (`*`) are allowed, the scraper randomly rotates among a pool of realistic browser User-Agent strings (Chrome, Firefox, Safari on Windows, macOS, iOS, Android) to bypass Cloudflare/Imperva blocks. If `*` is blocked but `searqon` is explicitly whitelisted, it uses `Searqon/1.0`.
-3. **Crawl Delay Compliance**: Respects optional `Crawl-delay` timers via `time.Sleep`. If disallowed, execution stops immediately and writes a "disallowed by robots.txt" status directly to the database.
+2. **Stealth Agent Matching & Rotation**: Searches for matching directives. If general crawlers (`*`) are allowed, the scraper passes to the escalation pipeline.
+3. **Crawl Delay Compliance**: Respects optional `Crawl-delay` timers via `time.Sleep`. If disallowed, execution stops immediately and records "disallowed by robots.txt" status.
 
-### Stage 4.5: Lightpanda Headless Scraper (Optional)
-If allowed by `robots.txt`, the engine checks the `config.yaml` configuration:
-* **Configuration Toggle**: Looks for `lightpanda: enabled: true` in the root configuration file.
-* **Subprocess Execution**: If enabled, the engine launches Lightpanda as a subprocess to parse the webpage, execute any client-side JavaScript, and directly dump purified markdown.
-* **Graceful Fallback**: If Lightpanda is disabled, missing, or fails to execute, the system falls back automatically to the native Go HTTP scraper.
+### Stage 5: Smart Stealth & Anti-Bot Escalation Ladder
+When scraping content, Searqon executes a progressive 4-tier escalation ladder designed for maximum speed and stealth:
 
-### Stage 5: DOM Purging, Readability & Markdown (Go Native Scraper)
-If Lightpanda is disabled or fails, the native Go scraper runs:
-1. **Element Stripping**: Drops scripts, styles, iframes, SVGs, and header/footer templates.
+* **Tier 1 — Fast HTTP (~50-150ms):** Direct, unproxied native Go HTTP request using lightweight standard headers. If the page returns 200 OK without bot challenge signatures, content is extracted immediately with zero overhead.
+* **Tier 2 — Anti-Bot Spoofed Headers:** If blocked (HTTP 403, 429, 503, or anti-bot challenge detected), the engine escalates to high-stealth browser personas matching Chrome 128 (Win11/macOS), Safari 17.6, or Firefox 129. Sets matching Client Hints (`Sec-CH-UA`, `Sec-CH-UA-Mobile`, `Sec-CH-UA-Platform`), modern TLS 1.3 ALPN ciphers, and search engine referer spoofing.
+* **Tier 3 — Headless Browser (Camoufox / Lightpanda):** If JS execution is required or Tier 2 is blocked by Cloudflare Turnstile / DataDome:
+  * **Camoufox**: Open-source anti-detect browser based on Firefox with C++ anti-fingerprinting.
+  * **Lightpanda**: Ultra-fast headless browser subprocess executing dynamic JS.
+* **Tier 4 — Residential / Rotating Proxy Fallback:** If IP bans, rate limits, or geo-blocks persist, the request routes through the configured proxy pool (`RESIDENTIAL_PROXY_URL`, `RESIDENTIAL_PROXIES`, `ROTATING_PROXIES`, or `proxies.txt`) with spoofed headers or headless browser.
+
+### Stage 6: DOM Purging, Readability & Markdown
+Once HTML is retrieved from the winning tier:
+1. **Element Stripping**: Drops scripts, styles, iframes, SVGs, and noise templates.
 2. **Readability Extraction**: Extracts the main content body using Mozilla's Readability algorithm.
 3. **Markdown Conversion**: Converts the clean content block to structured markdown.
 
-### Stage 6: Snippet Fallback on Failure
-If a scraping worker fails (e.g., connection reset, DNS failure, blocked by CAPTCHA/robots.txt, or hitting the 8-second timeout), the engine falls back to the search engine snippet returned during Stage 1. This guarantees that client agents always receive context, even for unreachable websites.
+### Stage 7: Snippet Fallback on Failure
+If all scraping escalation tiers fail (e.g., connection reset, DNS failure, or hard CAPTCHA block), the engine falls back to the search engine snippet returned during discovery.
 
-### Stage 7: Persistent Write
-Successfully scraped content and error states are written back to the PostgreSQL database for subsequent requests.
+### Stage 8: Persistent Write
+Successfully scraped content, escalation tier, render method, content hash, and error states are written back to the PostgreSQL database (and in-memory cache) for subsequent requests.
 

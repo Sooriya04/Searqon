@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -25,6 +24,7 @@ type ScrapeOptions struct {
 	BypassCache   bool
 	ForceNative   bool
 	ExtractSchema string
+	StealthLevel  string // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
 }
 
 func stripHTMLTagsForMarkdown(htmlStr string) string {
@@ -283,29 +283,19 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 		userAgent = defaultHeaders["User-Agent"]
 	}
 
-	// 2. Try Lightpanda Scraper if enabled and native mode is not forced
-	if !opts.ForceNative {
-		if enabled, binaryPath := utils.LoadLightpandaConfig(); enabled && binaryPath != "" {
-			scraped, rawOut, err := ScrapeWithLightpanda(targetURL, userAgent, binaryPath, opts.Format, startTime, opts.ExtractSchema)
-			if err == nil {
-				db.SaveScrapeCache(scraped)
-				return scraped, rawOut
-			}
-			log.Printf("[Scraper] Lightpanda failed: %v. Falling back to native Go scraper...", err)
-		}
-	}
-
-	htmlContent, parsedURL, statusCode, contentType, err := FetchHTML(targetURL, userAgent)
+	// 2. Multi-tier Smart Stealth & Anti-Bot Escalation:
+	// Tier 1: Fast HTTP -> Tier 2: Anti-bot spoofed headers -> Tier 3: Lightpanda / Camoufox -> Tier 4: Residential Proxy
+	scraped, rawOut, err := ExecuteSmartEscalationScrape(targetURL, userAgent, opts, startTime)
 	if err != nil {
 		result.Error = err.Error()
-		if parsedURL != nil {
-			result.Domain = parsedURL.Hostname()
-		} else if parsed, pErr := url.Parse(targetURL); pErr == nil {
+		if parsed, pErr := url.Parse(targetURL); pErr == nil {
 			result.Domain = parsed.Hostname()
 		}
-		result.StatusCode = statusCode
-		result.ContentType = contentType
+		result.StatusCode = scraped.StatusCode
+		result.ContentType = scraped.ContentType
 		result.Scraped = false
+		result.BotDetected = scraped.BotDetected
+		result.EscalationTier = scraped.EscalationTier
 		result.ExtractionMethod = "failed"
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)
 		result.Duration = time.Since(startTime).Milliseconds()
@@ -314,24 +304,13 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 		return result, ""
 	}
 
-	finalURL := targetURL
-	if parsedURL != nil {
-		finalURL = parsedURL.String()
-	}
-
 	prevCached, prevFound := db.GetScrapeCache(targetURL)
-
-	scraped := ScrapeHTMLContentWithSchema(htmlContent, targetURL, finalURL, opts.Format, startTime, opts.ExtractSchema)
-	scraped.StatusCode = statusCode
-	scraped.ContentType = contentType
-
 	if prevFound && prevCached.ContentHash != "" && scraped.ContentHash != "" {
 		scraped.ContentChanged = (scraped.ContentHash != prevCached.ContentHash)
 	}
 
 	db.SaveScrapeCache(scraped)
-
-	return scraped, htmlContent
+	return scraped, rawOut
 }
 
 func htmlToMarkdown(htmlContent string, baseURL string) (string, error) {

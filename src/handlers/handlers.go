@@ -78,6 +78,7 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		Format:        req.Format,
 		BypassCache:   req.BypassCache,
 		ExtractSchema: req.ExtractSchema,
+		StealthLevel:  req.StealthLevel,
 	})
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusGatewayTimeout, utils.ErrCodeScrapeFailed, result.Error)
