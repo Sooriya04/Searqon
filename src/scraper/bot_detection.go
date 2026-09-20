@@ -2,6 +2,8 @@ package scraper
 
 import (
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 	"src/utils"
 )
 
@@ -148,22 +150,20 @@ func DetectBotChallenge(statusCode int, body string, contentType string) BotBloc
 		}
 	}
 
-	// 4. Check for empty client-side JavaScript gates (where HTML has no content and requires JS to render)
+	// 4. Check for client-side JavaScript gates and empty SPA shells (Angular, React, Vue, Next.js)
 	if strings.Contains(contentType, "text/html") || contentType == "" {
-		wordCount := utils.CountWords(body)
-		if wordCount < 25 && len(body) > 0 {
-			if strings.Contains(lowerBody, "javascript") && (strings.Contains(lowerBody, "enable") || strings.Contains(lowerBody, "required") || strings.Contains(lowerBody, "disabled")) {
+		if !hasSubstantialText(body) {
+			if strings.Contains(lowerBody, "<app-root") ||
+				strings.Contains(lowerBody, `id="root"`) ||
+				strings.Contains(lowerBody, `id="app"`) ||
+				strings.Contains(lowerBody, `id="__next"`) ||
+				strings.Contains(lowerBody, "window.prerenderready = false") ||
+				strings.Contains(lowerBody, "prerenderready=false") ||
+				(strings.Contains(lowerBody, "javascript") && (strings.Contains(lowerBody, "enable") || strings.Contains(lowerBody, "required") || strings.Contains(lowerBody, "disabled"))) {
 				return BotBlockReason{
 					IsBlocked: true,
 					Category:  "js_gate",
-					Details:   "Page requires JavaScript to render content",
-				}
-			}
-			if (strings.Contains(lowerBody, `<div id="root"></div>`) || strings.Contains(lowerBody, `<div id="app"></div>`)) && !strings.Contains(lowerBody, "<article") {
-				return BotBlockReason{
-					IsBlocked: true,
-					Category:  "js_gate",
-					Details:   "Empty client-side Single Page Application (SPA) shell",
+					Details:   "Client-side Single Page Application (SPA) shell requiring JavaScript execution",
 				}
 			}
 		}
@@ -172,4 +172,14 @@ func DetectBotChallenge(statusCode int, body string, contentType string) BotBloc
 	return BotBlockReason{
 		IsBlocked: false,
 	}
+}
+
+func hasSubstantialText(body string) bool {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+	if err != nil || doc == nil {
+		return utils.CountWords(body) >= 25
+	}
+	doc.Find("script, style, noscript, svg").Remove()
+	text := utils.CleanText(doc.Find("body").Text())
+	return utils.CountWords(text) >= 25
 }

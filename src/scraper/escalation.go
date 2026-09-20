@@ -119,21 +119,26 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 		if err == nil {
 			block := DetectBotChallenge(statusCode, body, contentType)
-			if !block.IsBlocked && statusCode < 400 && utils.CountWords(body) >= 20 {
-				log.Printf("[Escalation] Tier 1 (Fast HTTP) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
-
+			if !block.IsBlocked && statusCode < 400 {
 				finalURLStr := targetURL
 				if finalURL != nil {
 					finalURLStr = finalURL.String()
 				}
 
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
-				parsed.StatusCode = statusCode
-				parsed.ContentType = contentType
-				parsed.RenderMethod = "go"
-				parsed.EscalationTier = string(TierFastHTTP)
-				parsed.BotDetected = false
-				return parsed, body, nil
+				if parsed.Scraped && parsed.WordCount >= 20 {
+					log.Printf("[Escalation] Tier 1 (Fast HTTP) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
+					parsed.StatusCode = statusCode
+					parsed.ContentType = contentType
+					parsed.RenderMethod = "go"
+					parsed.EscalationTier = string(TierFastHTTP)
+					parsed.BotDetected = false
+					return parsed, body, nil
+				}
+
+				block.IsBlocked = true
+				block.Category = "js_gate"
+				block.Details = fmt.Sprintf("Zero or insufficient readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
 			}
 
 			botEncountered = true
@@ -166,21 +171,26 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 		if err == nil {
 			block := DetectBotChallenge(statusCode, body, contentType)
-			if !block.IsBlocked && statusCode < 400 && utils.CountWords(body) >= 20 {
-				log.Printf("[Escalation] Tier 2 (Spoofed Headers - %s) bypassed challenge in %dms for %s", persona.Name, time.Since(t2Start).Milliseconds(), targetURL)
-
+			if !block.IsBlocked && statusCode < 400 {
 				finalURLStr := targetURL
 				if finalURL != nil {
 					finalURLStr = finalURL.String()
 				}
 
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
-				parsed.StatusCode = statusCode
-				parsed.ContentType = contentType
-				parsed.RenderMethod = "go"
-				parsed.EscalationTier = string(TierSpoofedHeaders)
-				parsed.BotDetected = true
-				return parsed, body, nil
+				if parsed.Scraped && parsed.WordCount >= 20 {
+					log.Printf("[Escalation] Tier 2 (Spoofed Headers - %s) bypassed challenge in %dms for %s", persona.Name, time.Since(t2Start).Milliseconds(), targetURL)
+					parsed.StatusCode = statusCode
+					parsed.ContentType = contentType
+					parsed.RenderMethod = "go"
+					parsed.EscalationTier = string(TierSpoofedHeaders)
+					parsed.BotDetected = true
+					return parsed, body, nil
+				}
+
+				block.IsBlocked = true
+				block.Category = "js_gate"
+				block.Details = fmt.Sprintf("Zero or insufficient readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
 			}
 
 			botEncountered = true
@@ -225,7 +235,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 			res, raw, lpErr := ScrapeWithLightpanda(targetURL, userAgent, lpPath, opts.Format, startTime, opts.ExtractSchema)
 			if lpErr == nil {
 				block := DetectBotChallenge(res.StatusCode, raw, res.ContentType)
-				if !block.IsBlocked && res.WordCount >= 20 {
+				if (!block.IsBlocked || block.Category == "js_gate") && res.WordCount >= 20 {
 					log.Printf("[Escalation] Tier 3 (Lightpanda) rendered page in %dms for %s", time.Since(t3Start).Milliseconds(), targetURL)
 					res.EscalationTier = string(TierHeadlessBrowser)
 					res.BotDetected = true

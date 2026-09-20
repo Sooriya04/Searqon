@@ -2,6 +2,7 @@ package utils
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -145,5 +146,17 @@ func LoadLightpandaConfig() (bool, string) {
 		}
 		return enabled, path
 	}
+
+	// Auto-detect local lightpanda binary if present in default locations
+	candidatePaths := []string{"./lightpanda/lightpanda", "../lightpanda/lightpanda", "lightpanda/lightpanda"}
+	for _, cp := range candidatePaths {
+		if fi, err := os.Stat(cp); err == nil && !fi.IsDir() {
+			return true, cp
+		}
+	}
+	if p, err := exec.LookPath("lightpanda"); err == nil {
+		return true, p
+	}
+
 	return false, ""
 }

@@ -24,18 +24,20 @@ func ScrapeWithLightpandaProxy(targetURL string, userAgent string, proxyURL stri
 	args := []string{
 		"fetch", targetURL,
 		"--dump", "html",
-		"--wait-until", "load",
+		"--wait-until", "networkalmostidle",
+		"--wait-ms", "3500",
+		"--terminate-ms", "9000",
 	}
 
-	if userAgent != "" {
+	if userAgent != "" && !strings.Contains(userAgent, "Mozilla") {
 		args = append(args, "--user-agent", userAgent)
 	}
 
 	if proxyURL != "" {
-		args = append(args, "--proxy", proxyURL)
+		args = append(args, "--http-proxy", proxyURL)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 11*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binaryPath, args...)

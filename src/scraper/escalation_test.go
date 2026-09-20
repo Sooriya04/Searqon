@@ -122,6 +122,7 @@ func TestProxyPoolResolution(t *testing.T) {
 	defer func() {
 		os.Unsetenv("ROTATING_PROXIES")
 		os.Unsetenv("RESIDENTIAL_PROXY_URL")
+		InitProxyPool()
 	}()
 
 	InitProxyPool()
@@ -160,7 +161,7 @@ func TestEscalationChainTier1ToTier2(t *testing.T) {
 		// Tier 2: Valid modern browser headers detected!
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><head><title>Stealth Passed</title></head><body><article><h1>Deep Intelligence Extraction</h1><p>The anti-bot escalation pipeline successfully bypassed the challenge page using realistic browser persona fingerprinting and headers.</p></article></body></html>`))
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Stealth Passed</title></head><body><article><h1>Deep Intelligence Extraction</h1><p>The anti-bot escalation pipeline successfully bypassed the challenge page using realistic browser persona fingerprinting and headers. This ensures high reliability web scraping for modern search engines and AI agents across protected sites.</p></article></body></html>`))
 	}))
 	defer ts.Close()
 

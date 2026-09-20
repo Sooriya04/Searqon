@@ -243,7 +243,7 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 
 	// 1. Check database cache
 	if !opts.BypassCache {
-		if cached, found := db.GetScrapeCache(targetURL); found {
+		if cached, found := db.GetScrapeCache(targetURL); found && cached.Scraped && cached.Error == "" {
 			cached.Duration = time.Since(startTime).Milliseconds()
 			cached.Cached = true
 			populateScrapeMetadata(&cached)
@@ -300,7 +300,6 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 		result.EndTime = time.Now().UTC().Format(time.RFC3339)
 		result.Duration = time.Since(startTime).Milliseconds()
 		result.FetchDurationMS = int(result.Duration)
-		db.SaveScrapeCache(result)
 		return result, ""
 	}
 
