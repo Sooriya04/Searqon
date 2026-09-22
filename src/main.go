@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"src/config"
 	"src/db"
 	"src/handlers"
 	"src/scraper"
@@ -12,15 +14,32 @@ import (
 )
 
 func main() {
-	port := "4001"
+	// 1. Load configuration from settings.yml / config.yml
+	cfg := config.LoadConfig()
 
-	// 1. Initialize core system modules
+	port := fmt.Sprintf("%d", cfg.Server.Port)
+	if port == "0" {
+		port = "4001"
+	}
+
+	readTimeout := time.Duration(cfg.Server.ReadTimeoutSeconds) * time.Second
+	if readTimeout <= 0 {
+		readTimeout = 30 * time.Second
+	}
+	writeTimeout := time.Duration(cfg.Server.WriteTimeoutSeconds) * time.Second
+	if writeTimeout <= 0 {
+		writeTimeout = 120 * time.Second
+	}
+
+	// 2. Initialize core system modules
 	utils.InitLogger()
+	defer utils.CloseLogger()
+
 	scraper.InitProxyPool()
 	db.InitDB()
 	defer db.CloseDB()
 
-	// 2. Setup HTTP router
+	// 3. Setup HTTP router
 	mux := http.NewServeMux()
 
 	// Discovery and Search
@@ -41,13 +60,14 @@ func main() {
 	mux.HandleFunc("/crawl", handlers.CrawlHandler)
 	mux.HandleFunc("/map", handlers.MapHandler)
 
-	// Utility and Telemetry
+	// Utility, Logs and Telemetry
 	mux.HandleFunc("/screenshot", handlers.ScreenshotHandler)
 	mux.HandleFunc("/summarize", handlers.SummarizeHandler)
 	mux.HandleFunc("/extract", handlers.ExtractHandler)
 	mux.HandleFunc("/feed", handlers.FeedHandler)
 	mux.HandleFunc("/stats", handlers.StatsHandler)
 	mux.HandleFunc("/metrics", handlers.MetricsHandler)
+	mux.HandleFunc("/logs", handlers.LogsHandler)
 
 	// OpenAPI API Documentation
 	mux.HandleFunc("/openapi.json", handlers.OpenAPIHandler)
@@ -62,12 +82,13 @@ func main() {
 	server := &http.Server{
 		Addr:         ":" + port,
 		Handler:      handlerStack,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("[Searqon] Server starting on port %s", port)
+	log.Printf("[Searqon] Server starting on %s:%s (SearXNG: enabled=%v, DB: %s, Redis: enabled=%v, Logs: %s)",
+		cfg.Server.Host, port, cfg.SearXNG.Enabled, db.GetBackend(), db.IsRedisEnabled(), cfg.Logs.Storage)
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("[Searqon] Server failed to start: %v", err)

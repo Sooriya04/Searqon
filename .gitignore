@@ -19,3 +19,7 @@ others/
 lightpanda/
 bin/
 logs/
+data/
+*.db
+*.db-wal
+*.db-shm

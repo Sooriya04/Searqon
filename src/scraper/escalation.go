@@ -126,7 +126,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 				}
 
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
-				if parsed.Scraped && parsed.WordCount >= 20 {
+				if parsed.Scraped && parsed.WordCount > 0 {
 					log.Printf("[Escalation] Tier 1 (Fast HTTP) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
 					parsed.StatusCode = statusCode
 					parsed.ContentType = contentType
@@ -138,7 +138,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 				block.IsBlocked = true
 				block.Category = "js_gate"
-				block.Details = fmt.Sprintf("Zero or insufficient readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
+				block.Details = fmt.Sprintf("Zero readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
 			}
 
 			botEncountered = true
@@ -178,7 +178,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 				}
 
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
-				if parsed.Scraped && parsed.WordCount >= 20 {
+				if parsed.Scraped && parsed.WordCount > 0 {
 					log.Printf("[Escalation] Tier 2 (Spoofed Headers - %s) bypassed challenge in %dms for %s", persona.Name, time.Since(t2Start).Milliseconds(), targetURL)
 					parsed.StatusCode = statusCode
 					parsed.ContentType = contentType
@@ -190,7 +190,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 				block.IsBlocked = true
 				block.Category = "js_gate"
-				block.Details = fmt.Sprintf("Zero or insufficient readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
+				block.Details = fmt.Sprintf("Zero readable text extracted (%d words) - requires JavaScript rendering", parsed.WordCount)
 			}
 
 			botEncountered = true

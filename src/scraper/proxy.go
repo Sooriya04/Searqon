@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+
+	"src/config"
 )
 
 var (
@@ -18,10 +20,15 @@ var (
 
 // InitProxyPool configures rotating and residential proxy lists.
 func InitProxyPool() {
+	cfg := config.Get()
+
 	// 1. Standard / Datacenter Rotating Proxies
 	var rawList []string
+	if cfg != nil && len(cfg.Proxies.Rotating) > 0 {
+		rawList = append(rawList, cfg.Proxies.Rotating...)
+	}
 	if envList := os.Getenv("ROTATING_PROXIES"); envList != "" {
-		rawList = strings.Split(envList, ",")
+		rawList = append(rawList, strings.Split(envList, ",")...)
 	}
 	if len(rawList) == 0 {
 		if fileBytes, err := os.ReadFile("proxies.txt"); err == nil {
@@ -43,6 +50,14 @@ func InitProxyPool() {
 
 	// 2. Residential Proxies
 	var rawResList []string
+	if cfg != nil {
+		if cfg.Proxies.ResidentialURL != "" {
+			rawResList = append(rawResList, cfg.Proxies.ResidentialURL)
+		}
+		if len(cfg.Proxies.ResidentialProxies) > 0 {
+			rawResList = append(rawResList, cfg.Proxies.ResidentialProxies...)
+		}
+	}
 	if singleRes := os.Getenv("RESIDENTIAL_PROXY_URL"); singleRes != "" {
 		rawResList = append(rawResList, singleRes)
 	}

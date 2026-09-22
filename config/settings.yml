@@ -1,0 +1,84 @@
+# ==============================================================================
+# Searqon Server & Engine Settings
+# ==============================================================================
+
+# Server Network Configuration
+server:
+  port: 4001
+  host: "0.0.0.0"
+  read_timeout_seconds: 30
+  write_timeout_seconds: 120
+
+# Core Meta-Search Provider (SearXNG)
+# If enabled is false, Searqon bypasses SearXNG and uses fallbacks / local index
+searxng:
+  enabled: true
+  url: "http://searxng:8080"
+  port: 8080
+
+# Primary Database Configuration (Cache, Search Indexing & Sessions)
+# Supported types:
+#   - "sqlite"   : Local lightweight file-based SQL (zero external setup needed)
+#   - "postgres" : Scalable PostgreSQL container with pgvector support (searqon-db)
+# Set enabled to false to use fast in-memory storage only
+database:
+  enabled: true
+  type: "sqlite" # options: "sqlite" | "postgres"
+  sqlite:
+    path: "./data/searqon.db"
+  postgres:
+    url: "postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable"
+    host: "searqon-db"
+    port: 5432
+    user: "searqon"
+    password: "searqon_pass"
+    dbname: "searqon_cache"
+    sslmode: "disable"
+
+# Distributed In-Memory Cache (Redis)
+# When enabled, Redis acts as a high-speed L1 cache for search and scrape requests
+redis:
+  enabled: false
+  host: "searqon-redis"
+  port: 6379
+  password: ""
+  db: 0
+  key_prefix: "searqon:"
+
+# System Logging Configuration
+# By default, all HTTP requests, scraping events, and system errors are persisted in SQLite
+logs:
+  enabled: true
+  storage: "sqlite" # options: "sqlite" | "stdout" | "both"
+  sqlite_path: "./data/logs.db"
+  level: "info" # options: "debug" | "info" | "warn" | "error"
+  retention_days: 14
+
+# Cache Expiration TTLs
+cache:
+  search_ttl_hours: 24
+  scrape_ttl_days: 7
+
+# Local AI / LLM Integration (Ollama)
+ollama:
+  enabled: true
+  url: "http://host.docker.internal:11434"
+  model: "gemma4"
+  embedding_model: "nomic-embed-text"
+
+# Scraping Engine & Headless Browser Options
+scraper:
+  rate_limit_per_domain_rps: 5
+  max_concurrent_scrapes: 10
+  lightpanda:
+    enabled: true
+    binary_path: "./lightpanda/lightpanda"
+  camoufox:
+    enabled: false
+    binary_path: "/usr/local/bin/camoufox"
+
+# Anti-Bot Proxy Fallback Ladders (Optional Tier 4)
+proxies:
+  rotating: []
+  residential_url: ""
+  residential_proxies: []

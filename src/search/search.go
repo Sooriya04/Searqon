@@ -15,6 +15,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"src/config"
 	"src/db"
 	"src/models"
 	"src/scraper"
@@ -32,6 +33,10 @@ type searxngResponse struct {
 }
 
 func getSearXNGBase() string {
+	cfg := config.Get()
+	if cfg.SearXNG.URL != "" {
+		return cfg.SearXNG.URL
+	}
 	if u := os.Getenv("SEARXNG_URL"); u != "" {
 		return u
 	}
@@ -39,6 +44,10 @@ func getSearXNGBase() string {
 }
 
 func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
+	cfg := config.Get()
+	if !cfg.SearXNG.Enabled {
+		return nil, nil
+	}
 	base := getSearXNGBase()
 	params := url.Values{}
 	params.Set("q", query)

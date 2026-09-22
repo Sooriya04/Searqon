@@ -103,6 +103,65 @@
           }
         }
       }
+    },
+    "/logs": {
+      "get": {
+        "summary": "Query structured system logs stored in SQLite",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 50 },
+            "description": "Max number of logs to return (max 500)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": { "type": "integer", "default": 0 },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by log level (DEBUG, INFO, WARN, ERROR)"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by log source (http, database, scraper, escalation, system)"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Full-text search in log messages or JSON attributes"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated structured system logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "total": { "type": "integer" },
+                    "limit": { "type": "integer" },
+                    "offset": { "type": "integer" },
+                    "logs": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

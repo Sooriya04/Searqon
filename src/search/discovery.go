@@ -15,6 +15,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"src/config"
 	"src/models"
 )
 
@@ -88,21 +89,22 @@ func discoverSearchResultsWithIntent(query string, limit int, intent SearchInten
 		queries = queries[:3]
 	}
 
+	cfg := config.Get()
 	var engines []discoveryEngine
 	if intent == IntentAcademic {
-		engines = []discoveryEngine{
-			{name: "arxiv", fn: searchArxiv},
-			{name: "wikipedia", fn: searchWikipedia},
-			{name: "searxng", fn: searchSearXNG},
-			{name: "duckduckgo", fn: searchDDGFallback},
+		engines = append(engines, discoveryEngine{name: "arxiv", fn: searchArxiv})
+		engines = append(engines, discoveryEngine{name: "wikipedia", fn: searchWikipedia})
+		if cfg.SearXNG.Enabled {
+			engines = append(engines, discoveryEngine{name: "searxng", fn: searchSearXNG})
 		}
+		engines = append(engines, discoveryEngine{name: "duckduckgo", fn: searchDDGFallback})
 	} else {
-		engines = []discoveryEngine{
-			{name: "searxng", fn: searchSearXNG},
-			{name: "wikipedia", fn: searchWikipedia},
-			{name: "arxiv", fn: searchArxiv},
-			{name: "duckduckgo", fn: searchDDGFallback},
+		if cfg.SearXNG.Enabled {
+			engines = append(engines, discoveryEngine{name: "searxng", fn: searchSearXNG})
 		}
+		engines = append(engines, discoveryEngine{name: "wikipedia", fn: searchWikipedia})
+		engines = append(engines, discoveryEngine{name: "arxiv", fn: searchArxiv})
+		engines = append(engines, discoveryEngine{name: "duckduckgo", fn: searchDDGFallback})
 	}
 
 	perEngineLimit := limit

@@ -9,9 +9,18 @@ services:
     restart: unless-stopped
     environment:
       - SEARXNG_URL=http://host.docker.internal:4002
-      - DATABASE_URL=postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable
+    volumes:
+      - ./config/settings.yml:/app/config/settings.yml:ro
+      - ./data:/app/data
     depends_on:
       - searqon-db
+
+  # ── Redis L1 Cache (Optional) ───────────────────────────────────────────────
+  searqon-redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
 
   # ── PostgreSQL Cache Database ───────────────────────────────────────────────
   searqon-db:
