@@ -140,7 +140,14 @@ func initBrowserTransport() {
 func PickRandomPersona() BrowserPersona {
 	headerMu.Lock()
 	defer headerMu.Unlock()
-	return modernPersonas[headerRand.Intn(len(modernPersonas))]
+	// Filter or prefer modern Chromium personas for Tier 2 anti-bot bypass
+	for i := 0; i < 10; i++ {
+		p := modernPersonas[headerRand.Intn(len(modernPersonas))]
+		if p.IsChromium {
+			return p
+		}
+	}
+	return modernPersonas[0]
 }
 
 // GetFastHTTPHeaders builds lightweight standard headers for Tier 1 Fast HTTP requests.

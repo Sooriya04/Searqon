@@ -7,8 +7,8 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.Server.Port != 4001 {
-		t.Fatalf("expected port 4001, got %d", cfg.Server.Port)
+	if cfg.Server.Port != 7493 {
+		t.Fatalf("expected port 7493, got %d", cfg.Server.Port)
 	}
 	if !cfg.SearXNG.Enabled {
 		t.Fatalf("expected SearXNG enabled by default")

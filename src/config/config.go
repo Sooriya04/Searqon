@@ -129,7 +129,7 @@ var (
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:                4001,
+			Port:                7493,
 			Host:                "0.0.0.0",
 			ReadTimeoutSeconds:  30,
 			WriteTimeoutSeconds: 120,
@@ -317,10 +317,20 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.SearXNG.URL = u
 		cfg.SearXNG.Enabled = true
 	}
+	if dt := os.Getenv("DB_TYPE"); dt != "" {
+		cfg.Database.Type = strings.ToLower(dt)
+	} else if dt := os.Getenv("DATABASE_TYPE"); dt != "" {
+		cfg.Database.Type = strings.ToLower(dt)
+	}
+	if sp := os.Getenv("SQLITE_PATH"); sp != "" {
+		cfg.Database.SQLite.Path = sp
+	}
 	if d := os.Getenv("DATABASE_URL"); d != "" {
 		cfg.Database.Enabled = true
-		cfg.Database.Type = "postgres"
 		cfg.Database.Postgres.URL = d
+		if os.Getenv("DB_TYPE") != "sqlite" && os.Getenv("DATABASE_TYPE") != "sqlite" {
+			cfg.Database.Type = "postgres"
+		}
 	}
 	if rHost := os.Getenv("REDIS_HOST"); rHost != "" {
 		cfg.Redis.Enabled = true

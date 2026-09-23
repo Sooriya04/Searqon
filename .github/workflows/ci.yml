@@ -1,0 +1,38 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Lint & Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: src/go.sum
+
+      - name: Verify Go Modules
+        working-directory: ./src
+        run: go mod verify
+
+      - name: Run Go Vet
+        working-directory: ./src
+        run: go vet ./...
+
+      - name: Run All Tests
+        working-directory: ./src
+        run: go test ./... -v -timeout 120s
+
+      - name: Build Binary Check
+        working-directory: ./src
+        run: go build -v -o ../bin/searqon .

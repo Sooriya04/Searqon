@@ -120,6 +120,14 @@ func DetectBotChallenge(statusCode int, body string, contentType string) BotBloc
 	for _, group := range challengeSignatures {
 		for _, signal := range group.signals {
 			if strings.Contains(lowerBody, signal) {
+				// Special guard for legitimate pages with embedded widgets:
+				// If status is 200 OK and page has substantial content, skip superficial script/widget matches
+				if statusCode < 400 && utils.CountWords(body) >= 150 {
+					if signal == "hcaptcha" || signal == "g-recaptcha" || signal == "imperva" || signal == "kasada" {
+						continue
+					}
+				}
+
 				// Special guard for WAF / generic signals: ensure page is actually small or blocked
 				if group.category == "waf" {
 					if statusCode == 403 || utils.CountWords(body) < 60 {

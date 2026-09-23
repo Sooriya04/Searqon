@@ -4,7 +4,7 @@
 
 # Server Network Configuration
 server:
-  port: 4001
+  port: 7493
   host: "0.0.0.0"
   read_timeout_seconds: 30
   write_timeout_seconds: 120

@@ -186,54 +186,56 @@ func InitLogger() {
 }
 
 func initSQLiteLogger(dbPath string, retentionDays int) {
-	logOnce.Do(func() {
-		if dbPath == "" {
-			dbPath = "./data/logs.db"
-		}
+	logMu.Lock()
+	defer logMu.Unlock()
 
-		db, err := sql.Open("sqlite", dbPath)
-		if err != nil {
-			log.Printf("[Logger] Failed to open SQLite logs database %s: %v", dbPath, err)
-			return
-		}
+	if sqliteReady && logDB != nil {
+		return
+	}
 
-		// Enable WAL mode & performance optimizations
-		_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-		_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
-		_, _ = db.Exec("PRAGMA busy_timeout=5000;")
+	if dbPath == "" {
+		dbPath = "./data/logs.db"
+	}
 
-		schema := `
-		CREATE TABLE IF NOT EXISTS system_logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-			level TEXT NOT NULL,
-			source TEXT NOT NULL,
-			message TEXT NOT NULL,
-			attributes TEXT DEFAULT '{}'
-		);
-		CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp);
-		CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
-		CREATE INDEX IF NOT EXISTS idx_system_logs_source ON system_logs(source);
-		`
-		if _, err := db.Exec(schema); err != nil {
-			log.Printf("[Logger] Failed to initialize system_logs schema: %v", err)
-			db.Close()
-			return
-		}
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		log.Printf("[Logger] Failed to open SQLite logs database %s: %v", dbPath, err)
+		return
+	}
 
-		logDB = db
-		logQueue = make(chan LogRecord, 4096)
-		logCloseCh = make(chan struct{})
+	// Enable WAL mode & performance optimizations
+	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
+	_, _ = db.Exec("PRAGMA busy_timeout=5000;")
 
-		logMu.Lock()
-		sqliteReady = true
-		logMu.Unlock()
+	schema := `
+	CREATE TABLE IF NOT EXISTS system_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+		level TEXT NOT NULL,
+		source TEXT NOT NULL,
+		message TEXT NOT NULL,
+		attributes TEXT DEFAULT '{}'
+	);
+	CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp);
+	CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
+	CREATE INDEX IF NOT EXISTS idx_system_logs_source ON system_logs(source);
+	`
+	if _, err := db.Exec(schema); err != nil {
+		log.Printf("[Logger] Failed to initialize system_logs schema: %v", err)
+		_ = db.Close()
+		return
+	}
 
-		logWorkerWg.Add(1)
-		go logBatchWorker(retentionDays)
+	logDB = db
+	logQueue = make(chan LogRecord, 4096)
+	logCloseCh = make(chan struct{})
+	sqliteReady = true
 
-		log.Printf("[Logger] SQLite log storage initialized successfully at %s", dbPath)
-	})
+	logWorkerWg.Add(1)
+	go logBatchWorker(logQueue, logCloseCh, retentionDays)
+
+	log.Printf("[Logger] SQLite log storage initialized successfully at %s", dbPath)
 }
 
 // QueueLog pushes a log event to the asynchronous batch channel.
@@ -255,7 +257,7 @@ func IsSQLiteLogReady() bool {
 	return sqliteReady && logDB != nil
 }
 
-func logBatchWorker(retentionDays int) {
+func logBatchWorker(queue chan LogRecord, closeCh chan struct{}, retentionDays int) {
 	defer logWorkerWg.Done()
 
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -268,11 +270,15 @@ func logBatchWorker(retentionDays int) {
 	batch := make([]LogRecord, 0, 100)
 
 	flush := func() {
-		if len(batch) == 0 || logDB == nil {
+		logMu.RLock()
+		db := logDB
+		logMu.RUnlock()
+
+		if len(batch) == 0 || db == nil {
 			return
 		}
 
-		tx, err := logDB.Begin()
+		tx, err := db.Begin()
 		if err != nil {
 			batch = batch[:0]
 			return
@@ -303,7 +309,7 @@ func logBatchWorker(retentionDays int) {
 
 	for {
 		select {
-		case rec := <-logQueue:
+		case rec := <-queue:
 			batch = append(batch, rec)
 			if len(batch) >= 100 {
 				flush()
@@ -311,15 +317,18 @@ func logBatchWorker(retentionDays int) {
 		case <-ticker.C:
 			flush()
 		case <-cleanupTicker.C:
-			if retentionDays > 0 && logDB != nil {
+			logMu.RLock()
+			db := logDB
+			logMu.RUnlock()
+			if retentionDays > 0 && db != nil {
 				cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays).Format(time.RFC3339)
-				_, _ = logDB.Exec("DELETE FROM system_logs WHERE timestamp < ?", cutoff)
+				_, _ = db.Exec("DELETE FROM system_logs WHERE timestamp < ?", cutoff)
 			}
-		case <-logCloseCh:
+		case <-closeCh:
 			// Drain remaining logs
 			for {
 				select {
-				case rec := <-logQueue:
+				case rec := <-queue:
 					batch = append(batch, rec)
 				default:
 					flush()
@@ -418,14 +427,19 @@ func CloseLogger() {
 		return
 	}
 	sqliteReady = false
+	closeCh := logCloseCh
+	db := logDB
+	logDB = nil
+	logQueue = nil
+	logCloseCh = nil
 	logMu.Unlock()
 
-	if logCloseCh != nil {
-		close(logCloseCh)
+	if closeCh != nil {
+		close(closeCh)
 		logWorkerWg.Wait()
 	}
 
-	if logDB != nil {
-		_ = logDB.Close()
+	if db != nil {
+		_ = db.Close()
 	}
 }

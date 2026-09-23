@@ -1,28 +1,39 @@
 services:
-  # ── Searqon Web Intelligence Engine ─────────────────────────────────────────
+  # ── Searqon Web Intelligence Engine (scratch ~8MB) ──────────────────────────
   searqon:
+    image: searqon:latest
     build:
       context: .
-      dockerfile: docker/app/Dockerfile
+      dockerfile: Dockerfile
     ports:
-      - "4001:4001"
+      - "7493:7493"
     restart: unless-stopped
     environment:
-      - SEARXNG_URL=http://host.docker.internal:4002
+      - PORT=7493
+      - SEARXNG_URL=http://searxng:8080
+      - DB_TYPE=sqlite # Set to "postgres" to use PostgreSQL, or "sqlite" for zero-overhead local SQL
+      - DATABASE_URL=postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable
+      - REDIS_HOST=searqon-redis
+      - REDIS_PORT=6379
     volumes:
       - ./config/settings.yml:/app/config/settings.yml:ro
       - ./data:/app/data
     depends_on:
-      - searqon-db
+      - searxng
 
-  # ── Redis L1 Cache (Optional) ───────────────────────────────────────────────
-  searqon-redis:
-    image: redis:alpine
+  # ── SearXNG Meta-Search Engine ──────────────────────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
     ports:
-      - "6379:6379"
+      - "8080:8080"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
     restart: unless-stopped
 
-  # ── PostgreSQL Cache Database ───────────────────────────────────────────────
+  # ── PostgreSQL Cache & Vector Database (Optional / Switchable) ──────────────
   searqon-db:
     build:
       context: ./docker/database
@@ -37,20 +48,12 @@ services:
       - searqon-db-data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  # ── SearXNG (Optional, separate profile) ────────────────────────────────────
-  # Run separately with: docker compose --profile searxng up
-  searxng:
-    image: searxng/searxng:latest
+  # ── Redis L1 In-Memory Cache (Optional) ─────────────────────────────────────
+  searqon-redis:
+    image: redis:alpine
     ports:
-      - "8080:8080"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    volumes:
-      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - "6379:6379"
     restart: unless-stopped
-    profiles:
-      - searxng
 
 volumes:
   searqon-db-data:
