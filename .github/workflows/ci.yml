@@ -1,8 +1,9 @@
-name: CI Pipeline
+name: CI & Docker Release Pipeline
 
 on:
   push:
     branches: [ main, dev ]
+    tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ main ]
 
@@ -36,3 +37,71 @@ jobs:
       - name: Build Binary Check
         working-directory: ./src
         run: go build -v -o ../bin/searqon .
+
+  publish-docker:
+    name: Build & Push to Docker Hub
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Version in Commit Message or Tag
+        id: check-version
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          REF="${{ github.ref_name }}"
+          
+          echo "Commit message: $MSG"
+          echo "Git ref: $REF"
+          
+          VER=""
+          # 1. Check if git ref is a version tag (e.g. v1.0.0 or 1.0.0)
+          if [[ "$REF" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            VER=$(echo "$REF" | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | sed -E 's/^v//')
+          # 2. Check if commit message contains a semantic version (e.g. v1.0.0, 1.0.0, release: v1.0.0)
+          elif echo "$MSG" | grep -Eq 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
+            VER=$(echo "$MSG" | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | sed -E 's/^v//')
+          fi
+
+          if [ -n "$VER" ]; then
+            echo "has_version=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+            echo "tags=sooriya04/searqon:${VER},sooriya04/searqon:v${VER},sooriya04/searqon:latest" >> "$GITHUB_OUTPUT"
+            echo "✓ Version detected: ${VER}. Proceeding with Docker Hub publish."
+          else
+            echo "has_version=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ No version found in commit message or tag. Skipping Docker Hub publish."
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check-version.outputs.has_version == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.check-version.outputs.has_version == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Release Image (scratch)
+        if: steps.check-version.outputs.has_version == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.check-version.outputs.tags }}
+
+      - name: Update Docker Hub Description & README
+        if: steps.check-version.outputs.has_version == 'true'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: sooriya04/searqon
+          short-description: "Self-hosted Web Intelligence, Search & 4-Tier Anti-Bot Scraping Engine for AI Agents & RAG."
+          readme-filepath: ./docs/docker.md
