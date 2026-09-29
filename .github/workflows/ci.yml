@@ -127,8 +127,12 @@ jobs:
           with open("./docs/docker.md", "r") as f:
               description = f.read()
 
-          # Step 3: PATCH repository full_description
-          patch_data = json.dumps({"full_description": description}).encode()
+          # Step 3: PATCH repository description + full_description
+          short_desc = "Self-hosted Web Intelligence Engine for AI Agents. Search, 4-Tier Anti-Bot Scrape & MCP Server."
+          patch_data = json.dumps({
+              "description": short_desc,
+              "full_description": description
+          }).encode()
           req2 = urllib.request.Request(
               f"https://hub.docker.com/v2/repositories/{username}/searqon/",
               data=patch_data,
