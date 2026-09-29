@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"src/config"
 	"src/db"
 	"src/handlers"
+	"src/mcp"
 	"src/scraper"
 	"src/utils"
 )
@@ -32,6 +34,21 @@ func main() {
 	}
 
 	// 2. Initialize core system modules
+	// If launched as 'searqon mcp', direct execution logs to stderr to preserve stdout for JSON-RPC
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		log.SetOutput(os.Stderr)
+		scraper.InitProxyPool()
+		db.InitDB()
+		defer db.CloseDB()
+
+		mcpServer := mcp.NewServer()
+		if err := mcpServer.StartStdioLoop(); err != nil {
+			fmt.Fprintf(os.Stderr, "[Searqon MCP] Stdio loop exited: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	utils.InitLogger()
 	defer utils.CloseLogger()
 
@@ -41,6 +58,11 @@ func main() {
 
 	// 3. Setup HTTP router
 	mux := http.NewServeMux()
+
+	// Model Context Protocol (MCP) over HTTP/SSE
+	mcpServer := mcp.NewServer()
+	mux.HandleFunc("/mcp", mcpServer.SSEHandler())
+	mux.HandleFunc("/mcp/sse", mcpServer.SSEHandler())
 
 	// Discovery and Search
 	mux.HandleFunc("/search", handlers.SearchHandler)

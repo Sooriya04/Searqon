@@ -108,6 +108,49 @@ volumes:
 
 ---
 
+## 🤖 Model Context Protocol (MCP) Support
+
+Searqon provides native **Model Context Protocol (MCP)** support, allowing AI agent desktop environments (such as **Claude Desktop**, **Cursor**, **Windsurf**, and autonomous agent frameworks) to use Searqon directly via Docker.
+
+### Claude Desktop & Cursor Configuration (`stdio` transport)
+
+Add the following to your `claude_desktop_config.json` or Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "searqon": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "CACHE_ENABLED=true",
+        "-e", "SEARXNG_URL=http://host.docker.internal:8080",
+        "-v", "searqon-data:/app/data",
+        "sooriya04/searqon:latest",
+        "mcp"
+      ]
+    }
+  }
+}
+```
+
+### Remote Agents / HTTP SSE transport
+If running Searqon as a containerized web service:
+- **SSE Endpoint**: `http://localhost:7493/mcp/sse`
+- **POST Endpoint**: `http://localhost:7493/mcp`
+
+### Available MCP Tools
+
+| Tool | Description |
+| :--- | :--- |
+| **`searqon_search`** | Real-time meta-search across SearXNG, DuckDuckGo, Arxiv, and Wikipedia with automatic reciprocal rank fusion and optional scraping. |
+| **`searqon_scrape`** | Ultra-sophisticated 4-tier anti-bot scraper. Converts dirty HTML into clean GitHub-flavored Markdown, bypasses Cloudflare, and applies token budget limits to protect context windows. |
+| **`searqon_research`** | Deep research tool that runs multi-engine discovery, fetches top sources concurrently, and synthesizes a structured context dossier. |
+
+---
+
 ## 📡 API Endpoints
 
 * **`POST /search`** — Meta-search aggregation, reranking, and live page scraping into structured JSON.
