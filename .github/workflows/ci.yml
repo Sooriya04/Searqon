@@ -96,12 +96,30 @@ jobs:
           push: true
           tags: ${{ steps.check-version.outputs.tags }}
 
-      - name: Update Docker Hub Description & README
+      - name: Update Docker Hub Description via API
         if: steps.check-version.outputs.has_version == 'true'
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: sooriya04/searqon
-          short-description: "Self-hosted Web Intelligence, Search & 4-Tier Anti-Bot Scraping Engine for AI Agents & RAG."
-          readme-filepath: ./docs/docker.md
+        run: |
+          # Authenticate with Docker Hub to get a JWT
+          TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"username\": \"${{ secrets.DOCKERHUB_USERNAME }}\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" \
+            "https://hub.docker.com/v2/users/login" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "$TOKEN" ]; then
+            echo "⚠ Could not authenticate with Docker Hub — skipping description update."
+            exit 0
+          fi
+
+          DESCRIPTION=$(cat ./docs/docker.md)
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"full_description\": $(echo "$DESCRIPTION" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" \
+            "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/searqon/")
+
+          if [ "$STATUS" = "200" ]; then
+            echo "✓ Docker Hub description updated successfully."
+          else
+            echo "⚠ Docker Hub description update returned HTTP $STATUS — skipping (non-fatal)."
+          fi
