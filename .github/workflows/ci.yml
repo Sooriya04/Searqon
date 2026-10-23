@@ -103,53 +103,52 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          cat > /tmp/update_dockerhub.py << 'PYEOF'
-import os, json, urllib.request, urllib.error, sys
+          python3 - <<'PYEOF'
+          import os, json, urllib.request, urllib.error, sys
 
-username = os.environ["DOCKERHUB_USERNAME"]
-token    = os.environ["DOCKERHUB_TOKEN"]
+          username = os.environ["DOCKERHUB_USERNAME"]
+          token    = os.environ["DOCKERHUB_TOKEN"]
 
-# Step 1: Authenticate and get JWT
-login_data = json.dumps({"username": username, "password": token}).encode()
-req = urllib.request.Request(
-    "https://hub.docker.com/v2/users/login",
-    data=login_data,
-    headers={"Content-Type": "application/json"},
-    method="POST"
-)
-try:
-    with urllib.request.urlopen(req) as resp:
-        jwt = json.loads(resp.read())["token"]
-        print("Authenticated with Docker Hub successfully.")
-except Exception as e:
-    print(f"Warning: Docker Hub login failed: {e} - skipping description update.")
-    sys.exit(0)
+          # Step 1: Authenticate and get JWT
+          login_data = json.dumps({"username": username, "password": token}).encode()
+          req = urllib.request.Request(
+              "https://hub.docker.com/v2/users/login",
+              data=login_data,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  jwt = json.loads(resp.read())["token"]
+                  print("Authenticated with Docker Hub successfully.")
+          except Exception as e:
+              print(f"Warning: Docker Hub login failed: {e} - skipping description update.")
+              sys.exit(0)
 
-# Step 2: Read docs/docker.md
-with open("./docs/docker.md", "r") as f:
-    full_description = f.read()
+          # Step 2: Read docs/docker.md
+          with open("./docs/docker.md", "r") as f:
+              full_description = f.read()
 
-# Step 3: PATCH repository short description + full README
-short_desc = "Self-hosted Web Intelligence Engine for AI Agents. Search, Anti-Bot Scraping & MCP Server."
-patch_data = json.dumps({
-    "description": short_desc,
-    "full_description": full_description
-}).encode()
+          # Step 3: PATCH repository short description + full README
+          short_desc = "Self-hosted Web Intelligence Engine for AI Agents. Search, Anti-Bot Scraping & MCP Server."
+          patch_data = json.dumps({
+              "description": short_desc,
+              "full_description": full_description
+          }).encode()
 
-req2 = urllib.request.Request(
-    f"https://hub.docker.com/v2/repositories/{username}/searqon/",
-    data=patch_data,
-    headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {jwt}"
-    },
-    method="PATCH"
-)
-try:
-    with urllib.request.urlopen(req2) as resp:
-        print(f"Docker Hub description updated successfully (HTTP {resp.status}).")
-except urllib.error.HTTPError as e:
-    body = e.read().decode()
-    print(f"Warning: Docker Hub description update failed HTTP {e.code}: {body}")
-PYEOF
-          python3 /tmp/update_dockerhub.py
+          req2 = urllib.request.Request(
+              f"https://hub.docker.com/v2/repositories/{username}/searqon/",
+              data=patch_data,
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {jwt}"
+              },
+              method="PATCH"
+          )
+          try:
+              with urllib.request.urlopen(req2) as resp:
+                  print(f"Docker Hub description updated successfully (HTTP {resp.status}).")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"Warning: Docker Hub description update failed HTTP {e.code}: {body}")
+          PYEOF
