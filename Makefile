@@ -105,13 +105,14 @@ docker-test: ## Verify Docker container health and logs endpoints on port $(PORT
 
 # ─── Full Stack Orchestration (Searqon + SearXNG + PG/SQLite + Redis) ────────
 
-compose-up: ## Start complete stack (Searqon, SearXNG, PG/SQLite, Redis)
+compose-up: ## Start complete stack (Searqon, SearXNG, Lightpanda, PG/SQLite, Redis)
 	@echo "→ Starting Searqon full stack..."
 	docker compose up -d
-	@echo "✓ Searqon:   http://localhost:$(PORT)"
-	@echo "✓ SearXNG:   http://localhost:8080"
-	@echo "✓ Postgres:  localhost:5435 (searqon-db)"
-	@echo "✓ Redis:     localhost:6379"
+	@echo "✓ Searqon:    http://localhost:$(PORT)"
+	@echo "✓ SearXNG:    http://localhost:8080"
+	@echo "✓ Lightpanda: localhost:9222 (CDP)"
+	@echo "✓ Postgres:   localhost:5435 (searqon-db)"
+	@echo "✓ Redis:      localhost:6379"
 
 compose-down: ## Stop complete stack
 	@echo "→ Stopping full stack..."

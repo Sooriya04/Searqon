@@ -73,6 +73,7 @@ scraper:
   lightpanda:
     enabled: true
     binary_path: "./lightpanda/lightpanda"
+    cdp_url: "ws://lightpanda:9222"
   camoufox:
     enabled: false
     binary_path: "/usr/local/bin/camoufox"

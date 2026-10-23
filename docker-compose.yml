@@ -11,6 +11,7 @@ services:
     environment:
       - PORT=7493
       - SEARXNG_URL=http://searxng:8080
+      - LIGHTPANDA_URL=ws://lightpanda:9222
       - DB_TYPE=sqlite # Set to "postgres" to use PostgreSQL, or "sqlite" for zero-overhead local SQL
       - DATABASE_URL=postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable
       - REDIS_HOST=searqon-redis
@@ -20,10 +21,12 @@ services:
       - ./data:/app/data
     depends_on:
       - searxng
+      - lightpanda
 
   # ── SearXNG Meta-Search Engine ──────────────────────────────────────────────
   searxng:
     image: searxng/searxng:latest
+    container_name: searqon-searxng
     ports:
       - "8080:8080"
     dns:
@@ -33,11 +36,21 @@ services:
       - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
     restart: unless-stopped
 
+  # ── Lightpanda Headless Browser (CDP WebSocket Server) ──────────────────────
+  lightpanda:
+    image: lightpanda/browser:latest
+    container_name: searqon-lightpanda
+    command: ["lightpanda", "serve", "--host", "0.0.0.0", "--port", "9222"]
+    ports:
+      - "9222:9222"
+    restart: unless-stopped
+
   # ── PostgreSQL Cache & Vector Database (Optional / Switchable) ──────────────
   searqon-db:
     build:
       context: ./docker/database
       dockerfile: Dockerfile
+    container_name: searqon-db
     ports:
       - "5435:5432"
     environment:
@@ -51,6 +64,7 @@ services:
   # ── Redis L1 In-Memory Cache (Optional) ─────────────────────────────────────
   searqon-redis:
     image: redis:alpine
+    container_name: searqon-redis
     ports:
       - "6379:6379"
     restart: unless-stopped

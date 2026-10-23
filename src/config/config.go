@@ -85,10 +85,11 @@ type OllamaConfig struct {
 	EmbeddingModel string `yaml:"embedding_model"`
 }
 
-// BrowserEngineConfig holds path and enable flags for headless browsers.
+// BrowserEngineConfig holds path, CDP endpoint, and enable flags for headless browsers.
 type BrowserEngineConfig struct {
 	Enabled    bool   `yaml:"enabled"`
 	BinaryPath string `yaml:"binary_path"`
+	CDPURL     string `yaml:"cdp_url"`
 }
 
 // ScraperConfig holds rate limits, concurrency, and headless browser options.
@@ -361,5 +362,16 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if resList := os.Getenv("RESIDENTIAL_PROXIES"); resList != "" {
 		cfg.Proxies.ResidentialProxies = strings.Split(resList, ",")
+	}
+	if lpURL := os.Getenv("LIGHTPANDA_URL"); lpURL != "" {
+		cfg.Scraper.Lightpanda.CDPURL = lpURL
+	} else if lpURL := os.Getenv("LIGHTPANDA_CDP_URL"); lpURL != "" {
+		cfg.Scraper.Lightpanda.CDPURL = lpURL
+	}
+	if lpBin := os.Getenv("LIGHTPANDA_BINARY_PATH"); lpBin != "" {
+		cfg.Scraper.Lightpanda.BinaryPath = lpBin
+	}
+	if lpEn := os.Getenv("LIGHTPANDA_ENABLED"); lpEn != "" {
+		cfg.Scraper.Lightpanda.Enabled = (lpEn == "true" || lpEn == "1")
 	}
 }

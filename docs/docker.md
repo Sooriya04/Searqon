@@ -38,7 +38,7 @@ curl http://localhost:7493/health
 
 ## 🐳 Full Stack Deployment (Docker Compose)
 
-To run Searqon with meta-search aggregation (**SearXNG**), PostgreSQL, and Redis:
+To run Searqon with meta-search aggregation (**SearXNG**), headless JavaScript rendering (**Lightpanda**), PostgreSQL, and Redis:
 
 ```yaml
 services:
@@ -49,6 +49,7 @@ services:
     environment:
       - PORT=7493
       - SEARXNG_URL=http://searxng:8080
+      - LIGHTPANDA_URL=ws://lightpanda:9222
       - DB_TYPE=sqlite # Set to "postgres" to switch to PostgreSQL
       - DATABASE_URL=postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable
       - REDIS_HOST=searqon-redis
@@ -57,6 +58,7 @@ services:
       - ./data:/app/data
     depends_on:
       - searxng
+      - lightpanda
     restart: unless-stopped
 
   searxng:
@@ -66,6 +68,13 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    restart: unless-stopped
+
+  lightpanda:
+    image: lightpanda/browser:latest
+    command: ["lightpanda", "serve", "--host", "0.0.0.0", "--port", "9222"]
+    ports:
+      - "9222:9222"
     restart: unless-stopped
 
   searqon-db:
