@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -40,10 +41,12 @@ func ScrapeWithLightpandaProxy(targetURL string, userAgent string, proxyURL stri
 	ctx, cancel := context.WithTimeout(context.Background(), 11*time.Second)
 	defer cancel()
 
+	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
-	outputBytes, err := cmd.CombinedOutput()
+	cmd.Stderr = &stderr
+	outputBytes, err := cmd.Output()
 	if err != nil {
-		return result, "", fmt.Errorf("lightpanda error: %v, output: %s", err, string(outputBytes))
+		return result, "", fmt.Errorf("lightpanda error: %v, stderr: %s", err, stderr.String())
 	}
 
 	htmlOutput := string(outputBytes)

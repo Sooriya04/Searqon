@@ -34,4 +34,7 @@ COPY config/ /app/config/
 
 EXPOSE 7493
 
+# Persistent storage for SQLite databases, cache, and telemetry
+VOLUME ["/app/data"]
+
 ENTRYPOINT ["/app/searqon"]
