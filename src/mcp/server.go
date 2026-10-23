@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
+
+	"src/crawler"
 	"src/models"
 	"src/scraper"
 	"src/search"
@@ -168,6 +171,52 @@ func (s *Server) registerTools() {
 				Required: []string{"query"},
 			},
 		},
+		{
+			Name: "searqon_map",
+			Description: "Discover and map internal URLs across a target website or domain. " +
+				"Acts as a sitemap crawler to reveal page hierarchy, link structures, and page paths for autonomous agent exploration.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]ToolParamProperty{
+					"url": {
+						Type:        "string",
+						Description: "The website or domain root URL to map (e.g. 'https://docs.example.com').",
+					},
+					"limit": {
+						Type:        "integer",
+						Description: "Maximum number of internal links to discover (default: 50, max: 150).",
+					},
+				},
+				Required: []string{"url"},
+			},
+		},
+		{
+			Name: "searqon_extract",
+			Description: "Extract targeted data from a webpage using CSS selectors or structured schema instructions. " +
+				"Ideal for extracting structured tables, pricing, article metadata, or specific DOM elements.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]ToolParamProperty{
+					"url": {
+						Type:        "string",
+						Description: "The webpage URL to scrape and extract from.",
+					},
+					"selectors": {
+						Type:        "object",
+						Description: "Map of field names to CSS selectors (e.g. {\"title\": \"h1\", \"price\": \".price\"}).",
+					},
+					"schema": {
+						Type:        "string",
+						Description: "Optional prompt or JSON schema description for structured extraction.",
+					},
+					"bypass_cache": {
+						Type:        "boolean",
+						Description: "Force live network fetch, ignoring cached records (default: false).",
+					},
+				},
+				Required: []string{"url"},
+			},
+		},
 	}
 }
 
@@ -252,6 +301,10 @@ func (s *Server) executeTool(name string, args map[string]interface{}) (CallTool
 		return s.handleScrape(args)
 	case "searqon_research":
 		return s.handleResearch(args)
+	case "searqon_map":
+		return s.handleMap(args)
+	case "searqon_extract":
+		return s.handleExtract(args)
 	default:
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", name)
 	}
@@ -528,6 +581,98 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 	return CallToolResult{
 		Content: []ToolContent{
 			{Type: "text", Text: sb.String()},
+		},
+	}, nil
+}
+
+func (s *Server) handleMap(args map[string]interface{}) (CallToolResult, error) {
+	targetURL, _ := args["url"].(string)
+	if strings.TrimSpace(targetURL) == "" {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "url parameter is required"}}}, nil
+	}
+
+	limit := 50
+	if l, ok := args["limit"].(float64); ok && l > 0 {
+		limit = int(l)
+		if limit > 150 {
+			limit = 150
+		}
+	}
+
+	mapRes := crawler.MapSiteURLs(targetURL, limit)
+	if mapRes.Error != "" {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Failed to map site: %s", mapRes.Error)}}}, nil
+	}
+
+	resJSON, err := json.MarshalIndent(mapRes, "", "  ")
+	if err != nil {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Serialization error: %v", err)}}}, nil
+	}
+
+	return CallToolResult{
+		Content: []ToolContent{
+			{Type: "text", Text: string(resJSON)},
+		},
+	}, nil
+}
+
+func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, error) {
+	targetURL, _ := args["url"].(string)
+	if strings.TrimSpace(targetURL) == "" {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "url parameter is required"}}}, nil
+	}
+
+	bypassCache, _ := args["bypass_cache"].(bool)
+	schemaPrompt, _ := args["schema"].(string)
+
+	var selectors map[string]string
+	if rawSel, ok := args["selectors"].(map[string]interface{}); ok {
+		selectors = make(map[string]string)
+		for k, v := range rawSel {
+			if strVal, ok := v.(string); ok {
+				selectors[k] = strVal
+			}
+		}
+	}
+
+	opts := scraper.ScrapeOptions{
+		Format:        "text",
+		BypassCache:   bypassCache,
+		ExtractSchema: schemaPrompt,
+		StealthLevel:  "auto",
+	}
+
+	res, rawHTML, err := scraper.ExecuteSmartEscalationScrape(targetURL, "", opts, time.Now())
+	if err != nil {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Scrape error: %v", err)}}}, nil
+	}
+
+	extracted := make(map[string]interface{})
+	if len(selectors) > 0 {
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
+		if err == nil && doc != nil {
+			selData := make(map[string]string)
+			for k, sel := range selectors {
+				selData[k] = strings.TrimSpace(doc.Find(sel).First().Text())
+			}
+			extracted["selectors_data"] = selData
+		}
+	}
+
+	if res.StructuredData != nil {
+		extracted["structured_data"] = res.StructuredData
+	}
+	extracted["url"] = targetURL
+	extracted["title"] = res.Title
+
+	outJSON, err := json.MarshalIndent(extracted, "", "  ")
+	if err != nil {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Serialization error: %v", err)}}}, nil
+	}
+
+	return CallToolResult{
+		Content: []ToolContent{
+			{Type: "text", Text: string(outJSON)},
 		},
 	}, nil
 }

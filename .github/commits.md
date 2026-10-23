@@ -246,6 +246,11 @@ Orchestrated the official Lightpanda headless browser CDP server (`lightpanda/br
 
 Implemented a native, dependency-free WebSocket Chrome DevTools Protocol (CDP) client in `src/scraper/scraper_lightpanda.go` and wired it into `src/scraper/escalation.go`, enabling Searqon to execute remote JavaScript-heavy page scraping directly against containerized Lightpanda instances (`LIGHTPANDA_URL=ws://lightpanda:9222`) inside minimal scratch environments without requiring a local browser binary. Added full test coverage in `src/scraper/scraper_lightpanda_test.go` verifying remote DOM hydration and outerHTML evaluation. Optimized CI/CD by decoupling GitHub Pages deployment into a dedicated workflow (`.github/workflows/pages.yml`) with strict path filtering (`index.html`, `docs/**`) and `workflow_dispatch` manual triggers, eliminating unnecessary rebuilds and deployments on everyday code pushes while ensuring the core CI testing pipeline runs reliably. Removed deprecated `.deployment/` directory.
 
+## feat(mcp): expand MCP agent tools with searqon_map and searqon_extract, add crawler and handler unit tests, and integrate Newman E2E suite
+
+Expanded Searqon's Model Context Protocol (MCP) server with two new agent tools in `src/mcp/server.go`: `searqon_map` (enabling AI agents to discover, crawl, and map domain URL trees) and `searqon_extract` (targeted CSS selector and schema extraction), backed by unit test verification in `src/mcp/server_test.go` and documented in `MCP.md` and `docs/MCP.md`. Added dedicated unit and mock test suites for previously untested packages in `src/crawler/crawler_test.go` (verifying domain boundary filtering, link extraction, and recursive limits) and `src/handlers/handlers_test.go` (verifying status codes, method restrictions, JSON schemas, and live markdown extraction across all endpoints). Tuned default HTTP transport timeout in `src/scraper/scraper_http.go` from 3s to 8s to prevent transient TLS/handshake timeouts on high-latency network paths. Built a comprehensive Postman/Newman black-box E2E test collection and environment (`tests/searqon.postman_collection.json`), wired `make newman-test` into `Makefile`, and verified 100% test pass rate across all 6 API requests and 12 assertions.
+
+
 
 
 

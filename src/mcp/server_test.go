@@ -59,8 +59,8 @@ func TestMCPToolsList(t *testing.T) {
 	}
 
 	tools := toolsListResp.Result.Tools
-	if len(tools) < 3 {
-		t.Fatalf("Expected at least 3 tools, got %d", len(tools))
+	if len(tools) < 5 {
+		t.Fatalf("Expected at least 5 tools, got %d", len(tools))
 	}
 
 	toolNames := make(map[string]bool)
@@ -68,10 +68,52 @@ func TestMCPToolsList(t *testing.T) {
 		toolNames[tool.Name] = true
 	}
 
-	for _, expected := range []string{"searqon_search", "searqon_scrape", "searqon_research"} {
+	for _, expected := range []string{"searqon_search", "searqon_scrape", "searqon_research", "searqon_map", "searqon_extract"} {
 		if !toolNames[expected] {
 			t.Errorf("Expected tool %s to be registered", expected)
 		}
+	}
+}
+
+func TestMCPCallMapTool(t *testing.T) {
+	server := NewServer()
+
+	// Missing url should return error in CallToolResult
+	callReq := `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"searqon_map","arguments":{"url":""}}}`
+	respBytes, err := server.HandleMessage([]byte(callReq))
+	if err != nil {
+		t.Fatalf("HandleMessage failed: %v", err)
+	}
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	resMap, ok := resp.Result.(map[string]interface{})
+	if !ok || resMap["isError"] != true {
+		t.Errorf("Expected isError=true for empty URL in searqon_map, got %+v", resp.Result)
+	}
+}
+
+func TestMCPCallExtractTool(t *testing.T) {
+	server := NewServer()
+
+	// Missing url should return error in CallToolResult
+	callReq := `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"searqon_extract","arguments":{"url":""}}}`
+	respBytes, err := server.HandleMessage([]byte(callReq))
+	if err != nil {
+		t.Fatalf("HandleMessage failed: %v", err)
+	}
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	resMap, ok := resp.Result.(map[string]interface{})
+	if !ok || resMap["isError"] != true {
+		t.Errorf("Expected isError=true for empty URL in searqon_extract, got %+v", resp.Result)
 	}
 }
 

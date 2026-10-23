@@ -54,6 +54,9 @@ restart: kill ## Kill existing server and rerun
 test: ## Run all go tests
 	cd $(SRC_DIR) && go test ./... -v
 
+newman-test: ## Run Newman E2E test suite against running Searqon server
+	npx --yes newman run tests/searqon.postman_collection.json -e tests/searqon.postman_environment.json
+
 lint: ## Run go vet
 	cd $(SRC_DIR) && go vet ./...
 

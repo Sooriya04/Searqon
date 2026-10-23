@@ -39,6 +39,8 @@ Add Searqon to your Claude Desktop configuration (`claude_desktop_config.json`) 
 | **`searqon_search`** | Real-time Web Search | SearXNG meta-search + DDG/Wikipedia fallback, deduplication, reciprocal rank fusion. |
 | **`searqon_scrape`** | Ultra-Sophisticated Scraper | 4-tier anti-bot escalation (Fast HTTP $\to$ Chrome spoof $\to$ Headless $\to$ Proxy), clean Markdown converter, `max_tokens` context limit guard. |
 | **`searqon_research`** | Deep Agent Research Dossier | Searches meta-engines, concurrently scrapes top sources, and formats a complete research dossier. |
+| **`searqon_map`** | Sitemap & Link Discovery | Crawls and maps full domain link structures, returning internal hierarchies and page paths. |
+| **`searqon_extract`** | Structured & Schema Extraction | Targeted extraction with CSS selectors or JSON schema instructions for tables, prices, and metadata. |
 
 ---
 

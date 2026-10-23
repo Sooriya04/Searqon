@@ -103,6 +103,26 @@ One-shot deep research tool for complex agent reasoning tasks. Queries SearXNG, 
 
 ---
 
+### 4. `searqon_map`
+Autonomous sitemap explorer. Discovers and maps internal URL structures across an entire domain or website hierarchy for agent navigation.
+
+**Parameters:**
+* `url` *(string, required)*: Website root or section URL to map.
+* `limit` *(integer, optional)*: Maximum internal links to return (default: `50`, max: `150`).
+
+---
+
+### 5. `searqon_extract`
+Targeted data extraction from any webpage using CSS selectors or structured JSON schema instructions.
+
+**Parameters:**
+* `url` *(string, required)*: Webpage to extract from.
+* `selectors` *(object, optional)*: Map of field names to CSS selectors (e.g. `{"title": "h1", "price": ".price"}`).
+* `schema` *(string, optional)*: Natural language prompt or schema description for structured JSON extraction.
+* `bypass_cache` *(boolean, optional)*: Skip cache for a live fetch.
+
+---
+
 ## 💻 Local CLI / Binary Usage
 
 To run the MCP server directly from the compiled binary:

@@ -43,7 +43,7 @@ var httpClient *http.Client
 func init() {
 	jar, _ := utils.NewPersistentCookieJar()
 	httpClient = &http.Client{
-		Timeout: 3 * time.Second,
+		Timeout: 8 * time.Second,
 		Jar:     jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
