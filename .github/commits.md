@@ -250,6 +250,11 @@ Implemented a native, dependency-free WebSocket Chrome DevTools Protocol (CDP) c
 
 Expanded Searqon's Model Context Protocol (MCP) server with two new agent tools in `src/mcp/server.go`: `searqon_map` (enabling AI agents to discover, crawl, and map domain URL trees) and `searqon_extract` (targeted CSS selector and schema extraction), backed by unit test verification in `src/mcp/server_test.go` and documented in `MCP.md` and `docs/MCP.md`. Added dedicated unit and mock test suites for previously untested packages in `src/crawler/crawler_test.go` (verifying domain boundary filtering, link extraction, and recursive limits) and `src/handlers/handlers_test.go` (verifying status codes, method restrictions, JSON schemas, and live markdown extraction across all endpoints). Tuned default HTTP transport timeout in `src/scraper/scraper_http.go` from 3s to 8s to prevent transient TLS/handshake timeouts on high-latency network paths. Built a comprehensive Postman/Newman black-box E2E test collection and environment (`tests/searqon.postman_collection.json`), wired `make newman-test` into `Makefile`, and verified 100% test pass rate across all 6 API requests and 12 assertions.
 
+## feat(ci): add GitHub Container Registry (GHCR) dual-publish to release pipeline
+
+Updated `.github/workflows/ci.yml` to automatically dual-publish container release images to both Docker Hub (`sooriya04/searqon`) and GitHub Container Registry (`ghcr.io/sooriya04/searqon`) on version releases and pushes to main. Added `packages: write` job permissions and automated login using the built-in `GITHUB_TOKEN`. Added GHCR repository badges and pull documentation to `readme.md` and `docs/docker.md`.
+
+
 
 
 

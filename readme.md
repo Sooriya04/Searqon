@@ -1,6 +1,7 @@
 # Searqon — Web Intelligence Engine for AI Agents
 
 [![Docker Hub](https://img.shields.io/docker/v/sooriya04/searqon?label=Docker%20Hub&color=2496ed)](https://hub.docker.com/r/sooriya04/searqon)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fsooriya04%2Fsearqon-24292e?logo=github)](https://github.com/Sooriya04/Searqon/pkgs/container/searqon)
 [![Version](https://img.shields.io/badge/version-v1.2.0-blue)](https://github.com/Sooriya04/Searqon/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

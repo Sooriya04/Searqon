@@ -22,11 +22,15 @@ Searqon is an open-source, self-hosted web intelligence and search engine writte
 Run Searqon standalone using its built-in SQLite engine on port **`7493`**:
 
 ```bash
+# From Docker Hub:
 docker run -d \
   --name searqon \
   -p 7493:7493 \
   -v $(pwd)/data:/app/data \
   sooriya04/searqon:latest
+
+# Or from GitHub Container Registry (GHCR):
+# docker run -d -p 7493:7493 -v $(pwd)/data:/app/data ghcr.io/sooriya04/searqon:latest
 ```
 
 Verify that the engine is online:
