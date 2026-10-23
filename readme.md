@@ -1,7 +1,7 @@
 # Searqon — Web Intelligence Engine for AI Agents
 
 [![Docker Hub](https://img.shields.io/docker/v/sooriya04/searqon?label=Docker%20Hub&color=2496ed)](https://hub.docker.com/r/sooriya04/searqon)
-[![Version](https://img.shields.io/badge/version-v1.1.0-blue)](https://github.com/Sooriya04/Searqon/releases)
+[![Version](https://img.shields.io/badge/version-v1.2.0-blue)](https://github.com/Sooriya04/Searqon/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Searqon is an open-source, self-hosted web intelligence engine that **searches, crawls, scrapes, ranks, and synthesizes** information from the internet. Built entirely in Go for maximum performance, minimal resource usage, and total transparency.
@@ -14,7 +14,7 @@ Think of it as a transparent alternative to services like Tavily or Firecrawl �
 
 ## 🤖 MCP (Model Context Protocol) — Use Searqon in Claude Desktop, Cursor & Windsurf
 
-Searqon `v1.1.0` ships with a **native Go MCP server**, making it the simplest way to give any AI agent access to real-time web search and sophisticated anti-bot scraping.
+Searqon `v1.2.0` ships with a **native Go MCP server**, making it the simplest way to give any AI agent access to real-time web search and sophisticated anti-bot scraping.
 
 ### Claude Desktop / Cursor Configuration
 ```json
@@ -41,6 +41,8 @@ Searqon `v1.1.0` ships with a **native Go MCP server**, making it the simplest w
 | `searqon_search` | Real-time meta-search via SearXNG + DuckDuckGo + Arxiv + Wikipedia with reciprocal rank fusion |
 | `searqon_scrape` | 4-tier anti-bot scraper (Cloudflare bypass, headless fallback, proxy rotation) → clean Markdown with `max_tokens` guard |
 | `searqon_research` | One-shot deep retrieval: search → concurrently scrape top sources → return structured research dossier |
+| `searqon_map` | Domain discovery & sitemap crawler: map internal URL trees, paths, and site hierarchies |
+| `searqon_extract` | Targeted CSS selector or structured JSON schema extraction for tables, prices, and metadata |
 
 Full MCP integration guide: [`MCP.md`](./MCP.md) | [`docs/MCP.md`](./docs/MCP.md)
 
@@ -62,7 +64,7 @@ Complete documentation is available in the [`docs/`](./docs/index.md) directory:
 
 ## ⚡ Key Features
 
-- **Native MCP Server (v1.1.0):** Run as `docker run -i ... mcp` for instant Claude Desktop / Cursor integration. Also exposes HTTP SSE at `/mcp` and `/mcp/sse`.
+- **Native MCP Server (v1.2.0):** Run as `docker run -i ... mcp` for instant Claude Desktop / Cursor integration. Also exposes HTTP SSE at `/mcp` and `/mcp/sse`.
 - **4-Tier Anti-Bot Escalation:** Fast HTTP → Spoofed Chrome/TLS Fingerprint → Camoufox/Lightpanda Headless → Rotating Residential Proxy. Bypasses Cloudflare, DataDome, and PerimeterX.
 - **SearXNG Meta-Search:** Aggregates SearXNG, DuckDuckGo, Arxiv, and Wikipedia with reciprocal rank fusion and deduplication.
 - **Context Window Protection:** Token budget (`max_tokens`) clamps scraped Markdown to safe sizes for LLMs.
