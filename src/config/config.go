@@ -318,10 +318,29 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.SearXNG.URL = u
 		cfg.SearXNG.Enabled = true
 	}
+	if de := os.Getenv("DATABASE_ENABLED"); de != "" {
+		cfg.Database.Enabled = (de == "true" || de == "1")
+	} else if de := os.Getenv("DB_ENABLED"); de != "" {
+		cfg.Database.Enabled = (de == "true" || de == "1")
+	}
 	if dt := os.Getenv("DB_TYPE"); dt != "" {
-		cfg.Database.Type = strings.ToLower(dt)
+		if strings.ToLower(dt) == "none" {
+			cfg.Database.Enabled = false
+		} else {
+			cfg.Database.Type = strings.ToLower(dt)
+		}
 	} else if dt := os.Getenv("DATABASE_TYPE"); dt != "" {
-		cfg.Database.Type = strings.ToLower(dt)
+		if strings.ToLower(dt) == "none" {
+			cfg.Database.Enabled = false
+		} else {
+			cfg.Database.Type = strings.ToLower(dt)
+		}
+	}
+	if re := os.Getenv("REDIS_ENABLED"); re != "" {
+		cfg.Redis.Enabled = (re == "true" || re == "1")
+	}
+	if le := os.Getenv("LOGS_ENABLED"); le != "" {
+		cfg.Logs.Enabled = (le == "true" || le == "1")
 	}
 	if sp := os.Getenv("SQLITE_PATH"); sp != "" {
 		cfg.Database.SQLite.Path = sp

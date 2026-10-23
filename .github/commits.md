@@ -242,6 +242,11 @@ Enhanced container storage persistence, hardened Lightpanda headless browser DOM
 
 Orchestrated the official Lightpanda headless browser CDP server (`lightpanda/browser:latest`) directly inside `docker-compose.yml`, completing the full-stack containerized search and anti-bot scraping workflow alongside SearXNG, PostgreSQL, and Redis. Configured the Lightpanda service container (`searqon-lightpanda`) with `lightpanda serve --host 0.0.0.0 --port 9222`, exposing its Chrome DevTools Protocol (CDP) WebSocket endpoint on port `9222` while keeping the main Searqon container image on its ultra-lightweight `scratch` footprint (~8.28 MB). Expanded configuration models in `src/config/config.go` and `config/settings.yml` by adding `CDPURL` to `BrowserEngineConfig` with automatic environment variable overrides (`LIGHTPANDA_URL`, `LIGHTPANDA_CDP_URL`, `LIGHTPANDA_BINARY_PATH`, `LIGHTPANDA_ENABLED`). Updated the orchestration lifecycle targets in `Makefile` (`make compose-up`) and updated the Docker deployment documentation in `docs/docker.md` to reflect the multi-container headless browser topology.
 
+## feat(scraper): add native Lightpanda WebSocket CDP driver, path-filtered Pages workflow, and remove legacy deployment
+
+Implemented a native, dependency-free WebSocket Chrome DevTools Protocol (CDP) client in `src/scraper/scraper_lightpanda.go` and wired it into `src/scraper/escalation.go`, enabling Searqon to execute remote JavaScript-heavy page scraping directly against containerized Lightpanda instances (`LIGHTPANDA_URL=ws://lightpanda:9222`) inside minimal scratch environments without requiring a local browser binary. Added full test coverage in `src/scraper/scraper_lightpanda_test.go` verifying remote DOM hydration and outerHTML evaluation. Optimized CI/CD by decoupling GitHub Pages deployment into a dedicated workflow (`.github/workflows/pages.yml`) with strict path filtering (`index.html`, `docs/**`) and `workflow_dispatch` manual triggers, eliminating unnecessary rebuilds and deployments on everyday code pushes while ensuring the core CI testing pipeline runs reliably. Removed deprecated `.deployment/` directory.
+
+
 
 
 

@@ -230,9 +230,21 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 			}
 		}
 
-		// 2. Try Lightpanda Headless Browser
-		if lightpandaEnabled, lpPath := utils.LoadLightpandaConfig(); lightpandaEnabled && lpPath != "" {
-			res, raw, lpErr := ScrapeWithLightpanda(targetURL, userAgent, lpPath, opts.Format, startTime, opts.ExtractSchema)
+		// 2. Try Lightpanda Headless Browser (Remote CDP or Local Binary)
+		cdpURL := GetLightpandaCDPURL()
+		lightpandaEnabled, lpPath := utils.LoadLightpandaConfig()
+		if lightpandaEnabled || cdpURL != "" {
+			var res models.ScrapeResult
+			var raw string
+			var lpErr error
+
+			if cdpURL != "" {
+				res, raw, lpErr = ScrapeWithLightpandaCDP(cdpURL, targetURL, opts.Format, startTime, opts.ExtractSchema)
+			}
+			if (cdpURL == "" || lpErr != nil) && lpPath != "" {
+				res, raw, lpErr = ScrapeWithLightpanda(targetURL, userAgent, lpPath, opts.Format, startTime, opts.ExtractSchema)
+			}
+
 			if lpErr == nil {
 				block := DetectBotChallenge(res.StatusCode, raw, res.ContentType)
 				if (!block.IsBlocked || block.Category == "js_gate") && res.WordCount >= 20 {
