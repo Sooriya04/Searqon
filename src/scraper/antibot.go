@@ -10,18 +10,65 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"src/config"
 )
 
-var domainLimiters sync.Map
+type domainLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+var (
+	domainLimiters    sync.Map
+	domainCleanupOnce sync.Once
+)
+
+func startDomainLimiterCleanup() {
+	domainCleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(10 * time.Minute)
+			for range ticker.C {
+				now := time.Now()
+				domainLimiters.Range(func(key, val interface{}) bool {
+					if entry, ok := val.(domainLimiterEntry); ok {
+						if now.Sub(entry.lastSeen) > 15*time.Minute {
+							domainLimiters.Delete(key)
+						}
+					}
+					return true
+				})
+			}
+		}()
+	})
+}
 
 // WaitDomainRateLimit enforces token-bucket rate limits per domain (5 req/sec).
 func WaitDomainRateLimit(ctx context.Context, domain string) error {
 	if domain == "" {
 		return nil
 	}
-	val, _ := domainLimiters.LoadOrStore(domain, rate.NewLimiter(rate.Limit(5.0), 5))
-	limiter := val.(*rate.Limiter)
-	return limiter.Wait(ctx)
+	startDomainLimiterCleanup()
+	now := time.Now()
+	val, loaded := domainLimiters.Load(domain)
+	var entry domainLimiterEntry
+	if loaded {
+		entry = val.(domainLimiterEntry)
+		entry.lastSeen = now
+		domainLimiters.Store(domain, entry)
+	} else {
+		entry = domainLimiterEntry{
+			limiter:  rate.NewLimiter(rate.Limit(5.0), 5),
+			lastSeen: now,
+		}
+		actual, loadedActual := domainLimiters.LoadOrStore(domain, entry)
+		if loadedActual {
+			entry = actual.(domainLimiterEntry)
+			entry.lastSeen = now
+			domainLimiters.Store(domain, entry)
+		}
+	}
+	return entry.limiter.Wait(ctx)
 }
 
 // BrowserPersona models a completely consistent modern browser identity.
@@ -107,13 +154,17 @@ var headerRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 var headerMu sync.Mutex
 
 func browserTLSConfig() *tls.Config {
+	insecure := false
+	if cfg := config.Get(); cfg != nil {
+		insecure = cfg.Scraper.InsecureSkipVerify
+	}
 	return &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		MaxVersion:               tls.VersionTLS13,
 		PreferServerCipherSuites: true,
 		NextProtos:               []string{"h2", "http/1.1"},
 		CurvePreferences:         []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384},
-		InsecureSkipVerify:       true,
+		InsecureSkipVerify:       insecure,
 	}
 }
 

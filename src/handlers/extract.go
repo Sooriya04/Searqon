@@ -43,10 +43,14 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, htmlContent := scraper.ScrapeSingleURL(req.URL, "text", req.BypassCache)
+	res, htmlContent := scraper.ScrapeSingleURL(req.URL, "text", req.BypassCache)
 	if htmlContent == "" {
-		utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
-		return
+		if res.Scraped && res.Content != "" {
+			htmlContent = res.Content
+		} else {
+			utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
+			return
+		}
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))

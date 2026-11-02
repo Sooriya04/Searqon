@@ -96,6 +96,7 @@ type BrowserEngineConfig struct {
 type ScraperConfig struct {
 	RateLimitPerDomainRPS int                 `yaml:"rate_limit_per_domain_rps"`
 	MaxConcurrentScrapes  int                 `yaml:"max_concurrent_scrapes"`
+	InsecureSkipVerify    bool                `yaml:"insecure_skip_verify"`
 	Lightpanda            BrowserEngineConfig `yaml:"lightpanda"`
 	Camoufox              BrowserEngineConfig `yaml:"camoufox"`
 }

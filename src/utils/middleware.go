@@ -13,17 +13,51 @@ import (
 	"golang.org/x/time/rate"
 )
 
+type clientLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
 var (
-	clientLimiters sync.Map
+	clientLimiters    sync.Map
+	clientCleanupOnce sync.Once
 )
 
+func startClientLimiterCleanup() {
+	clientCleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(10 * time.Minute)
+			for range ticker.C {
+				now := time.Now()
+				clientLimiters.Range(func(key, val interface{}) bool {
+					if entry, ok := val.(clientLimiterEntry); ok {
+						if now.Sub(entry.lastSeen) > 15*time.Minute {
+							clientLimiters.Delete(key)
+						}
+					}
+					return true
+				})
+			}
+		}()
+	})
+}
+
 func getClientLimiter(ip string) *rate.Limiter {
+	startClientLimiterCleanup()
+	now := time.Now()
 	if val, found := clientLimiters.Load(ip); found {
-		return val.(*rate.Limiter)
+		entry := val.(clientLimiterEntry)
+		entry.lastSeen = now
+		clientLimiters.Store(ip, entry)
+		return entry.limiter
 	}
 	limiter := rate.NewLimiter(rate.Limit(2.0), 30) // 2 req/sec average, burst 30
-	actual, _ := clientLimiters.LoadOrStore(ip, limiter)
-	return actual.(*rate.Limiter)
+	entry := clientLimiterEntry{
+		limiter:  limiter,
+		lastSeen: now,
+	}
+	actual, _ := clientLimiters.LoadOrStore(ip, entry)
+	return actual.(clientLimiterEntry).limiter
 }
 
 // InboundRateLimitMiddleware protects Searqon from client API rate limit abuse.
