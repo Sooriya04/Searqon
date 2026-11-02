@@ -292,10 +292,7 @@ func runCleanup() {
 	if backend == "sqlite" && sDB != nil {
 		_, _ = sDB.Exec("DELETE FROM search_cache WHERE created_at < DATETIME('now', '-' || ? || ' seconds')", int(searchCacheTTL.Seconds()))
 		_, _ = sDB.Exec("DELETE FROM scrape_cache WHERE expires_at < CURRENT_TIMESTAMP")
-		return
-	}
-
-	if backend == "postgres" && pPool != nil {
+	} else if backend == "postgres" && pPool != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -309,4 +306,24 @@ func runCleanup() {
 			WHERE expires_at < CURRENT_TIMESTAMP
 		`)
 	}
+
+	// Prune expired in-memory cache entries
+	now := time.Now().UTC()
+	searchMemoryCache.Range(func(key, val interface{}) bool {
+		if entry, ok := val.(inMemorySearchEntry); ok {
+			if now.Sub(entry.createdAt) > searchCacheTTL {
+				searchMemoryCache.Delete(key)
+			}
+		}
+		return true
+	})
+
+	scrapeMemoryCache.Range(func(key, val interface{}) bool {
+		if entry, ok := val.(inMemoryScrapeEntry); ok {
+			if now.After(entry.expiresAt) {
+				scrapeMemoryCache.Delete(key)
+			}
+		}
+		return true
+	})
 }
