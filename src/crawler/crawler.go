@@ -128,10 +128,13 @@ func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 
 	var activeWorkers int32
 	var pendingTasks int32 = 1
+	var wg sync.WaitGroup
 
 	numWorkers := 5
 	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			for task := range jobs {
 				atomic.AddInt32(&activeWorkers, 1)
 
@@ -166,7 +169,10 @@ func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				}
 
 				if len(newLinks) > 0 {
-					discoveredLinksChan <- newLinks
+					select {
+					case discoveredLinksChan <- newLinks:
+					default:
+					}
 				}
 
 				atomic.AddInt32(&activeWorkers, -1)
@@ -198,6 +204,11 @@ func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 	}
 
 	close(jobs)
+	wg.Wait()
+
+	close(discoveredLinksChan)
+	for range discoveredLinksChan {
+	}
 
 	result.Pages = pages
 	result.Total = len(pages)
