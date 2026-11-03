@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,9 +23,35 @@ type RobotsData struct {
 	Rules map[string]*AgentRules
 }
 
-var robotsCache = make(map[string]*RobotsData)
+type cachedRobots struct {
+	data      *RobotsData
+	timestamp time.Time
+}
+
+var robotsCache = make(map[string]cachedRobots)
 var robotsMu sync.RWMutex
 var robotsSF singleflight.Group
+var robotsCleanupOnce sync.Once
+
+const robotsTTL = 24 * time.Hour
+
+func startRobotsCleanup() {
+	robotsCleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(1 * time.Hour)
+			for range ticker.C {
+				now := time.Now()
+				robotsMu.Lock()
+				for host, entry := range robotsCache {
+					if now.Sub(entry.timestamp) > 48*time.Hour {
+						delete(robotsCache, host)
+					}
+				}
+				robotsMu.Unlock()
+			}
+		}()
+	})
+}
 
 var robotsHttpClient = &http.Client{
 	Timeout: 5 * time.Second,
@@ -41,37 +66,30 @@ var agentUserAgents = map[string]string{
 	"yandexbot":   "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
 }
 
-var rotatingUserAgents = []string{
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
-	"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/605.1.15",
-	"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
-}
-
 func getRobotsData(baseURL *url.URL) *RobotsData {
+	startRobotsCleanup()
 	host := baseURL.Host
 	robotsMu.RLock()
-	data, exists := robotsCache[host]
+	entry, exists := robotsCache[host]
 	robotsMu.RUnlock()
-	if exists {
-		return data
+	if exists && time.Since(entry.timestamp) < robotsTTL {
+		return entry.data
 	}
 
 	res, _, _ := robotsSF.Do(host, func() (interface{}, error) {
 		robotsMu.RLock()
-		if data, exists := robotsCache[host]; exists {
+		if entry, exists := robotsCache[host]; exists && time.Since(entry.timestamp) < robotsTTL {
 			robotsMu.RUnlock()
-			return data, nil
+			return entry.data, nil
 		}
 		robotsMu.RUnlock()
 
 		d := fetchRobotsData(baseURL)
 		robotsMu.Lock()
-		robotsCache[host] = d
+		robotsCache[host] = cachedRobots{
+			data:      d,
+			timestamp: time.Now(),
+		}
 		robotsMu.Unlock()
 		return d, nil
 	})
@@ -85,14 +103,14 @@ func getRobotsData(baseURL *url.URL) *RobotsData {
 func fetchRobotsData(baseURL *url.URL) *RobotsData {
 	host := baseURL.Host
 	robotsMu.RLock()
-	data, exists := robotsCache[host]
+	entry, exists := robotsCache[host]
 	robotsMu.RUnlock()
-	if exists {
-		return data
+	if exists && time.Since(entry.timestamp) < robotsTTL {
+		return entry.data
 	}
 
 	robotsURL := fmt.Sprintf("%s://%s/robots.txt", baseURL.Scheme, host)
-	data = &RobotsData{
+	data := &RobotsData{
 		Rules: make(map[string]*AgentRules),
 	}
 
@@ -162,7 +180,10 @@ func fetchRobotsData(baseURL *url.URL) *RobotsData {
 	}
 
 	robotsMu.Lock()
-	robotsCache[host] = data
+	robotsCache[host] = cachedRobots{
+		data:      data,
+		timestamp: time.Now(),
+	}
 	robotsMu.Unlock()
 	return data
 }
@@ -212,7 +233,7 @@ func isAgentAllowed(targetURL string, agent string, robotsData *RobotsData) (boo
 
 func findAllowedAgent(targetURL string, robotsData *RobotsData) (string, time.Duration, bool) {
 	if allowed, delay := isAgentAllowed(targetURL, "*", robotsData); allowed {
-		ua := rotatingUserAgents[rand.Intn(len(rotatingUserAgents))]
+		ua := PickRandomPersona().UserAgent
 		return ua, delay, true
 	}
 
