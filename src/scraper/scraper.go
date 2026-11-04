@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -197,6 +198,9 @@ func finalizeScrapeResult(result *models.ScrapeResult, startTime time.Time, opts
 	result.ExtractionMethod = method
 	result.Scraped = true
 	result.ContentHash = computeContentHash(result.Content)
+	if result.ScrapedAt == "" {
+		result.ScrapedAt = startTime.UTC().Format(time.RFC3339)
+	}
 
 	textForTokens := result.Markdown
 	if textForTokens == "" {
@@ -239,13 +243,20 @@ func computeContentHash(text string) string {
 
 // ScrapeSingleURL scrapes a single URL, resolving cache and robots.txt.
 func ScrapeSingleURL(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := ScrapeSingleURLWithOptions(targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache})
-	return res, raw
+	return ScrapeSingleURLContext(context.Background(), targetURL, format, bypassCache)
+}
+
+func ScrapeSingleURLContext(ctx context.Context, targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
+	return ScrapeSingleURLWithOptionsContext(ctx, targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache})
 }
 
 // ScrapeSingleURLWithOptions scrapes a single URL using optional schema extraction and native-render overrides.
 func ScrapeSingleURLWithOptions(targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternal(targetURL, opts)
+	return ScrapeSingleURLWithOptionsContext(context.Background(), targetURL, opts)
+}
+
+func ScrapeSingleURLWithOptionsContext(ctx context.Context, targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
+	res, raw := scrapeSingleURLInternalContext(ctx, targetURL, opts)
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			if res.ExtractionMethod == "lightpanda" {
@@ -270,7 +281,7 @@ func ScrapeSingleURLWithOptions(targetURL string, opts ScrapeOptions) (models.Sc
 
 // ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
 func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternal(targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
+	res, raw := scrapeSingleURLInternalContext(context.Background(), targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			res.RenderMethod = "go"
@@ -290,8 +301,31 @@ func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (m
 }
 
 func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
+	return scrapeSingleURLInternalContext(context.Background(), targetURL, opts)
+}
+
+func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts ScrapeOptions) (models.ScrapeResult, string) {
 	startTime := time.Now()
 	startISO := startTime.UTC().Format(time.RFC3339)
+
+	if err := ctx.Err(); err != nil {
+		se := &models.SearqonError{
+			ErrorType:         models.ErrTimeout,
+			StatusCode:        499,
+			Message:           err.Error(),
+			Retryable:         true,
+			SuggestedFallback: models.FallbackNone,
+		}
+		return models.ScrapeResult{
+			URL:             targetURL,
+			StartTime:       startISO,
+			EndTime:         time.Now().UTC().Format(time.RFC3339),
+			Error:           err.Error(),
+			StructuredError: se,
+			Scraped:         false,
+			ScrapedAt:       startISO,
+		}, ""
+	}
 
 	// 1. Check database cache
 	if !opts.BypassCache {

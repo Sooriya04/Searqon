@@ -17,8 +17,17 @@ import (
 
 // MapSiteURLs maps all internal links on a given website domain.
 func MapSiteURLs(targetURL string, limit int) models.MapResult {
+	return MapSiteURLsWithContext(context.Background(), targetURL, limit)
+}
+
+func MapSiteURLsWithContext(ctx context.Context, targetURL string, limit int) models.MapResult {
 	startTime := time.Now()
 	result := models.MapResult{SourceURL: targetURL}
+
+	if err := ctx.Err(); err != nil {
+		result.Error = err.Error()
+		return result
+	}
 
 	if limit <= 0 {
 		limit = 100
@@ -26,6 +35,7 @@ func MapSiteURLs(targetURL string, limit int) models.MapResult {
 
 	parsedBase, err := url.Parse(targetURL)
 	if err != nil {
+		result.Error = err.Error()
 		return result
 	}
 	baseDomain := parsedBase.Hostname()
@@ -36,7 +46,12 @@ func MapSiteURLs(targetURL string, limit int) models.MapResult {
 		return result
 	}
 	if delay > 0 {
-		time.Sleep(delay)
+		select {
+		case <-ctx.Done():
+			result.Error = ctx.Err().Error()
+			return result
+		case <-time.After(delay):
+		}
 	}
 
 	htmlContent, _, _, _, err := scraper.FetchHTML(targetURL, userAgent)
@@ -92,6 +107,10 @@ func MapSiteURLs(targetURL string, limit int) models.MapResult {
 
 // CrawlSite crawls a target URL recursively.
 func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped func(models.ScrapeResult)) models.CrawlResult {
+	return CrawlSiteWithContext(context.Background(), targetURL, limit, depth, format, onPageScraped)
+}
+
+func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth int, format string, onPageScraped func(models.ScrapeResult)) models.CrawlResult {
 	startTime := time.Now()
 
 	if limit <= 0 {

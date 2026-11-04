@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,10 +92,12 @@ func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
 			continue
 		}
 		results = append(results, models.SearchResult{
-			Title:   r.Title,
-			URL:     r.URL,
-			Snippet: r.Content,
-			Source:  "searxng",
+			Title:       r.Title,
+			URL:         r.URL,
+			Snippet:     r.Content,
+			Source:      "searxng",
+			FetchedAt:   time.Now().UTC().Format(time.RFC3339),
+			ContentHash: computeContentHash(r.Content),
 		})
 		if len(results) >= limit {
 			break
@@ -150,10 +153,12 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 		}
 
 		results = append(results, models.SearchResult{
-			Title:   title,
-			URL:     rawURL,
-			Snippet: snippet,
-			Source:  "duckduckgo",
+			Title:       title,
+			URL:         rawURL,
+			Snippet:     snippet,
+			Source:      "duckduckgo",
+			FetchedAt:   time.Now().UTC().Format(time.RFC3339),
+			ContentHash: computeContentHash(snippet),
 		})
 	})
 
@@ -162,12 +167,22 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
 func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, summarize, extractSchema)
+}
+
+func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
 	}
 
 	response := models.SearchResponse{Query: query}
+
+	if err := ctx.Err(); err != nil {
+		response.Duration = time.Since(start).Milliseconds()
+		response.Provider = "aborted"
+		return response
+	}
 
 	// 1. Check PostgreSQL cache first
 	if !bypassCache {
@@ -226,7 +241,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 		}
 		scraper.PreResolveDNS(urlsToPreResolve)
 
-		scrapeCtx, scrapeCancel := context.WithTimeout(context.Background(), 15000*time.Millisecond)
+		scrapeCtx, scrapeCancel := context.WithTimeout(ctx, 15000*time.Millisecond)
 		defer scrapeCancel()
 
 		var mu sync.Mutex
@@ -243,7 +258,7 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 				default:
 				}
 
-				scraped, _ := scraper.ScrapeSingleURLWithOptions(results[idx].URL, scraper.ScrapeOptions{
+				scraped, _ := scraper.ScrapeSingleURLWithOptionsContext(scrapeCtx, results[idx].URL, scraper.ScrapeOptions{
 					Format:        "markdown",
 					BypassCache:   bypassCache,
 					ExtractSchema: extractSchema,
@@ -268,6 +283,12 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 					results[idx].Markdown = scraped.Markdown
 					results[idx].Metadata = scraped.Metadata
 					results[idx].Scraped = true
+					results[idx].ContentHash = scraped.ContentHash
+					if scraped.ScrapedAt != "" {
+						results[idx].FetchedAt = scraped.ScrapedAt
+					} else {
+						results[idx].FetchedAt = time.Now().UTC().Format(time.RFC3339)
+					}
 					mu.Unlock()
 
 					slog.Info("Scrape Success", "url", results[idx].URL, "word_count", scraped.WordCount, "duration_ms", scraped.Duration)
@@ -324,4 +345,12 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	}
 
 	return response
+}
+
+func computeContentHash(text string) string {
+	if text == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(text))
+	return fmt.Sprintf("%x", sum)
 }
