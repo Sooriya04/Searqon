@@ -222,6 +222,19 @@ func (s *Server) registerTools() {
 
 // HandleMessage parses an incoming JSON-RPC payload and dispatches the MCP handler.
 func (s *Server) HandleMessage(reqBytes []byte) ([]byte, error) {
+	return s.HandleMessageContext(context.Background(), reqBytes)
+}
+
+func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		resp := JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      nil,
+			Error:   &RPCError{Code: -32000, Message: "Context canceled or timeout: " + err.Error()},
+		}
+		return json.Marshal(resp)
+	}
+
 	var req JSONRPCRequest
 	if err := json.Unmarshal(reqBytes, &req); err != nil {
 		resp := JSONRPCResponse{
@@ -253,7 +266,6 @@ func (s *Server) HandleMessage(reqBytes []byte) ([]byte, error) {
 		}
 
 	case "notifications/initialized":
-		// Notification - no response needed
 		return nil, nil
 
 	case "tools/list":
@@ -271,7 +283,7 @@ func (s *Server) HandleMessage(reqBytes []byte) ([]byte, error) {
 			break
 		}
 
-		toolResult, err := s.executeTool(callParams.Name, callParams.Arguments)
+		toolResult, err := s.executeToolContext(ctx, callParams.Name, callParams.Arguments)
 		if err != nil {
 			se := models.ClassifyError(500, "", err)
 			errJSON, _ := json.MarshalIndent(se, "", "  ")
@@ -300,23 +312,31 @@ func (s *Server) HandleMessage(reqBytes []byte) ([]byte, error) {
 }
 
 func (s *Server) executeTool(name string, args map[string]interface{}) (CallToolResult, error) {
+	return s.executeToolContext(context.Background(), name, args)
+}
+
+func (s *Server) executeToolContext(ctx context.Context, name string, args map[string]interface{}) (CallToolResult, error) {
 	switch name {
 	case "searqon_search":
-		return s.handleSearch(args)
+		return s.handleSearchContext(ctx, args)
 	case "searqon_scrape":
-		return s.handleScrape(args)
+		return s.handleScrapeContext(ctx, args)
 	case "searqon_research":
-		return s.handleResearch(args)
+		return s.handleResearchContext(ctx, args)
 	case "searqon_map":
-		return s.handleMap(args)
+		return s.handleMapContext(ctx, args)
 	case "searqon_extract":
-		return s.handleExtract(args)
+		return s.handleExtractContext(ctx, args)
 	default:
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", name)
 	}
 }
 
 func (s *Server) handleSearch(args map[string]interface{}) (CallToolResult, error) {
+	return s.handleSearchContext(context.Background(), args)
+}
+
+func (s *Server) handleSearchContext(ctx context.Context, args map[string]interface{}) (CallToolResult, error) {
 	query, _ := args["query"].(string)
 	if strings.TrimSpace(query) == "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "Query parameter is required"}}}, nil
@@ -335,7 +355,7 @@ func (s *Server) handleSearch(args map[string]interface{}) (CallToolResult, erro
 		scrape = sc
 	}
 
-	searchResp := search.RunSearchPipeline(query, limit, scrape, false, 0, false, "")
+	searchResp := search.RunSearchPipelineWithContext(ctx, query, limit, scrape, false, 0, false, "")
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("# Searqon Search Results for: %q\n", query))
@@ -347,7 +367,7 @@ func (s *Server) handleSearch(args map[string]interface{}) (CallToolResult, erro
 	} else {
 		for i, r := range searchResp.Results {
 			sb.WriteString(fmt.Sprintf("### %d. [%s](%s)\n", i+1, r.Title, r.URL))
-			sb.WriteString(fmt.Sprintf("- **Source:** %s | **Score:** %.2f\n", r.Source, r.Score))
+			sb.WriteString(fmt.Sprintf("- **Source:** %s | **Score:** %.2f | **Fetched At:** %s | **SHA-256:** `%s`\n", r.Source, r.Score, r.FetchedAt, r.ContentHash))
 			if r.Snippet != "" {
 				sb.WriteString(fmt.Sprintf("- **Snippet:** %s\n", strings.TrimSpace(r.Snippet)))
 			}
@@ -370,6 +390,10 @@ func (s *Server) handleSearch(args map[string]interface{}) (CallToolResult, erro
 }
 
 func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, error) {
+	return s.handleScrapeContext(context.Background(), args)
+}
+
+func (s *Server) handleScrapeContext(ctx context.Context, args map[string]interface{}) (CallToolResult, error) {
 	targetURL, _ := args["url"].(string)
 	if strings.TrimSpace(targetURL) == "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "url parameter is required"}}}, nil
@@ -404,7 +428,7 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 		MaxTokens:    maxTokens,
 	}
 
-	result, _ := scraper.ScrapeSingleURLWithOptions(targetURL, opts)
+	result, _ := scraper.ScrapeSingleURLWithOptionsContext(ctx, targetURL, opts)
 
 	if !result.Scraped && (result.Error != "" || result.StructuredError != nil) {
 		se := result.StructuredError
@@ -450,7 +474,7 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("# %s\n", result.Title))
-		sb.WriteString(fmt.Sprintf("- **URL:** %s\n", result.URL))
+		sb.WriteString(fmt.Sprintf("- **URL:** %s | **Fetched At:** %s | **SHA-256:** `%s`\n", result.URL, result.ScrapedAt, result.ContentHash))
 		if result.Author != "" {
 			sb.WriteString(fmt.Sprintf("- **Author:** %s\n", result.Author))
 		}
@@ -474,6 +498,10 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 }
 
 func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, error) {
+	return s.handleResearchContext(context.Background(), args)
+}
+
+func (s *Server) handleResearchContext(ctx context.Context, args map[string]interface{}) (CallToolResult, error) {
 	query, _ := args["query"].(string)
 	if strings.TrimSpace(query) == "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "query parameter is required"}}}, nil
@@ -493,7 +521,7 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 	}
 
 	// 1. Search across meta-engines
-	searchResp := search.RunSearchPipeline(query, maxSources+2, false, false, 0, false, "")
+	searchResp := search.RunSearchPipelineWithContext(ctx, query, maxSources+2, false, false, 0, false, "")
 	if len(searchResp.Results) == 0 {
 		return CallToolResult{
 			Content: []ToolContent{
@@ -540,11 +568,13 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 
 	// 3. Concurrently scrape targets with anti-bot evasion
 	type researchDoc struct {
-		title   string
-		url     string
-		content string
-		source  string
-		tier    string
+		title     string
+		url       string
+		content   string
+		source    string
+		tier      string
+		fetchedAt string
+		sha256    string
 	}
 
 	docsChan := make(chan researchDoc, len(targets))
@@ -554,7 +584,7 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 		wg.Add(1)
 		go func(t models.SearchResult) {
 			defer wg.Done()
-			res, _ := scraper.ScrapeSingleURLWithOptions(t.URL, scraper.ScrapeOptions{
+			res, _ := scraper.ScrapeSingleURLWithOptionsContext(ctx, t.URL, scraper.ScrapeOptions{
 				Format:       "markdown",
 				StealthLevel: "auto",
 			})
@@ -574,11 +604,13 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 			}
 
 			docsChan <- researchDoc{
-				title:   t.Title,
-				url:     t.URL,
-				content: body,
-				source:  t.Source,
-				tier:    res.EscalationTier,
+				title:     t.Title,
+				url:       t.URL,
+				content:   body,
+				source:    t.Source,
+				tier:      res.EscalationTier,
+				fetchedAt: res.ScrapedAt,
+				sha256:    res.ContentHash,
 			}
 		}(target)
 	}
@@ -595,7 +627,7 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 	docIdx := 1
 	for doc := range docsChan {
 		sb.WriteString(fmt.Sprintf("## Source %d: [%s](%s)\n", docIdx, doc.title, doc.url))
-		sb.WriteString(fmt.Sprintf("- **Search Source:** %s | **Evasion Tier:** %s\n\n", doc.source, doc.tier))
+		sb.WriteString(fmt.Sprintf("- **Search Source:** %s | **Evasion Tier:** %s | **Fetched At:** %s | **SHA-256:** `%s`\n\n", doc.source, doc.tier, doc.fetchedAt, doc.sha256))
 		sb.WriteString(doc.content)
 		sb.WriteString("\n\n---\n\n")
 		docIdx++
@@ -609,6 +641,10 @@ func (s *Server) handleResearch(args map[string]interface{}) (CallToolResult, er
 }
 
 func (s *Server) handleMap(args map[string]interface{}) (CallToolResult, error) {
+	return s.handleMapContext(context.Background(), args)
+}
+
+func (s *Server) handleMapContext(ctx context.Context, args map[string]interface{}) (CallToolResult, error) {
 	targetURL, _ := args["url"].(string)
 	if strings.TrimSpace(targetURL) == "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "url parameter is required"}}}, nil
@@ -622,7 +658,7 @@ func (s *Server) handleMap(args map[string]interface{}) (CallToolResult, error) 
 		}
 	}
 
-	mapRes := crawler.MapSiteURLs(targetURL, limit)
+	mapRes := crawler.MapSiteURLsWithContext(ctx, targetURL, limit)
 	if mapRes.Error != "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Failed to map site: %s", mapRes.Error)}}}, nil
 	}
@@ -640,6 +676,10 @@ func (s *Server) handleMap(args map[string]interface{}) (CallToolResult, error) 
 }
 
 func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, error) {
+	return s.handleExtractContext(context.Background(), args)
+}
+
+func (s *Server) handleExtractContext(ctx context.Context, args map[string]interface{}) (CallToolResult, error) {
 	targetURL, _ := args["url"].(string)
 	if strings.TrimSpace(targetURL) == "" {
 		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "url parameter is required"}}}, nil
@@ -673,9 +713,9 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 		MaxTokens:     maxTokens,
 	}
 
-	res, rawHTML, err := scraper.ExecuteSmartEscalationScrape(targetURL, "", opts, time.Now())
-	if err != nil {
-		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Scrape error: %v", err)}}}, nil
+	res, rawHTML := scraper.ScrapeSingleURLWithOptionsContext(ctx, targetURL, opts)
+	if !res.Scraped && res.Error != "" {
+		return CallToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Scrape error: %s", res.Error)}}}, nil
 	}
 
 	extracted := make(map[string]interface{})
@@ -686,6 +726,8 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 	extracted["headings"] = res.Headings
 	extracted["outline"] = res.Outline
 	extracted["is_truncated"] = res.IsTruncated
+	extracted["content_hash"] = res.ContentHash
+	extracted["fetched_at"] = res.ScrapedAt
 
 	if len(selectors) > 0 {
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
@@ -764,7 +806,7 @@ func (s *Server) SSEHandler() http.HandlerFunc {
 				http.Error(w, "Failed to read request body", http.StatusBadRequest)
 				return
 			}
-			resp, _ := s.HandleMessage(body)
+			resp, _ := s.HandleMessageContext(r.Context(), body)
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(resp)
 			return

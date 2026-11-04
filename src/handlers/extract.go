@@ -25,6 +25,8 @@ type ExtractResponse struct {
 	IsTruncated   bool              `json:"is_truncated"`
 	Data          map[string]string `json:"data,omitempty"`
 	Structured    json.RawMessage   `json:"structured_data,omitempty"`
+	ContentHash   string            `json:"content_hash,omitempty"`
+	FetchedAt     string            `json:"fetched_at,omitempty"`
 }
 
 // ExtractHandler parses specific elements on a scraped page using CSS selectors or structured markdown extraction.
@@ -106,5 +108,7 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 		IsTruncated:   res.IsTruncated,
 		Data:          extracted,
 		Structured:    res.StructuredData,
+		ContentHash:   res.ContentHash,
+		FetchedAt:     res.ScrapedAt,
 	})
 }

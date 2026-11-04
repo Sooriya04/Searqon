@@ -40,6 +40,8 @@ type SearchResult struct {
 	Headings      []Heading        `json:"headings,omitempty"`
 	Outline       string           `json:"outline,omitempty"`
 	IsTruncated   bool             `json:"is_truncated"`
+	ContentHash   string           `json:"content_hash,omitempty"`
+	FetchedAt     string           `json:"fetched_at,omitempty"`
 }
 
 // SearchResponse is the final search aggregation response.
