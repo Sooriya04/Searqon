@@ -270,4 +270,11 @@ Resolved observability, logging, and scraper resilience issues across handlers a
 3. **Jina Reader Status Codes:** Refactored `src/handlers/jina_reader.go` to return the actual upstream `StatusCode` (e.g. 404, 403, 502) instead of hardcoding `504 Gateway Timeout` on scrape errors.
 4. **Pipeline Anti-Bot Timeout:** Extended `/pipeline` scrape timeout from 4s to 15s in `src/handlers/pipeline.go` to allow multi-tier headless browser anti-bot escalation (Lightpanda/Camoufox) to finish successfully without prematurely timing out.
 
+## perf(scraper): eliminate redundant DOM re-parsing during table extraction and goquery fallback
+
+Optimized HTML extraction pipeline performance in `src/scraper/scraper.go` and `src/scraper/table_extractor.go`:
+- Replaced repeated string serialization and `goquery.NewDocumentFromReader` round-trips by introducing `ConvertTablesInDocument(doc *goquery.Document)` to mutate DOM tables in place.
+- Reused the parsed `docRaw` across outline extraction, table conversion, and goquery fallback parsing rather than parsing HTML 3 separate times, eliminating unnecessary memory allocations and CPU overhead on large scraped pages.
+
+
 

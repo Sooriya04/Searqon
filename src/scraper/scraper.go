@@ -66,7 +66,7 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 		parsedURL = &url.URL{}
 	}
 
-	// 0. Extract headings and outline upfront
+	// 0. Extract headings and outline upfront, and reuse the parsed doc
 	docRaw, docErr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if docErr == nil && docRaw != nil {
 		headings, outline := extractor.ExtractHeadingsAndOutline(docRaw)
@@ -89,8 +89,17 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 	// 2. Extract media images
 	result.Images = ExtractImages(htmlContent, targetURL)
 
-	// Convert tables to markdown before main text extraction
-	tableCleanedHTML := ConvertTablesToMarkdown(htmlContent)
+	// Convert tables to markdown on the parsed document directly if available
+	var tableCleanedHTML string
+	if docRaw != nil {
+		ConvertTablesInDocument(docRaw)
+		if h, err := docRaw.Html(); err == nil && h != "" {
+			tableCleanedHTML = h
+		}
+	}
+	if tableCleanedHTML == "" {
+		tableCleanedHTML = htmlContent
+	}
 
 	// 3. Strategy 1: go-readability
 	article, err := readability.FromReader(strings.NewReader(tableCleanedHTML), parsedURL)
@@ -118,19 +127,23 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 		return result
 	}
 
-	// 4. Strategy 2: goquery fallback
-	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(tableCleanedHTML))
-	if docErr != nil || doc == nil {
-		result.Error = fmt.Sprintf("parse failed: %v", docErr)
-		result.EndTime = time.Now().UTC().Format(time.RFC3339)
-		result.Duration = time.Since(startTime).Milliseconds()
-		result.FetchDurationMS = int(result.Duration)
-		result.ExtractionMethod = "failed"
-		result.Scraped = false
-		return result
+	// 4. Strategy 2: goquery fallback (reuse docRaw if available, else reparse)
+	var cleanDoc *goquery.Document
+	if docRaw != nil {
+		cleanDoc = docRaw
+	} else {
+		cleanDoc, docErr = goquery.NewDocumentFromReader(strings.NewReader(tableCleanedHTML))
+		if docErr != nil || cleanDoc == nil {
+			result.Error = fmt.Sprintf("parse failed: %v", docErr)
+			result.EndTime = time.Now().UTC().Format(time.RFC3339)
+			result.Duration = time.Since(startTime).Milliseconds()
+			result.FetchDurationMS = int(result.Duration)
+			result.ExtractionMethod = "failed"
+			result.Scraped = false
+			return result
+		}
 	}
 
-	cleanDoc := doc
 	for _, selector := range utils.NoiseSelectors {
 		cleanDoc.Find(selector).Remove()
 	}
