@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -80,8 +81,21 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		ExtractSchema: req.ExtractSchema,
 		StealthLevel:  req.StealthLevel,
 	})
-	if result.Error != "" {
-		utils.WriteError(w, http.StatusGatewayTimeout, utils.ErrCodeScrapeFailed, result.Error)
+	if result.Error != "" || result.StructuredError != nil {
+		se := result.StructuredError
+		if se == nil {
+			se = models.ClassifyError(result.StatusCode, result.Content, fmt.Errorf("%s", result.Error))
+		}
+		if se == nil {
+			se = &models.SearqonError{
+				ErrorType:         models.ErrUpstreamUnavailable,
+				StatusCode:        http.StatusBadGateway,
+				Message:           result.Error,
+				Retryable:         false,
+				SuggestedFallback: models.FallbackLightpanda,
+			}
+		}
+		utils.WriteSearqonError(w, se)
 		return
 	}
 	if !req.Chunk {

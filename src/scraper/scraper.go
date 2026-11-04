@@ -262,7 +262,15 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 		robotsData := getRobotsData(parsedBase)
 		userAgent, delay, allowed = findAllowedAgent(targetURL, robotsData)
 		if !allowed {
+			se := &models.SearqonError{
+				ErrorType:         models.ErrCloudflareBlocked,
+				StatusCode:        403,
+				Message:           "Disallowed by robots.txt",
+				Retryable:         false,
+				SuggestedFallback: models.FallbackNone,
+			}
 			result.Error = "disallowed by robots.txt"
+			result.StructuredError = se
 			result.Domain = parsedBase.Hostname()
 			result.CanonicalURL = targetURL
 			result.StatusCode = 403
@@ -288,10 +296,18 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 	scraped, rawOut, err := ExecuteSmartEscalationScrape(targetURL, userAgent, opts, startTime)
 	if err != nil {
 		result.Error = err.Error()
+		if scraped.StructuredError != nil {
+			result.StructuredError = scraped.StructuredError
+		} else {
+			result.StructuredError = models.ClassifyError(scraped.StatusCode, rawOut, err)
+		}
 		if parsed, pErr := url.Parse(targetURL); pErr == nil {
 			result.Domain = parsed.Hostname()
 		}
 		result.StatusCode = scraped.StatusCode
+		if result.StatusCode == 0 && result.StructuredError != nil {
+			result.StatusCode = result.StructuredError.StatusCode
+		}
 		result.ContentType = scraped.ContentType
 		result.Scraped = false
 		result.BotDetected = scraped.BotDetected

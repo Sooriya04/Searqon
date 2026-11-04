@@ -52,6 +52,7 @@ type ScrapeResult struct {
 	EndTime          string           `json:"endTime"`
 	Duration         int64            `json:"duration"` // ms
 	Error            string           `json:"error,omitempty"`
+	StructuredError  *SearqonError    `json:"structured_error,omitempty"`
 	CanonicalURL     string           `json:"canonicalUrl,omitempty"`
 	Domain           string           `json:"domain"`
 	Description      string           `json:"description,omitempty"`

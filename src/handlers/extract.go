@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 
+	"src/models"
 	"src/scraper"
 	"src/utils"
 )
@@ -44,18 +46,38 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, htmlContent := scraper.ScrapeSingleURL(req.URL, "text", req.BypassCache)
-	if htmlContent == "" {
+	if !res.Scraped || htmlContent == "" {
 		if res.Scraped && res.Content != "" {
 			htmlContent = res.Content
 		} else {
-			utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
+			se := res.StructuredError
+			if se == nil {
+				se = models.ClassifyError(res.StatusCode, res.Content, fmt.Errorf("%s", res.Error))
+			}
+			if se == nil {
+				se = &models.SearqonError{
+					ErrorType:         models.ErrUpstreamUnavailable,
+					StatusCode:        http.StatusBadGateway,
+					Message:           "Failed to retrieve page content",
+					Retryable:         false,
+					SuggestedFallback: models.FallbackLightpanda,
+				}
+			}
+			utils.WriteSearqonError(w, se)
 			return
 		}
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil || doc == nil {
-		utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, "Failed to parse document HTML")
+		se := &models.SearqonError{
+			ErrorType:         models.ErrParsingFailed,
+			StatusCode:        http.StatusInternalServerError,
+			Message:           "Failed to parse document HTML",
+			Retryable:         false,
+			SuggestedFallback: models.FallbackNone,
+		}
+		utils.WriteSearqonError(w, se)
 		return
 	}
 

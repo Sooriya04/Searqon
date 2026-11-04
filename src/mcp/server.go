@@ -273,12 +273,18 @@ func (s *Server) HandleMessage(reqBytes []byte) ([]byte, error) {
 
 		toolResult, err := s.executeTool(callParams.Name, callParams.Arguments)
 		if err != nil {
+			se := models.ClassifyError(500, "", err)
+			errJSON, _ := json.MarshalIndent(se, "", "  ")
 			resp.Result = CallToolResult{
 				Content: []ToolContent{
-					{Type: "text", Text: fmt.Sprintf("Error executing tool %s: %v", callParams.Name, err)},
+					{Type: "text", Text: string(errJSON)},
 				},
 				IsError: true,
 			}
+			resp.Error = &RPCError{Code: -32000, Message: se.Message, Data: se}
+		} else if toolResult.IsError {
+			resp.Result = toolResult
+			resp.Error = &RPCError{Code: -32000, Message: "Tool execution encountered a structured error"}
 		} else {
 			resp.Result = toolResult
 		}
@@ -397,11 +403,25 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 
 	result, _ := scraper.ScrapeSingleURLWithOptions(targetURL, opts)
 
-	if !result.Scraped && result.Error != "" {
+	if !result.Scraped && (result.Error != "" || result.StructuredError != nil) {
+		se := result.StructuredError
+		if se == nil {
+			se = models.ClassifyError(result.StatusCode, result.Content, fmt.Errorf("%s", result.Error))
+		}
+		if se == nil {
+			se = &models.SearqonError{
+				ErrorType:         models.ErrUpstreamUnavailable,
+				StatusCode:        502,
+				Message:           result.Error,
+				Retryable:         false,
+				SuggestedFallback: models.FallbackLightpanda,
+			}
+		}
+		errJSON, _ := json.MarshalIndent(se, "", "  ")
 		return CallToolResult{
 			IsError: true,
 			Content: []ToolContent{
-				{Type: "text", Text: fmt.Sprintf("Failed to scrape %s: %s (Status: %d, Tier: %s)", targetURL, result.Error, result.StatusCode, result.EscalationTier)},
+				{Type: "text", Text: string(errJSON)},
 			},
 		}, nil
 	}
