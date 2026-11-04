@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"src/models"
 )
 
 func TestMCPInitialize(t *testing.T) {
@@ -114,6 +116,44 @@ func TestMCPCallExtractTool(t *testing.T) {
 	resMap, ok := resp.Result.(map[string]interface{})
 	if !ok || resMap["isError"] != true {
 		t.Errorf("Expected isError=true for empty URL in searqon_extract, got %+v", resp.Result)
+	}
+}
+
+func TestMCPToolStructuredErrorOutput(t *testing.T) {
+	server := NewServer()
+
+	// Calling searqon_scrape on an unreachable / blocked mock or invalid url
+	callReq := `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"searqon_scrape","arguments":{"url":"http://127.0.0.1:1/blocked"}}}`
+	respBytes, err := server.HandleMessage([]byte(callReq))
+	if err != nil {
+		t.Fatalf("HandleMessage failed: %v", err)
+	}
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	resMap, ok := resp.Result.(map[string]interface{})
+	if !ok || resMap["isError"] != true {
+		t.Fatalf("Expected isError=true for scraping unreachable URL, got %+v", resp.Result)
+	}
+
+	contentSlice, ok := resMap["content"].([]interface{})
+	if !ok || len(contentSlice) == 0 {
+		t.Fatalf("Expected error content in tool result")
+	}
+
+	contentMap := contentSlice[0].(map[string]interface{})
+	text := contentMap["text"].(string)
+
+	var se models.SearqonError
+	if err := json.Unmarshal([]byte(text), &se); err != nil {
+		t.Fatalf("Expected tool error text to be valid SearqonError JSON, got: %s", text)
+	}
+
+	if se.ErrorType == "" {
+		t.Errorf("Expected non-empty error type in structured error")
 	}
 }
 

@@ -3,6 +3,8 @@ package utils
 import (
 	"encoding/json"
 	"net/http"
+
+	"src/models"
 )
 
 // APIResponse wraps all API responses.
@@ -20,13 +22,13 @@ type APIError struct {
 
 // Global API error codes
 const (
-	ErrCodeInvalidJSON     = "INVALID_JSON"
-	ErrCodeMissingParam    = "MISSING_PARAM"
+	ErrCodeInvalidJSON      = "INVALID_JSON"
+	ErrCodeMissingParam     = "MISSING_PARAM"
 	ErrCodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
-	ErrCodeScrapeFailed    = "SCRAPE_FAILED"
-	ErrCodeSearchFailed    = "SEARCH_FAILED"
-	ErrCodeInternalError   = "INTERNAL_ERROR"
-	ErrCodeTimeout         = "TIMEOUT"
+	ErrCodeScrapeFailed     = "SCRAPE_FAILED"
+	ErrCodeSearchFailed     = "SEARCH_FAILED"
+	ErrCodeInternalError    = "INTERNAL_ERROR"
+	ErrCodeTimeout          = "TIMEOUT"
 )
 
 func writeJSON(w http.ResponseWriter, status int, val interface{}) {
@@ -52,4 +54,13 @@ func WriteError(w http.ResponseWriter, status int, code, msg string) {
 			Message: msg,
 		},
 	})
+}
+
+// WriteSearqonError writes a deterministic structured SearqonError response with the appropriate status code.
+func WriteSearqonError(w http.ResponseWriter, se *models.SearqonError) {
+	status := se.StatusCode
+	if status == 0 {
+		status = http.StatusBadGateway
+	}
+	writeJSON(w, status, se)
 }
