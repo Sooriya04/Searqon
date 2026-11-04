@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"src/utils"
 )
 
 var (
@@ -15,6 +17,11 @@ var (
 	metricsCacheMisses     uint64
 	metricsStartTime       = time.Now()
 )
+
+func init() {
+	utils.RegisterRequestMetricHook(IncTotalRequests)
+	utils.RegisterCacheMetricHooks(IncCacheHit, IncCacheMiss)
+}
 
 // IncTotalRequests increments total request count.
 func IncTotalRequests() {

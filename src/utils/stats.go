@@ -21,6 +21,23 @@ type StatsTracker struct {
 	EndpointCalls map[string]uint64 `json:"endpointCalls"`
 }
 
+var (
+	onTotalRequestsHook func()
+	onCacheHitHook      func()
+	onCacheMissHook     func()
+)
+
+// RegisterRequestMetricHook registers a callback to increment total request metrics.
+func RegisterRequestMetricHook(onTotal func()) {
+	onTotalRequestsHook = onTotal
+}
+
+// RegisterCacheMetricHooks registers callbacks to increment Prometheus metrics.
+func RegisterCacheMetricHooks(onHit, onMiss func()) {
+	onCacheHitHook = onHit
+	onCacheMissHook = onMiss
+}
+
 var stats = StatsTracker{
 	EndpointCalls: make(map[string]uint64),
 }
@@ -35,21 +52,33 @@ func RecordEndpointCall(endpoint string) {
 // RecordSearchCacheHit increments the hit counter.
 func RecordSearchCacheHit() {
 	atomic.AddUint64(&stats.SearchCacheHits, 1)
+	if onCacheHitHook != nil {
+		onCacheHitHook()
+	}
 }
 
 // RecordSearchCacheMiss increments the miss counter.
 func RecordSearchCacheMiss() {
 	atomic.AddUint64(&stats.SearchCacheMisses, 1)
+	if onCacheMissHook != nil {
+		onCacheMissHook()
+	}
 }
 
 // RecordScrapeCacheHit increments the hit counter.
 func RecordScrapeCacheHit() {
 	atomic.AddUint64(&stats.ScrapeCacheHits, 1)
+	if onCacheHitHook != nil {
+		onCacheHitHook()
+	}
 }
 
 // RecordScrapeCacheMiss increments the miss counter.
 func RecordScrapeCacheMiss() {
 	atomic.AddUint64(&stats.ScrapeCacheMisses, 1)
+	if onCacheMissHook != nil {
+		onCacheMissHook()
+	}
 }
 
 // RecordSearXNGCall tracks SearXNG performance.

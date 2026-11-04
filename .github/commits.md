@@ -262,3 +262,12 @@ Resolved four critical production and scale issues identified during quality aud
 3. **In-Memory Cache Eviction:** Fixed `StartCacheCleanupWorker` in `src/db/db.go` being skipped when `database.enabled: false`. Reduced the cleanup ticker interval from 12 hours to 10 minutes in `src/db/db_scrape.go` to reliably evict expired in-memory cache entries (`searchMemoryCache`, `scrapeMemoryCache`).
 4. **Crawler Hang & Deadlock Prevention:** Added context timeout and cancellation checks to `CrawlSite` in `src/crawler/crawler.go` to ensure crawler goroutines terminate gracefully when pages contain no internal links or network failures occur.
 
+## fix(telemetry): wire Prometheus metrics, optimize SQLite log concurrency, fix Jina Reader error status codes, and extend pipeline timeout
+
+Resolved observability, logging, and scraper resilience issues across handlers and pipeline:
+1. **Prometheus Metrics Tracking:** Wired `IncTotalRequests` into `HTTPLogger` middleware, `IncSearchRequests` and `IncScrapeRequests` into their respective handlers, and hooked `IncCacheHit`/`IncCacheMiss` to cache lookups in `search.go` and `scraper.go`. Verified `/metrics` returns live counts.
+2. **SQLite Logger Concurrency:** Set `SetMaxOpenConns(1)` and `SetMaxIdleConns(1)` on `logDB` in `src/utils/logger.go` to eliminate SQLite WAL write lock contention, expanded log queue buffer from 4,096 to 16,384, and added dropped log counting under extreme load.
+3. **Jina Reader Status Codes:** Refactored `src/handlers/jina_reader.go` to return the actual upstream `StatusCode` (e.g. 404, 403, 502) instead of hardcoding `504 Gateway Timeout` on scrape errors.
+4. **Pipeline Anti-Bot Timeout:** Extended `/pipeline` scrape timeout from 4s to 15s in `src/handlers/pipeline.go` to allow multi-tier headless browser anti-bot escalation (Lightpanda/Camoufox) to finish successfully without prematurely timing out.
+
+

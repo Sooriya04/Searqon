@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -29,13 +30,14 @@ type LogRecord struct {
 }
 
 var (
-	logDB       *sql.DB
-	logQueue    chan LogRecord
-	logWorkerWg sync.WaitGroup
-	logCloseCh  chan struct{}
-	logOnce     sync.Once
-	logMu       sync.RWMutex
-	sqliteReady bool
+	logDB           *sql.DB
+	logQueue        chan LogRecord
+	logWorkerWg     sync.WaitGroup
+	logCloseCh      chan struct{}
+	logOnce         sync.Once
+	logMu           sync.RWMutex
+	sqliteReady     bool
+	droppedLogCount uint64
 )
 
 // SQLiteLogHandler is an slog.Handler that writes to stdout and queues to SQLite.
@@ -203,6 +205,9 @@ func initSQLiteLogger(dbPath string, retentionDays int) {
 		return
 	}
 
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
 	// Enable WAL mode & performance optimizations
 	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
 	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
@@ -228,7 +233,7 @@ func initSQLiteLogger(dbPath string, retentionDays int) {
 	}
 
 	logDB = db
-	logQueue = make(chan LogRecord, 4096)
+	logQueue = make(chan LogRecord, 16384)
 	logCloseCh = make(chan struct{})
 	sqliteReady = true
 
@@ -246,7 +251,8 @@ func QueueLog(rec LogRecord) {
 	select {
 	case logQueue <- rec:
 	default:
-		// Queue full under extreme pressure, drop rather than blocking
+		// Queue full under extreme pressure, count dropped logs
+		atomic.AddUint64(&droppedLogCount, 1)
 	}
 }
 

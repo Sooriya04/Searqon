@@ -172,12 +172,14 @@ func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, m
 	// 1. Check PostgreSQL cache first
 	if !bypassCache {
 		if cachedResults, provider, found := db.GetSearchCache(query); found {
+			utils.RecordSearchCacheHit()
 			response.Results = cachedResults
 			response.Total = len(cachedResults)
 			response.Provider = provider
 			response.Duration = time.Since(start).Milliseconds()
 			return response
 		}
+		utils.RecordSearchCacheMiss()
 	}
 
 	// 2. Query Expansion & Intent Classification
