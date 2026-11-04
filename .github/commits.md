@@ -254,9 +254,11 @@ Expanded Searqon's Model Context Protocol (MCP) server with two new agent tools 
 
 Updated `.github/workflows/ci.yml` to automatically dual-publish container release images to both Docker Hub (`sooriya04/searqon`) and GitHub Container Registry (`ghcr.io/sooriya04/searqon`) on version releases and pushes to main. Added `packages: write` job permissions and automated login using the built-in `GITHUB_TOKEN`. Added GHCR repository badges and pull documentation to `readme.md` and `docs/docker.md`.
 
+## fix(core): populate FTS5 search index on live scrape, fix domain rate limiter memory leak, add in-memory cache eviction, and prevent crawler deadlocks
 
-
-
-
-
+Resolved four critical production and scale issues identified during quality audit:
+1. **FTS5 Search Indexing:** Fixed live scraped pages never being inserted into SQLite FTS5 table in `src/db/db_scrape.go`. Now automatically calls `IndexScrapeInFTS` upon saving scrape cache entries so `/search/index` returns full-text results immediately.
+2. **Domain Rate Limiter Memory & Race Protection:** Replaced time-based struct copy race in `src/scraper/antibot.go` with `atomic.Int64` unix timestamps and atomic `LoadOrStore`. Enforced a strict maximum domain capacity (`maxDomainLimiters = 2000`) and shortened periodic eviction from 10 minutes to 2 minutes to prevent unbounded memory growth during large-scale web scraping and crawling.
+3. **In-Memory Cache Eviction:** Fixed `StartCacheCleanupWorker` in `src/db/db.go` being skipped when `database.enabled: false`. Reduced the cleanup ticker interval from 12 hours to 10 minutes in `src/db/db_scrape.go` to reliably evict expired in-memory cache entries (`searchMemoryCache`, `scrapeMemoryCache`).
+4. **Crawler Hang & Deadlock Prevention:** Added context timeout and cancellation checks to `CrawlSite` in `src/crawler/crawler.go` to ensure crawler goroutines terminate gracefully when pages contain no internal links or network failures occur.
 

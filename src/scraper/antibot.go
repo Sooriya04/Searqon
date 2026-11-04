@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -16,30 +17,39 @@ import (
 
 type domainLimiterEntry struct {
 	limiter  *rate.Limiter
-	lastSeen time.Time
+	lastSeen atomic.Int64 // unix timestamp in seconds
 }
 
 var (
 	domainLimiters    sync.Map
+	domainLimiterCount atomic.Int64
 	domainCleanupOnce sync.Once
 )
+
+const maxDomainLimiters = 2000
 
 func startDomainLimiterCleanup() {
 	domainCleanupOnce.Do(func() {
 		go func() {
-			ticker := time.NewTicker(10 * time.Minute)
+			ticker := time.NewTicker(2 * time.Minute)
 			for range ticker.C {
-				now := time.Now()
-				domainLimiters.Range(func(key, val interface{}) bool {
-					if entry, ok := val.(domainLimiterEntry); ok {
-						if now.Sub(entry.lastSeen) > 15*time.Minute {
-							domainLimiters.Delete(key)
-						}
-					}
-					return true
-				})
+				evictStaleDomainLimiters(10 * time.Minute)
 			}
 		}()
+	})
+}
+
+func evictStaleDomainLimiters(olderThan time.Duration) {
+	threshold := time.Now().Add(-olderThan).Unix()
+	domainLimiters.Range(func(key, val interface{}) bool {
+		if entry, ok := val.(*domainLimiterEntry); ok {
+			if entry.lastSeen.Load() < threshold {
+				if _, deleted := domainLimiters.LoadAndDelete(key); deleted {
+					domainLimiterCount.Add(-1)
+				}
+			}
+		}
+		return true
 	})
 }
 
@@ -49,25 +59,30 @@ func WaitDomainRateLimit(ctx context.Context, domain string) error {
 		return nil
 	}
 	startDomainLimiterCleanup()
-	now := time.Now()
-	val, loaded := domainLimiters.Load(domain)
-	var entry domainLimiterEntry
-	if loaded {
-		entry = val.(domainLimiterEntry)
-		entry.lastSeen = now
-		domainLimiters.Store(domain, entry)
-	} else {
-		entry = domainLimiterEntry{
-			limiter:  rate.NewLimiter(rate.Limit(5.0), 5),
-			lastSeen: now,
-		}
-		actual, loadedActual := domainLimiters.LoadOrStore(domain, entry)
-		if loadedActual {
-			entry = actual.(domainLimiterEntry)
-			entry.lastSeen = now
-			domainLimiters.Store(domain, entry)
-		}
+	nowUnix := time.Now().Unix()
+
+	if val, ok := domainLimiters.Load(domain); ok {
+		entry := val.(*domainLimiterEntry)
+		entry.lastSeen.Store(nowUnix)
+		return entry.limiter.Wait(ctx)
 	}
+
+	// Guard against memory growth under unbounded domain crawling
+	if domainLimiterCount.Load() >= maxDomainLimiters {
+		evictStaleDomainLimiters(3 * time.Minute)
+	}
+
+	newEntry := &domainLimiterEntry{
+		limiter: rate.NewLimiter(rate.Limit(5.0), 5),
+	}
+	newEntry.lastSeen.Store(nowUnix)
+
+	actual, loaded := domainLimiters.LoadOrStore(domain, newEntry)
+	if !loaded {
+		domainLimiterCount.Add(1)
+	}
+	entry := actual.(*domainLimiterEntry)
+	entry.lastSeen.Store(nowUnix)
 	return entry.limiter.Wait(ctx)
 }
 
