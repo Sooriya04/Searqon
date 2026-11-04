@@ -345,6 +345,8 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 	failMsg := fmt.Sprintf("anti-bot escalation failed: %s", strings.Join(lastErrSummary, " | "))
 	log.Printf("[Escalation] All escalation tiers exhausted for %s: %s", targetURL, failMsg)
 
+	structuredErr := models.ClassifyError(502, "", fmt.Errorf("%s", failMsg))
+
 	fallbackRes := models.ScrapeResult{
 		URL:             targetURL,
 		StartTime:       startTime.UTC().Format(time.RFC3339),
@@ -352,6 +354,8 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 		Duration:        time.Since(startTime).Milliseconds(),
 		FetchDurationMS: int(time.Since(startTime).Milliseconds()),
 		Error:           failMsg,
+		StructuredError: structuredErr,
+		StatusCode:      502,
 		Scraped:         false,
 		BotDetected:     botEncountered,
 	}

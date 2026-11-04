@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -61,8 +62,25 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, rawHTML := scraper.ScrapeSingleURLWithOptions(req.URL, opts)
 	if !res.Scraped && rawHTML == "" {
-		utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
-		return
+		if res.Scraped && res.Content != "" {
+			rawHTML = res.Content
+		} else {
+			se := res.StructuredError
+			if se == nil {
+				se = models.ClassifyError(res.StatusCode, res.Content, fmt.Errorf("%s", res.Error))
+			}
+			if se == nil {
+				se = &models.SearqonError{
+					ErrorType:         models.ErrUpstreamUnavailable,
+					StatusCode:        http.StatusBadGateway,
+					Message:           "Failed to retrieve page content",
+					Retryable:         false,
+					SuggestedFallback: models.FallbackLightpanda,
+				}
+			}
+			utils.WriteSearqonError(w, se)
+			return
+		}
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
