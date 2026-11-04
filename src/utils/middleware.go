@@ -134,6 +134,11 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 // HTTPLogger is a middleware that logs all incoming HTTP requests using slog.
 func HTTPLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		RecordEndpointCall(r.URL.Path)
+		if onTotalRequestsHook != nil {
+			onTotalRequestsHook()
+		}
+
 		start := time.Now()
 
 		rw := &responseWriter{

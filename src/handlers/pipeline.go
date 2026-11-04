@@ -65,7 +65,8 @@ func PipelineHandler(w http.ResponseWriter, r *http.Request) {
 	sources := make([]models.PipelineSource, 0, len(searchResp.Results))
 	var allChunks []models.Chunk
 
-	scrapeCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	timeoutSec := 15
+	scrapeCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
 	for _, result := range searchResp.Results {

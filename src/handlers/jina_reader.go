@@ -34,13 +34,22 @@ func JinaReaderHandler(w http.ResponseWriter, r *http.Request) {
 	bypassCache := r.URL.Query().Get("bypass_cache") == "true"
 	scraped, _ := scraper.ScrapeSingleURL(targetURL, "markdown", bypassCache)
 
+	statusCode := http.StatusOK
+	if scraped.Error != "" {
+		if scraped.StatusCode >= 400 && scraped.StatusCode < 600 {
+			statusCode = scraped.StatusCode
+		} else {
+			statusCode = http.StatusBadGateway
+		}
+	}
+
 	acceptHeader := r.Header.Get("Accept")
 	if strings.Contains(acceptHeader, "application/json") || r.URL.Query().Get("json") == "true" {
 		w.Header().Set("Content-Type", "application/json")
 		if scraped.Error != "" {
-			w.WriteHeader(http.StatusGatewayTimeout)
+			w.WriteHeader(statusCode)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"code":   http.StatusGatewayTimeout,
+				"code":   statusCode,
 				"status": "failed",
 				"error":  scraped.Error,
 				"data": map[string]interface{}{
@@ -66,7 +75,7 @@ func JinaReaderHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		if scraped.Error != "" {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.WriteHeader(http.StatusGatewayTimeout)
+			w.WriteHeader(statusCode)
 			fmt.Fprintf(w, "Error scraping page: %s", scraped.Error)
 			return
 		}

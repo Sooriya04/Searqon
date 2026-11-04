@@ -54,6 +54,8 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	IncSearchRequests()
+
 	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, req.Summarize, req.ExtractSchema)
 	utils.WriteSuccess(w, result)
 }
@@ -74,6 +76,8 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "URL is required")
 		return
 	}
+
+	IncScrapeRequests()
 
 	maxTokens := req.MaxTokens
 	if maxTokens <= 0 {

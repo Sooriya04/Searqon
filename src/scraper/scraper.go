@@ -283,11 +283,13 @@ func scrapeSingleURLInternal(targetURL string, opts ScrapeOptions) (models.Scrap
 	// 1. Check database cache
 	if !opts.BypassCache {
 		if cached, found := db.GetScrapeCache(targetURL); found && cached.Scraped && cached.Error == "" {
+			utils.RecordScrapeCacheHit()
 			cached.Duration = time.Since(startTime).Milliseconds()
 			cached.Cached = true
 			populateScrapeMetadata(&cached)
 			return cached, ""
 		}
+		utils.RecordScrapeCacheMiss()
 	}
 
 	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
