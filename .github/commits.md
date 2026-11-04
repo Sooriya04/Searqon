@@ -282,6 +282,16 @@ Hardened headless browser process lifecycle in `src/scraper/scraper_lightpanda.g
 - Configured explicit `cmd.Cancel = func() error { return cmd.Process.Kill() }` on `exec.CommandContext` invocations.
 - Guaranteed immediate SIGKILL delivery when scrape contexts time out or abort, preventing rogue or hanging Lightpanda and Camoufox browser subprocesses from becoming orphaned zombies and consuming server memory/CPU.
 
+## test(e2e): expand Newman test suite coverage to all core retrieval and extraction endpoints
+
+Expanded the black-box Newman E2E test collection in `tests/searqon.postman_collection.json` from 6 to 10 automated test suites with 20 assertion checks:
+- Added `POST /scrape/chunked` test verifying token and heading chunking metadata.
+- Added `POST /extract` test verifying structured CSS selector and token estimation schema.
+- Added `POST /search/index` test verifying live SQLite FTS5 search indexing and BM25 rank scores.
+- Added `POST /pipeline` test verifying full Search → Fetch → Deduplicate → BM25 Ranking pipeline.
+- Verified 100% test pass rate (10/10 requests, 20/20 assertions) via `make newman-test`.
+
+
 
 
 

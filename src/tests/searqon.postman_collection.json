@@ -2,7 +2,7 @@
   "info": {
     "name": "Searqon API Test Suite",
     "_postman_id": "searqon-collection-v1",
-    "description": "Black-box E2E API collection for Searqon Web Intelligence Engine",
+    "description": "Comprehensive E2E Newman & Postman API collection for Searqon Web Intelligence Engine",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -108,7 +108,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"url\": \"https://example.com\",\n  \"format\": \"markdown\",\n  \"bypass_cache\": true,\n  \"stealth_level\": \"auto\"\n}"
+          "raw": "{\n  \"url\": \"https://example.com\",\n  \"format\": \"markdown\",\n  \"bypass_cache\": false,\n  \"stealth_level\": \"auto\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/scrape",
@@ -130,6 +130,127 @@
               "    pm.expect(jsonData.success).to.eql(true);",
               "    pm.expect(jsonData.data.markdown.length).to.be.above(0);",
               "    pm.expect(jsonData.data.title).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chunked Scraper",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://example.com\",\n  \"format\": \"markdown\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/scrape/chunked",
+          "host": ["{{baseUrl}}"],
+          "path": ["scrape", "chunked"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Chunked scrape response contains metadata', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.title).to.exist;",
+              "    pm.expect(jsonData.data.content).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Structured Extract",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://example.com\",\n  \"selectors\": {\n    \"heading\": \"h1\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["extract"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Extracted data structure returned', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.title).to.exist;",
+              "    pm.expect(jsonData.data.token_estimate).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Local FTS5 Search Index",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"documentation\",\n  \"limit\": 5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/search/index",
+          "host": ["{{baseUrl}}"],
+          "path": ["search", "index"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('FTS5 index returns search matches', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data).to.be.an('array');",
+              "    pm.expect(jsonData.data.length).to.be.above(0);",
+              "    pm.expect(jsonData.data[0].source).to.eql('local_index');",
               "});"
             ]
           }
@@ -169,6 +290,47 @@
               "    var jsonData = pm.response.json();",
               "    pm.expect(jsonData.success).to.eql(true);",
               "    pm.expect(jsonData.data.results).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "End-to-End Pipeline",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"example domain\",\n  \"max_sources\": 2,\n  \"bypass_cache\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/pipeline",
+          "host": ["{{baseUrl}}"],
+          "path": ["pipeline"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Pipeline returns scored sources and chunks', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.query).to.eql('example domain');",
+              "    pm.expect(jsonData.data.sources).to.be.an('array');",
+              "    pm.expect(jsonData.data.sources.length).to.be.above(0);",
               "});"
             ]
           }
