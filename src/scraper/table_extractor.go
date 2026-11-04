@@ -6,11 +6,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// ConvertTablesToMarkdown converts HTML tables to Github-Flavored Markdown.
-func ConvertTablesToMarkdown(htmlContent string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil || doc == nil {
-		return htmlContent
+// ConvertTablesInDocument converts HTML tables to Github-Flavored Markdown directly on a *goquery.Document in place.
+func ConvertTablesInDocument(doc *goquery.Document) {
+	if doc == nil {
+		return
 	}
 
 	doc.Find("table").Each(func(i int, tableSel *goquery.Selection) {
@@ -28,7 +27,7 @@ func ConvertTablesToMarkdown(htmlContent string) string {
 		if len(headers) > 0 {
 			maxCols = len(headers)
 			mdRows = append(mdRows, "| "+strings.Join(headers, " | ")+" |")
-			
+
 			var separators []string
 			for k := 0; k < maxCols; k++ {
 				separators = append(separators, "---")
@@ -67,7 +66,15 @@ func ConvertTablesToMarkdown(htmlContent string) string {
 			tableSel.Remove()
 		}
 	})
+}
 
+// ConvertTablesToMarkdown converts HTML tables to Github-Flavored Markdown.
+func ConvertTablesToMarkdown(htmlContent string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil || doc == nil {
+		return htmlContent
+	}
+	ConvertTablesInDocument(doc)
 	html, err := doc.Html()
 	if err != nil || html == "" {
 		return htmlContent
