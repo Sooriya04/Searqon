@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// Heading represents a document heading with level, text, and URL slug anchor.
+type Heading struct {
+	Level  int    `json:"level"`
+	Text   string `json:"text"`
+	Anchor string `json:"anchor"`
+}
+
 // DocumentMetadata captures normalized page metadata for downstream agents.
 type DocumentMetadata struct {
 	Title         string          `json:"title,omitempty"`
@@ -19,16 +26,20 @@ type DocumentMetadata struct {
 
 // SearchResult represents a single discovered search result.
 type SearchResult struct {
-	Title       string           `json:"title"`
-	URL         string           `json:"url"`
-	Snippet     string           `json:"snippet"`
-	Source      string           `json:"source"`             // "searxng" | "duckduckgo" | "local_index"
-	Content     string           `json:"content,omitempty"`  // scraped plain text
-	Markdown    string           `json:"markdown,omitempty"` // scraped markdown
-	Scraped     bool             `json:"scraped"`
-	ScrapeError string           `json:"scrape_error,omitempty"`
-	Score       float64          `json:"score"` // relevance score from ranker
-	Metadata    DocumentMetadata `json:"metadata,omitempty"`
+	Title         string           `json:"title"`
+	URL           string           `json:"url"`
+	Snippet       string           `json:"snippet"`
+	Source        string           `json:"source"`             // "searxng" | "duckduckgo" | "local_index"
+	Content       string           `json:"content,omitempty"`  // scraped plain text
+	Markdown      string           `json:"markdown,omitempty"` // scraped markdown
+	Scraped       bool             `json:"scraped"`
+	ScrapeError   string           `json:"scrape_error,omitempty"`
+	Score         float64          `json:"score"` // relevance score from ranker
+	Metadata      DocumentMetadata `json:"metadata,omitempty"`
+	TokenEstimate int              `json:"token_estimate,omitempty"`
+	Headings      []Heading        `json:"headings,omitempty"`
+	Outline       string           `json:"outline,omitempty"`
+	IsTruncated   bool             `json:"is_truncated"`
 }
 
 // SearchResponse is the final search aggregation response.
@@ -75,6 +86,10 @@ type ScrapeResult struct {
 	ContentChanged   bool             `json:"content_changed"`
 	Metadata         DocumentMetadata `json:"metadata,omitempty"`
 	StructuredData   json.RawMessage  `json:"structured_data,omitempty"`
+	TokenEstimate    int              `json:"token_estimate,omitempty"`
+	Headings         []Heading        `json:"headings,omitempty"`
+	Outline          string           `json:"outline,omitempty"`
+	IsTruncated      bool             `json:"is_truncated"`
 }
 
 // ScrapedImage holds details about an extracted image.
@@ -132,6 +147,8 @@ type SearchRequest struct {
 	Scrape        *bool  `json:"scrape"`
 	BypassCache   bool   `json:"bypass_cache"`
 	MaxWords      int    `json:"max_words"`
+	MaxTokens     int    `json:"max_tokens"`
+	TokenLimit    int    `json:"token_limit"`
 	Summarize     bool   `json:"summarize"`
 	ExtractSchema string `json:"extract_schema,omitempty"`
 }
@@ -141,9 +158,20 @@ type ScrapeRequest struct {
 	Format        string `json:"format"`
 	BypassCache   bool   `json:"bypass_cache"`
 	MaxWords      int    `json:"max_words"`
+	MaxTokens     int    `json:"max_tokens"`
+	TokenLimit    int    `json:"token_limit"`
 	Chunk         bool   `json:"chunk"`
 	ExtractSchema string `json:"extract_schema,omitempty"`
 	StealthLevel  string `json:"stealth_level,omitempty"` // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
+}
+
+type ExtractRequest struct {
+	URL         string            `json:"url"`
+	Selectors   map[string]string `json:"selectors"`
+	Schema      string            `json:"schema"`
+	BypassCache bool              `json:"bypass_cache"`
+	MaxTokens   int               `json:"max_tokens"`
+	TokenLimit  int               `json:"token_limit"`
 }
 
 type BatchScrapeRequest struct {

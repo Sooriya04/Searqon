@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -10,6 +11,103 @@ import (
 
 	"src/models"
 )
+
+// GenerateSlugAnchor converts heading text into a URL slug anchor.
+func GenerateSlugAnchor(text string) string {
+	text = strings.ToLower(strings.TrimSpace(text))
+	var sb strings.Builder
+	for _, r := range text {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			sb.WriteRune(r)
+		} else if r == ' ' || r == '	' || r == '\n' {
+			sb.WriteRune('-')
+		}
+	}
+	slug := sb.String()
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+	return strings.Trim(slug, "-")
+}
+
+// ExtractHeadingsAndOutline extracts H1-H6 headings with anchors and builds a table of contents outline.
+func ExtractHeadingsAndOutline(doc *goquery.Document) ([]models.Heading, string) {
+	var headings []models.Heading
+	var outlineBuilder strings.Builder
+	outlineBuilder.WriteString("### Table of Contents\n")
+
+	doc.Find("h1, h2, h3, h4, h5, h6").Each(func(i int, s *goquery.Selection) {
+		tagName := ""
+		if len(s.Nodes) > 0 && s.Nodes[0] != nil {
+			tagName = strings.ToLower(s.Nodes[0].Data)
+		}
+		level := 1
+		if len(tagName) == 2 && tagName[0] == 'h' {
+			if l := int(tagName[1] - '0'); l >= 1 && l <= 6 {
+				level = l
+			}
+		}
+		text := strings.TrimSpace(s.Text())
+		if text == "" {
+			return
+		}
+		anchor := GenerateSlugAnchor(text)
+		headings = append(headings, models.Heading{
+			Level:  level,
+			Text:   text,
+			Anchor: anchor,
+		})
+
+		indent := strings.Repeat("  ", level-1)
+		outlineBuilder.WriteString(fmt.Sprintf("%s- [%s](#%s)\n", indent, text, anchor))
+	})
+
+	outline := ""
+	if len(headings) > 0 {
+		outline = outlineBuilder.String()
+	}
+	return headings, outline
+}
+
+// EstimateTokens calculates approximate token count (~4 characters per token).
+func EstimateTokens(text string) int {
+	if text == "" {
+		return 0
+	}
+	return (len(text) + 3) / 4
+}
+
+// CleanTruncateMarkdown truncates markdown at paragraph, heading, or sentence boundaries without cutting mid-sentence/code block.
+func CleanTruncateMarkdown(markdown string, maxTokens int) (string, bool) {
+	if maxTokens <= 0 {
+		return markdown, false
+	}
+	maxChars := maxTokens * 4
+	if len(markdown) <= maxChars {
+		return markdown, false
+	}
+
+	truncated := markdown[:maxChars]
+
+	// 1. Try paragraph boundary \n\n in second half
+	if idx := strings.LastIndex(truncated, "\n\n"); idx > maxChars/2 {
+		return strings.TrimSpace(markdown[:idx]), true
+	}
+	// 2. Try heading boundary \n#
+	if idx := strings.LastIndex(truncated, "\n#"); idx > maxChars/2 {
+		return strings.TrimSpace(markdown[:idx]), true
+	}
+	// 3. Try sentence boundary . 
+	if idx := strings.LastIndex(truncated, ". "); idx > maxChars/2 {
+		return strings.TrimSpace(markdown[:idx+1]), true
+	}
+	// 4. Fallback to last space
+	if idx := strings.LastIndex(truncated, " "); idx > maxChars/2 {
+		return strings.TrimSpace(markdown[:idx]), true
+	}
+
+	return strings.TrimSpace(truncated), true
+}
 
 // ParseMetadata extracts SEO, metadata, JSON-LD, and outbound links from an HTML document.
 func ParseMetadata(htmlContent string, targetURL string, finalURL string) models.DocumentMetadata {
