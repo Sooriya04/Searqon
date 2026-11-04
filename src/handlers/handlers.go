@@ -74,11 +74,17 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	maxTokens := req.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = req.TokenLimit
+	}
+
 	result, _ := scraper.ScrapeSingleURLWithOptions(req.URL, scraper.ScrapeOptions{
 		Format:        req.Format,
 		BypassCache:   req.BypassCache,
 		ExtractSchema: req.ExtractSchema,
 		StealthLevel:  req.StealthLevel,
+		MaxTokens:     maxTokens,
 	})
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusGatewayTimeout, utils.ErrCodeScrapeFailed, result.Error)

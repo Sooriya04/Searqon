@@ -382,6 +382,8 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 	maxTokens := 4000
 	if mt, ok := args["max_tokens"].(float64); ok && mt > 0 {
 		maxTokens = int(mt)
+	} else if tl, ok := args["token_limit"].(float64); ok && tl > 0 {
+		maxTokens = int(tl)
 	}
 
 	stealthLevel := "auto"
@@ -393,6 +395,7 @@ func (s *Server) handleScrape(args map[string]interface{}) (CallToolResult, erro
 		Format:       format,
 		BypassCache:  bypassCache,
 		StealthLevel: stealthLevel,
+		MaxTokens:    maxTokens,
 	}
 
 	result, _ := scraper.ScrapeSingleURLWithOptions(targetURL, opts)
@@ -625,6 +628,13 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 	bypassCache, _ := args["bypass_cache"].(bool)
 	schemaPrompt, _ := args["schema"].(string)
 
+	maxTokens := 4000
+	if mt, ok := args["max_tokens"].(float64); ok && mt > 0 {
+		maxTokens = int(mt)
+	} else if tl, ok := args["token_limit"].(float64); ok && tl > 0 {
+		maxTokens = int(tl)
+	}
+
 	var selectors map[string]string
 	if rawSel, ok := args["selectors"].(map[string]interface{}); ok {
 		selectors = make(map[string]string)
@@ -636,10 +646,11 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 	}
 
 	opts := scraper.ScrapeOptions{
-		Format:        "text",
+		Format:        "markdown",
 		BypassCache:   bypassCache,
 		ExtractSchema: schemaPrompt,
 		StealthLevel:  "auto",
+		MaxTokens:     maxTokens,
 	}
 
 	res, rawHTML, err := scraper.ExecuteSmartEscalationScrape(targetURL, "", opts, time.Now())
@@ -648,6 +659,14 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 	}
 
 	extracted := make(map[string]interface{})
+	extracted["title"] = res.Title
+	extracted["url"] = targetURL
+	extracted["markdown"] = res.Markdown
+	extracted["token_estimate"] = res.TokenEstimate
+	extracted["headings"] = res.Headings
+	extracted["outline"] = res.Outline
+	extracted["is_truncated"] = res.IsTruncated
+
 	if len(selectors) > 0 {
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
 		if err == nil && doc != nil {
@@ -662,8 +681,6 @@ func (s *Server) handleExtract(args map[string]interface{}) (CallToolResult, err
 	if res.StructuredData != nil {
 		extracted["structured_data"] = res.StructuredData
 	}
-	extracted["url"] = targetURL
-	extracted["title"] = res.Title
 
 	outJSON, err := json.MarshalIndent(extracted, "", "  ")
 	if err != nil {

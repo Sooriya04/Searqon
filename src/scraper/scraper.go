@@ -25,6 +25,7 @@ type ScrapeOptions struct {
 	ForceNative   bool
 	ExtractSchema string
 	StealthLevel  string // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
+	MaxTokens     int
 }
 
 func stripHTMLTagsForMarkdown(htmlStr string) string {
@@ -42,14 +43,20 @@ func stripHTMLTagsForMarkdown(htmlStr string) string {
 
 // ScrapeHTMLContent extracts structural text from HTML content directly.
 func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) models.ScrapeResult {
-	return ScrapeHTMLContentWithSchema(htmlContent, targetURL, finalURL, format, startTime, "")
+	return ScrapeHTMLContentWithOptions(htmlContent, targetURL, finalURL, startTime, ScrapeOptions{Format: format})
 }
 
 // ScrapeHTMLContentWithSchema extracts structural text and optionally runs schema-guided structured extraction.
 func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time, extractSchema string) models.ScrapeResult {
+	return ScrapeHTMLContentWithOptions(htmlContent, targetURL, finalURL, startTime, ScrapeOptions{Format: format, ExtractSchema: extractSchema})
+}
+
+// ScrapeHTMLContentWithOptions extracts structural text, headings, outline, estimates tokens, and applies token-bounded truncation.
+func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL string, startTime time.Time, opts ScrapeOptions) models.ScrapeResult {
 	startISO := startTime.UTC().Format(time.RFC3339)
 	result := models.ScrapeResult{URL: targetURL, StartTime: startISO}
 
+	format := opts.Format
 	if format == "" {
 		format = "markdown"
 	}
@@ -57,6 +64,14 @@ func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL 
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		parsedURL = &url.URL{}
+	}
+
+	// 0. Extract headings and outline upfront
+	docRaw, docErr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if docErr == nil && docRaw != nil {
+		headings, outline := extractor.ExtractHeadingsAndOutline(docRaw)
+		result.Headings = headings
+		result.Outline = outline
 	}
 
 	// 1. Extract metadata
@@ -95,19 +110,11 @@ func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL 
 			} else {
 				result.Markdown = plainText
 			}
+		} else {
+			result.Markdown = plainText
 		}
 
-		result.EndTime = time.Now().UTC().Format(time.RFC3339)
-		result.Duration = time.Since(startTime).Milliseconds()
-		result.FetchDurationMS = int(result.Duration)
-		result.ExtractionMethod = "readability"
-		result.Scraped = true
-		result.ContentHash = computeContentHash(result.Content)
-		if extractSchema != "" {
-			if structured, err := extractStructuredData(extractSchema, result); err == nil {
-				result.StructuredData = structured
-			}
-		}
+		finalizeScrapeResult(&result, startTime, opts, "readability")
 		return result
 	}
 
@@ -162,19 +169,51 @@ func ScrapeHTMLContentWithSchema(htmlContent string, targetURL string, finalURL 
 		} else {
 			result.Markdown = content
 		}
+	} else {
+		result.Markdown = content
 	}
 
+	finalizeScrapeResult(&result, startTime, opts, "goquery")
+	return result
+}
+
+func finalizeScrapeResult(result *models.ScrapeResult, startTime time.Time, opts ScrapeOptions, method string) {
 	result.EndTime = time.Now().UTC().Format(time.RFC3339)
 	result.Duration = time.Since(startTime).Milliseconds()
 	result.FetchDurationMS = int(result.Duration)
-	result.ExtractionMethod = "goquery"
+	result.ExtractionMethod = method
+	result.Scraped = true
 	result.ContentHash = computeContentHash(result.Content)
-	if extractSchema != "" {
-		if structured, err := extractStructuredData(extractSchema, result); err == nil {
+
+	textForTokens := result.Markdown
+	if textForTokens == "" {
+		textForTokens = result.Content
+	}
+	result.TokenEstimate = extractor.EstimateTokens(textForTokens)
+
+	maxTokens := opts.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 4000 // default agent token budget
+	}
+
+	if result.TokenEstimate > maxTokens {
+		truncated, isTruncated := extractor.CleanTruncateMarkdown(textForTokens, maxTokens)
+		if isTruncated {
+			if result.Markdown != "" {
+				result.Markdown = truncated
+			} else {
+				result.Content = truncated
+			}
+			result.IsTruncated = true
+			result.TokenEstimate = extractor.EstimateTokens(truncated)
+		}
+	}
+
+	if opts.ExtractSchema != "" {
+		if structured, err := extractStructuredData(opts.ExtractSchema, *result); err == nil {
 			result.StructuredData = structured
 		}
 	}
-	return result
 }
 
 func computeContentHash(text string) string {

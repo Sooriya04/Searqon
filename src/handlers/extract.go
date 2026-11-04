@@ -7,29 +7,33 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"src/models"
 	"src/scraper"
 	"src/utils"
 )
 
-type ExtractRequest struct {
-	URL         string            `json:"url"`
-	Selectors   map[string]string `json:"selectors"`
-	BypassCache bool              `json:"bypass_cache"`
-}
+type ExtractRequest = models.ExtractRequest
 
 type ExtractResponse struct {
-	URL  string            `json:"url"`
-	Data map[string]string `json:"data"`
+	Title         string            `json:"title"`
+	URL           string            `json:"url"`
+	Markdown      string            `json:"markdown,omitempty"`
+	TokenEstimate int               `json:"token_estimate"`
+	Headings      []models.Heading  `json:"headings,omitempty"`
+	Outline       string            `json:"outline,omitempty"`
+	IsTruncated   bool              `json:"is_truncated"`
+	Data          map[string]string `json:"data,omitempty"`
+	Structured    json.RawMessage   `json:"structured_data,omitempty"`
 }
 
-// ExtractHandler parses specific elements on a scraped page using CSS selectors.
+// ExtractHandler parses specific elements on a scraped page using CSS selectors or structured markdown extraction.
 func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		utils.WriteError(w, http.StatusMethodNotAllowed, utils.ErrCodeMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	var req ExtractRequest
+	var req models.ExtractRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeInvalidJSON, "Invalid JSON request body")
 		return
@@ -38,35 +42,51 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "URL is required")
 		return
 	}
-	if len(req.Selectors) == 0 {
-		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "Selectors map is required")
+
+	maxTokens := req.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = req.TokenLimit
+	}
+	if maxTokens <= 0 {
+		maxTokens = 4000
+	}
+
+	opts := scraper.ScrapeOptions{
+		Format:        "markdown",
+		BypassCache:   req.BypassCache,
+		ExtractSchema: req.Schema,
+		StealthLevel:  "auto",
+		MaxTokens:     maxTokens,
+	}
+
+	res, rawHTML := scraper.ScrapeSingleURLWithOptions(req.URL, opts)
+	if !res.Scraped && rawHTML == "" {
+		utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
 		return
 	}
 
-	res, htmlContent := scraper.ScrapeSingleURL(req.URL, "text", req.BypassCache)
-	if htmlContent == "" {
-		if res.Scraped && res.Content != "" {
-			htmlContent = res.Content
-		} else {
-			utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, "Failed to retrieve page content")
-			return
-		}
-	}
-
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
 	if err != nil || doc == nil {
-		utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, "Failed to parse document HTML")
-		return
+		doc, _ = goquery.NewDocumentFromReader(strings.NewReader(res.Content))
 	}
 
 	extracted := make(map[string]string)
-	for key, selector := range req.Selectors {
-		val := strings.TrimSpace(doc.Find(selector).First().Text())
-		extracted[key] = val
+	if len(req.Selectors) > 0 && doc != nil {
+		for key, selector := range req.Selectors {
+			val := strings.TrimSpace(doc.Find(selector).First().Text())
+			extracted[key] = val
+		}
 	}
 
 	utils.WriteSuccess(w, ExtractResponse{
-		URL:  req.URL,
-		Data: extracted,
+		Title:         res.Title,
+		URL:           req.URL,
+		Markdown:      res.Markdown,
+		TokenEstimate: res.TokenEstimate,
+		Headings:      res.Headings,
+		Outline:       res.Outline,
+		IsTruncated:   res.IsTruncated,
+		Data:          extracted,
+		Structured:    res.StructuredData,
 	})
 }
