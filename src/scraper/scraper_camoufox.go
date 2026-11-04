@@ -54,6 +54,9 @@ func ScrapeWithCamoufox(targetURL string, proxyURL string, format string, startT
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Kill()
+	}
 	outputBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		// Try python module fallback if standalone CLI failed
@@ -74,6 +77,9 @@ except Exception as e:
     sys.exit(1)
 `, proxyURL, proxyURL, targetURL)
 			pyCmd := exec.CommandContext(ctx, pyBin, "-c", pyScript)
+			pyCmd.Cancel = func() error {
+				return pyCmd.Process.Kill()
+			}
 			pyOut, pyRunErr := pyCmd.CombinedOutput()
 			if pyRunErr == nil && len(strings.TrimSpace(string(pyOut))) > 0 {
 				outputBytes = pyOut

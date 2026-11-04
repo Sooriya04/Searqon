@@ -77,6 +77,9 @@ func ScrapeWithLightpandaProxy(targetURL string, userAgent string, proxyURL stri
 
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Kill()
+	}
 	cmd.Stderr = &stderr
 	outputBytes, err := cmd.Output()
 	if err != nil {

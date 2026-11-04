@@ -276,5 +276,12 @@ Optimized HTML extraction pipeline performance in `src/scraper/scraper.go` and `
 - Replaced repeated string serialization and `goquery.NewDocumentFromReader` round-trips by introducing `ConvertTablesInDocument(doc *goquery.Document)` to mutate DOM tables in place.
 - Reused the parsed `docRaw` across outline extraction, table conversion, and goquery fallback parsing rather than parsing HTML 3 separate times, eliminating unnecessary memory allocations and CPU overhead on large scraped pages.
 
+## fix(scraper): guarantee SIGKILL process cleanup and zombie protection on headless timeouts
+
+Hardened headless browser process lifecycle in `src/scraper/scraper_lightpanda.go` and `src/scraper/scraper_camoufox.go`:
+- Configured explicit `cmd.Cancel = func() error { return cmd.Process.Kill() }` on `exec.CommandContext` invocations.
+- Guaranteed immediate SIGKILL delivery when scrape contexts time out or abort, preventing rogue or hanging Lightpanda and Camoufox browser subprocesses from becoming orphaned zombies and consuming server memory/CPU.
+
+
 
 
