@@ -59,20 +59,19 @@ func InitDB() {
 		dbEnabled = false
 		dbBackend = "none"
 		dbMu.Unlock()
-		return
-	}
-
-	dbType := strings.ToLower(strings.TrimSpace(cfg.Database.Type))
-	if dbType == "" || dbType == "sqlite" {
-		initSQLite(cfg.Database.SQLite.Path)
-	} else if dbType == "postgres" || dbType == "pg" {
-		initPostgres(cfg)
 	} else {
-		log.Printf("[Database] Unknown database type '%s', falling back to SQLite", cfg.Database.Type)
-		initSQLite(cfg.Database.SQLite.Path)
+		dbType := strings.ToLower(strings.TrimSpace(cfg.Database.Type))
+		if dbType == "" || dbType == "sqlite" {
+			initSQLite(cfg.Database.SQLite.Path)
+		} else if dbType == "postgres" || dbType == "pg" {
+			initPostgres(cfg)
+		} else {
+			log.Printf("[Database] Unknown database type '%s', falling back to SQLite", cfg.Database.Type)
+			initSQLite(cfg.Database.SQLite.Path)
+		}
 	}
 
-	// 3. Start periodic background cleanup worker
+	// 3. Start periodic background cleanup worker (for DB and in-memory caches)
 	cleanupCtx, cleanupCancelFunc := context.WithCancel(context.Background())
 	cleanupCancel = cleanupCancelFunc
 	StartCacheCleanupWorker(cleanupCtx)

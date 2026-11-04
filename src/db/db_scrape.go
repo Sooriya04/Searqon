@@ -215,6 +215,8 @@ func SaveScrapeCache(r models.ScrapeResult) {
 
 		if err != nil {
 			log.Printf("[Database] SQLite failed to save scrape cache: %v", err)
+		} else if r.Scraped && (r.Title != "" || r.Content != "") {
+			IndexScrapeInFTS(r.URL, r.Title, r.Description, r.Content)
 		}
 		return
 	}
@@ -268,7 +270,7 @@ func SaveScrapeCache(r models.ScrapeResult) {
 
 // StartCacheCleanupWorker initiates a background routine that regularly removes expired cache rows.
 func StartCacheCleanupWorker(ctx context.Context) {
-	ticker := time.NewTicker(12 * time.Hour)
+	ticker := time.NewTicker(10 * time.Minute)
 	go func() {
 		defer ticker.Stop()
 		for {

@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"log"
 	"net/url"
 	"strings"
@@ -183,8 +184,15 @@ func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 
 	jobs <- crawlTask{url: targetURL, depth: 0}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	for atomic.LoadInt32(&pendingTasks) > 0 {
 		select {
+		case <-ctx.Done():
+			result.Error = "crawl timeout exceeded"
+			atomic.StoreInt32(&pendingTasks, 0)
+			break
 		case newLinks := <-discoveredLinksChan:
 			var addedCount int32
 			mu.Lock()
@@ -192,7 +200,11 @@ func CrawlSite(targetURL string, limit, depth int, format string, onPageScraped 
 				if !visited[link.url] && len(visited) < limit {
 					visited[link.url] = true
 					addedCount++
-					jobs <- link
+					select {
+					case jobs <- link:
+					case <-ctx.Done():
+						break
+					}
 				}
 			}
 			mu.Unlock()
