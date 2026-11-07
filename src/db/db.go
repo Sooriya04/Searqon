@@ -219,6 +219,8 @@ func initSQLiteTables() {
 		extraction_method   TEXT,
 		error_msg           TEXT,
 		fetch_duration_ms   INTEGER,
+		content_hash        TEXT,
+		scraped_at          DATETIME,
 		created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
 		expires_at          DATETIME
 	);
@@ -271,6 +273,8 @@ func initPostgresTables() {
 		extraction_method   TEXT,
 		error_msg           TEXT,
 		fetch_duration_ms   INTEGER,
+		content_hash        TEXT,
+		scraped_at          TIMESTAMP WITH TIME ZONE,
 		created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 		expires_at          TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
 	);
