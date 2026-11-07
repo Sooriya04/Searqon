@@ -64,7 +64,7 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, rawHTML := scraper.ScrapeSingleURLWithOptions(req.URL, opts)
 	if !res.Scraped && rawHTML == "" {
-		if res.Scraped && res.Content != "" {
+		if res.Content != "" {
 			rawHTML = res.Content
 		} else {
 			se := res.StructuredError
@@ -85,9 +85,18 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
-	if err != nil || doc == nil {
-		doc, _ = goquery.NewDocumentFromReader(strings.NewReader(res.Content))
+	htmlToParse := rawHTML
+	if strings.TrimSpace(htmlToParse) == "" {
+		if res.Content != "" {
+			htmlToParse = res.Content
+		} else if res.Markdown != "" {
+			htmlToParse = res.Markdown
+		}
+	}
+
+	var doc *goquery.Document
+	if strings.TrimSpace(htmlToParse) != "" {
+		doc, _ = goquery.NewDocumentFromReader(strings.NewReader(htmlToParse))
 	}
 
 	extracted := make(map[string]string)

@@ -69,3 +69,46 @@ func TestRankResults(t *testing.T) {
 		t.Errorf("Unrelated webpage ranked first; expected Go programming language topic first")
 	}
 }
+
+func TestNormalizeDiscoveryURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Preserve YouTube video ID",
+			input:    "https://www.youtube.com/watch?v=dQw4w9WgXcQ&utm_source=twitter&utm_medium=social",
+			expected: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		},
+		{
+			name:     "Preserve Hacker News item ID",
+			input:    "https://news.ycombinator.com/item?id=12345678&ref=producthunt",
+			expected: "https://news.ycombinator.com/item?id=12345678",
+		},
+		{
+			name:     "Preserve ArXiv search query and pagination",
+			input:    "https://arxiv.org/search/?query=quantum&searchtype=all&source=header&fbclid=IwAR123",
+			expected: "https://arxiv.org/search/?query=quantum&searchtype=all",
+		},
+		{
+			name:     "Strip all tracking parameters if only tracking parameters exist",
+			input:    "https://example.com/article?utm_campaign=spring&mc_cid=abc&ref_topic=tech#frag",
+			expected: "https://example.com/article",
+		},
+		{
+			name:     "Trailing slash removed",
+			input:    "https://example.com/page/",
+			expected: "https://example.com/page",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := normalizeDiscoveryURL(tc.input)
+			if actual != tc.expected {
+				t.Errorf("normalizeDiscoveryURL(%q) = %q, expected %q", tc.input, actual, tc.expected)
+			}
+		})
+	}
+}

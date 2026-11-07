@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	md "github.com/JohannesKaufmann/html-to-markdown/v2"
@@ -28,6 +29,9 @@ type ScrapeOptions struct {
 	StealthLevel  string // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
 	MaxTokens     int
 }
+
+var rawHTMLCache sync.Map // targetURL -> string
+
 
 func stripHTMLTagsForMarkdown(htmlStr string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
@@ -334,7 +338,11 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 			cached.Duration = time.Since(startTime).Milliseconds()
 			cached.Cached = true
 			populateScrapeMetadata(&cached)
-			return cached, ""
+			cachedRaw := ""
+			if val, ok := rawHTMLCache.Load(targetURL); ok {
+				cachedRaw = val.(string)
+			}
+			return cached, cachedRaw
 		}
 		utils.RecordScrapeCacheMiss()
 	}
@@ -410,6 +418,10 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 	prevCached, prevFound := db.GetScrapeCache(targetURL)
 	if prevFound && prevCached.ContentHash != "" && scraped.ContentHash != "" {
 		scraped.ContentChanged = (scraped.ContentHash != prevCached.ContentHash)
+	}
+
+	if rawOut != "" {
+		rawHTMLCache.Store(targetURL, rawOut)
 	}
 
 	db.SaveScrapeCache(scraped)

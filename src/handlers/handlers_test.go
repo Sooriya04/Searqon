@@ -161,6 +161,41 @@ func TestExtractHandler(t *testing.T) {
 	if resp.Data.Data["cost"] != "$0.00 Open Source" {
 		t.Errorf("Expected cost '$0.00 Open Source', got '%s'", resp.Data.Data["cost"])
 	}
+
+	// 4. Test cached extraction (Finding 5: CSS Selectors on Cached Content)
+	cachedPayload, _ := json.Marshal(ExtractRequest{
+		URL: ts.URL,
+		Selectors: map[string]string{
+			"title": ".headline",
+			"cost":  ".price",
+		},
+		BypassCache: false,
+	})
+	req4 := httptest.NewRequest(http.MethodPost, "/extract", bytes.NewBuffer(cachedPayload))
+	rr4 := httptest.NewRecorder()
+	ExtractHandler(rr4, req4)
+
+	if rr4.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for cached extraction, got %d: %s", rr4.Code, rr4.Body.String())
+	}
+
+	var cachedResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			URL  string            `json:"url"`
+			Data map[string]string `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rr4.Body).Decode(&cachedResp); err != nil {
+		t.Fatalf("Failed to decode cached response: %v", err)
+	}
+
+	if cachedResp.Data.Data["title"] != "Searqon Engine v2" {
+		t.Errorf("Expected cached title 'Searqon Engine v2', got '%s'", cachedResp.Data.Data["title"])
+	}
+	if cachedResp.Data.Data["cost"] != "$0.00 Open Source" {
+		t.Errorf("Expected cached cost '$0.00 Open Source', got '%s'", cachedResp.Data.Data["cost"])
+	}
 }
 
 func TestScrapeHandler_Validation(t *testing.T) {
