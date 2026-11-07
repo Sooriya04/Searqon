@@ -35,13 +35,14 @@ type SQLiteConfig struct {
 
 // PostgresConfig holds PostgreSQL connection settings.
 type PostgresConfig struct {
-	URL      string `yaml:"url"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	DBName   string `yaml:"dbname"`
-	SSLMode  string `yaml:"sslmode"`
+	URL             string `yaml:"url"`
+	Host            string `yaml:"host"`
+	Port            int    `yaml:"port"`
+	User            string `yaml:"user"`
+	Password        string `yaml:"password"`
+	DBName          string `yaml:"dbname"`
+	SSLMode         string `yaml:"sslmode"`
+	VectorDimension int    `yaml:"vector_dimension"`
 }
 
 // DatabaseConfig holds primary database configuration (SQLite or PostgreSQL).
@@ -79,10 +80,11 @@ type CacheConfig struct {
 
 // OllamaConfig holds local LLM server settings.
 type OllamaConfig struct {
-	Enabled        bool   `yaml:"enabled"`
-	URL            string `yaml:"url"`
-	Model          string `yaml:"model"`
-	EmbeddingModel string `yaml:"embedding_model"`
+	Enabled            bool   `yaml:"enabled"`
+	URL                string `yaml:"url"`
+	Model              string `yaml:"model"`
+	EmbeddingModel     string `yaml:"embedding_model"`
+	EmbeddingDimension int    `yaml:"embedding_dimension"`
 }
 
 // BrowserEngineConfig holds path, CDP endpoint, and enable flags for headless browsers.
@@ -148,13 +150,14 @@ func DefaultConfig() *Config {
 				Path: "./data/searqon.db",
 			},
 			Postgres: PostgresConfig{
-				URL:      "postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable",
-				Host:     "searqon-db",
-				Port:     5432,
-				User:     "searqon",
-				Password: "searqon_pass",
-				DBName:   "searqon_cache",
-				SSLMode:  "disable",
+				URL:             "postgres://searqon:searqon_pass@searqon-db:5432/searqon_cache?sslmode=disable",
+				Host:            "searqon-db",
+				Port:            5432,
+				User:            "searqon",
+				Password:        "searqon_pass",
+				DBName:          "searqon_cache",
+				SSLMode:         "disable",
+				VectorDimension: 768,
 			},
 		},
 		Redis: RedisConfig{
@@ -177,10 +180,11 @@ func DefaultConfig() *Config {
 			ScrapeTTLDays:  7,
 		},
 		Ollama: OllamaConfig{
-			Enabled:        true,
-			URL:            "http://host.docker.internal:11434",
-			Model:          "gemma4",
-			EmbeddingModel: "nomic-embed-text",
+			Enabled:            true,
+			URL:                "http://host.docker.internal:11434",
+			Model:              "gemma4",
+			EmbeddingModel:     "nomic-embed-text",
+			EmbeddingDimension: 768,
 		},
 		Scraper: ScraperConfig{
 			RateLimitPerDomainRPS: 5,
@@ -373,6 +377,17 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if embModel := os.Getenv("OLLAMA_EMBEDDING_MODEL"); embModel != "" {
 		cfg.Ollama.EmbeddingModel = embModel
+	}
+	if embDim := os.Getenv("OLLAMA_EMBEDDING_DIMENSION"); embDim != "" {
+		if d, err := strconv.Atoi(embDim); err == nil && d > 0 {
+			cfg.Ollama.EmbeddingDimension = d
+			cfg.Database.Postgres.VectorDimension = d
+		}
+	} else if vecDim := os.Getenv("VECTOR_DIMENSION"); vecDim != "" {
+		if d, err := strconv.Atoi(vecDim); err == nil && d > 0 {
+			cfg.Ollama.EmbeddingDimension = d
+			cfg.Database.Postgres.VectorDimension = d
+		}
 	}
 	if rot := os.Getenv("ROTATING_PROXIES"); rot != "" {
 		cfg.Proxies.Rotating = strings.Split(rot, ",")

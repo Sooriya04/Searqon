@@ -3,11 +3,31 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
+
+	"src/config"
 )
 
-var vectorEnabled bool
+var (
+	vectorEnabled   bool
+	vectorDimension int = 768
+)
+
+// GetVectorDimension returns the configured vector embedding dimension.
+func GetVectorDimension() int {
+	cfg := config.Get()
+	if cfg != nil {
+		if cfg.Database.Postgres.VectorDimension > 0 {
+			return cfg.Database.Postgres.VectorDimension
+		}
+		if cfg.Ollama.EmbeddingDimension > 0 {
+			return cfg.Ollama.EmbeddingDimension
+		}
+	}
+	return 768
+}
 
 // InitVectorDB checks for the pgvector extension (PostgreSQL) or initializes SQLite embeddings table.
 func InitVectorDB() {
@@ -52,14 +72,17 @@ func InitVectorDB() {
 			return
 		}
 
-		schema := `
+		dim := GetVectorDimension()
+		vectorDimension = dim
+
+		schema := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS page_embeddings (
 			url TEXT PRIMARY KEY,
-			embedding VECTOR(768) NOT NULL,
+			embedding VECTOR(%d) NOT NULL,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE INDEX IF NOT EXISTS idx_page_embeddings_cosine ON page_embeddings USING hnsw (embedding vector_cosine_ops);
-		`
+		`, dim)
 		_, err = pPool.Exec(ctx, schema)
 		if err != nil {
 			log.Printf("[Database] Failed to initialize PostgreSQL page_embeddings table: %v. Semantic search is DISABLED.", err)
@@ -67,8 +90,25 @@ func InitVectorDB() {
 			return
 		}
 
+		// Dynamically handle vector dimension alteration/migration if existing table dimension differs
+		var existingDim int
+		err = pPool.QueryRow(ctx, `
+			SELECT atttypmod 
+			FROM pg_attribute 
+			WHERE attrelid = 'page_embeddings'::regclass AND attname = 'embedding'
+		`).Scan(&existingDim)
+		if err == nil && existingDim > 0 && existingDim != dim {
+			log.Printf("[Database] Migrating page_embeddings vector dimension from %d to %d", existingDim, dim)
+			_, _ = pPool.Exec(ctx, "DROP INDEX IF EXISTS idx_page_embeddings_cosine;")
+			alterQuery := fmt.Sprintf("ALTER TABLE page_embeddings ALTER COLUMN embedding TYPE VECTOR(%d);", dim)
+			if _, aErr := pPool.Exec(ctx, alterQuery); aErr != nil {
+				log.Printf("[Database] Notice on vector dimension migration: %v", aErr)
+			}
+			_, _ = pPool.Exec(ctx, "CREATE INDEX IF NOT EXISTS idx_page_embeddings_cosine ON page_embeddings USING hnsw (embedding vector_cosine_ops);")
+		}
+
 		vectorEnabled = true
-		log.Println("[Database] PostgreSQL pgvector semantic embeddings table initialized successfully.")
+		log.Printf("[Database] PostgreSQL pgvector semantic embeddings table initialized successfully (dimension: %d).", dim)
 	}
 }
 
@@ -106,6 +146,18 @@ func SavePageEmbedding(targetURL string, embedding []float32) {
 	if backend == "postgres" && pPool != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+
+		dim := len(embedding)
+		if dim > 0 && dim != vectorDimension {
+			// Embedding dimension differs from current table column: adapt column dimension
+			log.Printf("[Database] Auto-migrating page_embeddings column dimension from %d to %d", vectorDimension, dim)
+			_, _ = pPool.Exec(ctx, "DROP INDEX IF EXISTS idx_page_embeddings_cosine;")
+			alterQuery := fmt.Sprintf("ALTER TABLE page_embeddings ALTER COLUMN embedding TYPE VECTOR(%d);", dim)
+			if _, aErr := pPool.Exec(ctx, alterQuery); aErr == nil {
+				vectorDimension = dim
+			}
+			_, _ = pPool.Exec(ctx, "CREATE INDEX IF NOT EXISTS idx_page_embeddings_cosine ON page_embeddings USING hnsw (embedding vector_cosine_ops);")
+		}
 
 		_, err := pPool.Exec(ctx, `
 			INSERT INTO page_embeddings (url, embedding, created_at)

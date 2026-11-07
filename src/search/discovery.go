@@ -277,6 +277,59 @@ func extractQuotedPhrases(query string) []string {
 	return phrases
 }
 
+var trackingParamPrefixes = []string{
+	"utm_",
+	"ref_",
+}
+
+var trackingParamExact = map[string]bool{
+	"fbclid":     true,
+	"gclid":      true,
+	"gbraid":     true,
+	"wbraid":     true,
+	"msclkid":    true,
+	"ref":        true,
+	"source":     true,
+	"mc_cid":     true,
+	"mc_eid":     true,
+	"igshid":     true,
+	"yclid":      true,
+	"_hsenc":     true,
+	"_hsmi":      true,
+	"mkt_tok":    true,
+	"trk":        true,
+	"trackingId": true,
+}
+
+func isTrackingParam(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	if trackingParamExact[lower] {
+		return true
+	}
+	for _, prefix := range trackingParamPrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanTrackingParams(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return rawQuery
+	}
+	for key := range values {
+		if isTrackingParam(key) {
+			values.Del(key)
+		}
+	}
+	return values.Encode()
+}
+
 func normalizeDiscoveryURL(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -287,7 +340,7 @@ func normalizeDiscoveryURL(raw string) string {
 		return strings.TrimRight(raw, "/")
 	}
 	parsed.Fragment = ""
-	parsed.RawQuery = ""
+	parsed.RawQuery = cleanTrackingParams(parsed.RawQuery)
 	return strings.TrimRight(parsed.String(), "/")
 }
 

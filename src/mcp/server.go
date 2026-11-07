@@ -293,12 +293,10 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 				},
 				IsError: true,
 			}
-			resp.Error = &RPCError{Code: -32000, Message: se.Message, Data: se}
-		} else if toolResult.IsError {
-			resp.Result = toolResult
-			resp.Error = &RPCError{Code: -32000, Message: "Tool execution encountered a structured error"}
+			resp.Error = nil
 		} else {
 			resp.Result = toolResult
+			resp.Error = nil
 		}
 
 	case "ping":
@@ -730,13 +728,24 @@ func (s *Server) handleExtractContext(ctx context.Context, args map[string]inter
 	extracted["fetched_at"] = res.ScrapedAt
 
 	if len(selectors) > 0 {
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
-		if err == nil && doc != nil {
-			selData := make(map[string]string)
-			for k, sel := range selectors {
-				selData[k] = strings.TrimSpace(doc.Find(sel).First().Text())
+		htmlToParse := rawHTML
+		if strings.TrimSpace(htmlToParse) == "" {
+			if res.Content != "" {
+				htmlToParse = res.Content
+			} else if res.Markdown != "" {
+				htmlToParse = res.Markdown
 			}
-			extracted["selectors_data"] = selData
+		}
+
+		if strings.TrimSpace(htmlToParse) != "" {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlToParse))
+			if err == nil && doc != nil {
+				selData := make(map[string]string)
+				for k, sel := range selectors {
+					selData[k] = strings.TrimSpace(doc.Find(sel).First().Text())
+				}
+				extracted["selectors_data"] = selData
+			}
 		}
 	}
 
