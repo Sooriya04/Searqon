@@ -92,6 +92,10 @@ func TestMCPCallMapTool(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
+	if resp.Error != nil {
+		t.Fatalf("Expected resp.Error to be nil on tool error per JSON-RPC 2.0 / MCP spec, got: %+v", resp.Error)
+	}
+
 	resMap, ok := resp.Result.(map[string]interface{})
 	if !ok || resMap["isError"] != true {
 		t.Errorf("Expected isError=true for empty URL in searqon_map, got %+v", resp.Result)
@@ -113,6 +117,10 @@ func TestMCPCallExtractTool(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
+	if resp.Error != nil {
+		t.Fatalf("Expected resp.Error to be nil on tool error per JSON-RPC 2.0 / MCP spec, got: %+v", resp.Error)
+	}
+
 	resMap, ok := resp.Result.(map[string]interface{})
 	if !ok || resMap["isError"] != true {
 		t.Errorf("Expected isError=true for empty URL in searqon_extract, got %+v", resp.Result)
@@ -132,6 +140,10 @@ func TestMCPToolStructuredErrorOutput(t *testing.T) {
 	var resp JSONRPCResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if resp.Error != nil {
+		t.Fatalf("Expected resp.Error to be nil on tool error per JSON-RPC 2.0 / MCP spec, got: %+v", resp.Error)
 	}
 
 	resMap, ok := resp.Result.(map[string]interface{})

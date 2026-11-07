@@ -58,6 +58,7 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 
 	// 2. Test Scrape Cache
+	scrapeTime := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	scrapeRes := models.ScrapeResult{
 		URL:         "https://example.com/test",
 		Title:       "Test Page",
@@ -67,6 +68,8 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 		Scraped:     true,
 		StatusCode:  200,
 		ContentType: "text/html",
+		ContentHash: "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890",
+		ScrapedAt:   scrapeTime,
 	}
 	SaveScrapeCache(scrapeRes)
 
@@ -76,6 +79,12 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 	if cachedScrape.Title != "Test Page" || cachedScrape.WordCount != 8 {
 		t.Fatalf("unexpected scrape cache result: %+v", cachedScrape)
+	}
+	if cachedScrape.ContentHash != scrapeRes.ContentHash {
+		t.Fatalf("expected content_hash %s, got %s", scrapeRes.ContentHash, cachedScrape.ContentHash)
+	}
+	if cachedScrape.ScrapedAt != scrapeRes.ScrapedAt {
+		t.Fatalf("expected scraped_at %s, got %s", scrapeRes.ScrapedAt, cachedScrape.ScrapedAt)
 	}
 
 	// 3. Test Sessions

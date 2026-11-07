@@ -293,12 +293,10 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 				},
 				IsError: true,
 			}
-			resp.Error = &RPCError{Code: -32000, Message: se.Message, Data: se}
-		} else if toolResult.IsError {
-			resp.Result = toolResult
-			resp.Error = &RPCError{Code: -32000, Message: "Tool execution encountered a structured error"}
+			resp.Error = nil
 		} else {
 			resp.Result = toolResult
+			resp.Error = nil
 		}
 
 	case "ping":
