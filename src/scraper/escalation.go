@@ -118,13 +118,23 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 		body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 2500*time.Millisecond)
 
 		if err == nil {
+			finalURLStr := targetURL
+			if finalURL != nil {
+				finalURLStr = finalURL.String()
+			}
+
+			// Directly handle PDF documents to bypass HTML readability & anti-bot escalation storms
+			if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
+				pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+				if pdfErr == nil && pdfRes.WordCount > 0 {
+					log.Printf("[Escalation] Tier 1 (Fast HTTP PDF) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
+					pdfRes.StatusCode = statusCode
+					return pdfRes, body, nil
+				}
+			}
+
 			block := DetectBotChallenge(statusCode, body, contentType)
 			if !block.IsBlocked && statusCode < 400 {
-				finalURLStr := targetURL
-				if finalURL != nil {
-					finalURLStr = finalURL.String()
-				}
-
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
 				if parsed.Scraped && parsed.WordCount > 0 {
 					log.Printf("[Escalation] Tier 1 (Fast HTTP) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
@@ -170,13 +180,24 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 		body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 4000*time.Millisecond)
 
 		if err == nil {
+			finalURLStr := targetURL
+			if finalURL != nil {
+				finalURLStr = finalURL.String()
+			}
+
+			// Directly handle PDF documents to bypass HTML readability & anti-bot escalation storms
+			if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
+				pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+				if pdfErr == nil && pdfRes.WordCount > 0 {
+					log.Printf("[Escalation] Tier 2 (Spoofed Headers PDF) succeeded in %dms for %s", time.Since(t2Start).Milliseconds(), targetURL)
+					pdfRes.StatusCode = statusCode
+					pdfRes.EscalationTier = string(TierSpoofedHeaders)
+					return pdfRes, body, nil
+				}
+			}
+
 			block := DetectBotChallenge(statusCode, body, contentType)
 			if !block.IsBlocked && statusCode < 400 {
-				finalURLStr := targetURL
-				if finalURL != nil {
-					finalURLStr = finalURL.String()
-				}
-
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
 				if parsed.Scraped && parsed.WordCount > 0 {
 					log.Printf("[Escalation] Tier 2 (Spoofed Headers - %s) bypassed challenge in %dms for %s", persona.Name, time.Since(t2Start).Milliseconds(), targetURL)
@@ -315,14 +336,25 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 				body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, proxyTransport, 6000*time.Millisecond)
 				if err == nil {
+					finalURLStr := targetURL
+					if finalURL != nil {
+						finalURLStr = finalURL.String()
+					}
+
+					if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
+						pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+						if pdfErr == nil && pdfRes.WordCount > 0 {
+							log.Printf("[Escalation] Tier 4 (Proxy PDF) succeeded in %dms for %s", time.Since(t4Start).Milliseconds(), targetURL)
+							pdfRes.StatusCode = statusCode
+							pdfRes.EscalationTier = string(TierResidentialProxy)
+							pdfRes.BotDetected = true
+							return pdfRes, body, nil
+						}
+					}
+
 					block := DetectBotChallenge(statusCode, body, contentType)
 					if !block.IsBlocked && statusCode < 400 && utils.CountWords(body) >= 20 {
 						log.Printf("[Escalation] Tier 4 (Residential Proxy HTTP) succeeded in %dms for %s", time.Since(t4Start).Milliseconds(), targetURL)
-
-						finalURLStr := targetURL
-						if finalURL != nil {
-							finalURLStr = finalURL.String()
-						}
 
 						parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
 						parsed.StatusCode = statusCode
