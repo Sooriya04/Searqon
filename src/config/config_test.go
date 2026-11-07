@@ -39,4 +39,12 @@ func TestEnvOverrides(t *testing.T) {
 	if cfg.SearXNG.URL != "http://custom-searxng:8080" {
 		t.Fatalf("expected overridden SearXNG URL, got %s", cfg.SearXNG.URL)
 	}
+
+	// Test Vector Dimension overrides
+	os.Setenv("VECTOR_DIMENSION", "1536")
+	cfgDim := LoadConfig()
+	if cfgDim.Database.Postgres.VectorDimension != 1536 {
+		t.Fatalf("expected overridden VectorDimension 1536, got %d", cfgDim.Database.Postgres.VectorDimension)
+	}
+	os.Unsetenv("VECTOR_DIMENSION")
 }
