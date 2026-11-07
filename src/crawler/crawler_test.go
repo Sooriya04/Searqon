@@ -105,4 +105,13 @@ func TestCrawlSite(t *testing.T) {
 	if streamedPages == 0 {
 		t.Errorf("Expected callback invocation for streamed pages")
 	}
+
+	// Test CrawlSite with Cached Pages (OutboundLinks and Markdown link extraction)
+	resCached := CrawlSite(ts.URL, 5, 2, "markdown", nil)
+	if resCached.Error != "" {
+		t.Fatalf("CrawlSite on cached pages failed: %s", resCached.Error)
+	}
+	if resCached.Total != 3 {
+		t.Errorf("Expected 3 crawled pages from cache, got %d", resCached.Total)
+	}
 }

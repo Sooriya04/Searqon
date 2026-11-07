@@ -169,22 +169,46 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 				}
 
 				var newLinks []crawlTask
-				if task.depth < depth && scraped.Error == "" && htmlContent != "" {
-					doc, derr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-					if derr == nil {
-						doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
-							href, ok := s.Attr("href")
-							if !ok || href == "" || strings.HasPrefix(href, "#") {
-								return
+				if task.depth < depth && scraped.Error == "" {
+					addLink := func(href string) {
+						if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "javascript:") {
+							return
+						}
+						resolved, rerr := parsedBase.Parse(href)
+						if rerr != nil || resolved.Hostname() != baseDomain {
+							return
+						}
+						resolved.Fragment = ""
+						cleanURL := resolved.String()
+						newLinks = append(newLinks, crawlTask{url: cleanURL, depth: task.depth + 1})
+					}
+
+					if htmlContent != "" {
+						doc, derr := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+						if derr == nil {
+							doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
+								if href, ok := s.Attr("href"); ok {
+									addLink(href)
+								}
+							})
+						}
+					} else {
+						// Cache hit fallback: use OutboundLinks or extract from markdown/content
+						if len(scraped.OutboundLinks) > 0 {
+							for _, link := range scraped.OutboundLinks {
+								addLink(link)
 							}
-							resolved, rerr := parsedBase.Parse(href)
-							if rerr != nil || resolved.Hostname() != baseDomain {
-								return
+						}
+						textToScan := scraped.Markdown
+						if textToScan == "" {
+							textToScan = scraped.Content
+						}
+						for _, token := range strings.Fields(textToScan) {
+							if strings.HasPrefix(token, "http://") || strings.HasPrefix(token, "https://") || strings.HasPrefix(token, "/") {
+								trimmed := strings.Trim(token, "()[]<>\"'.,;*")
+								addLink(trimmed)
 							}
-							resolved.Fragment = ""
-							cleanURL := resolved.String()
-							newLinks = append(newLinks, crawlTask{url: cleanURL, depth: task.depth + 1})
-						})
+						}
 					}
 				}
 
@@ -203,12 +227,12 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 
 	jobs <- crawlTask{url: targetURL, depth: 0}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	crawlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	for atomic.LoadInt32(&pendingTasks) > 0 {
 		select {
-		case <-ctx.Done():
+		case <-crawlCtx.Done():
 			result.Error = "crawl timeout exceeded"
 			atomic.StoreInt32(&pendingTasks, 0)
 			break
@@ -221,7 +245,7 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 					addedCount++
 					select {
 					case jobs <- link:
-					case <-ctx.Done():
+					case <-crawlCtx.Done():
 						break
 					}
 				}
