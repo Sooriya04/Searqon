@@ -2,6 +2,9 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -124,6 +127,64 @@ func TestMCPCallExtractTool(t *testing.T) {
 	resMap, ok := resp.Result.(map[string]interface{})
 	if !ok || resMap["isError"] != true {
 		t.Errorf("Expected isError=true for empty URL in searqon_extract, got %+v", resp.Result)
+	}
+
+	// Live extraction and cached extraction test
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>MCP Extract Test</title></head><body>
+			<div class="content">
+				<h2 class="title">MCP Extract Item</h2>
+				<span class="badge">Active</span>
+				<p>This is test content with sufficient length for extraction checks in Searqon MCP tool testing suite.</p>
+			</div>
+		</body></html>`)
+	}))
+	defer ts.Close()
+
+	// First call: live scrape & extract
+	callReqLive := fmt.Sprintf(`{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"searqon_extract","arguments":{"url":%q,"selectors":{"heading":".title","status":".badge"},"bypass_cache":true}}}`, ts.URL)
+	respBytesLive, err := server.HandleMessage([]byte(callReqLive))
+	if err != nil {
+		t.Fatalf("Live HandleMessage failed: %v", err)
+	}
+	var respLive JSONRPCResponse
+	if err := json.Unmarshal(respBytesLive, &respLive); err != nil {
+		t.Fatalf("Live unmarshal failed: %v", err)
+	}
+	resMapLive := respLive.Result.(map[string]interface{})
+	contentLive := resMapLive["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
+
+	var extractedLive map[string]interface{}
+	if err := json.Unmarshal([]byte(contentLive), &extractedLive); err != nil {
+		t.Fatalf("Failed to parse extracted JSON: %v", err)
+	}
+	selDataLive := extractedLive["selectors_data"].(map[string]interface{})
+	if selDataLive["heading"] != "MCP Extract Item" || selDataLive["status"] != "Active" {
+		t.Fatalf("Live selector extraction failed: %+v", selDataLive)
+	}
+
+	// Second call: cached extraction (bypass_cache=false)
+	callReqCached := fmt.Sprintf(`{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"searqon_extract","arguments":{"url":%q,"selectors":{"heading":".title","status":".badge"},"bypass_cache":false}}}`, ts.URL)
+	respBytesCached, err := server.HandleMessage([]byte(callReqCached))
+	if err != nil {
+		t.Fatalf("Cached HandleMessage failed: %v", err)
+	}
+	var respCached JSONRPCResponse
+	if err := json.Unmarshal(respBytesCached, &respCached); err != nil {
+		t.Fatalf("Cached unmarshal failed: %v", err)
+	}
+	resMapCached := respCached.Result.(map[string]interface{})
+	contentCached := resMapCached["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
+
+	var extractedCached map[string]interface{}
+	if err := json.Unmarshal([]byte(contentCached), &extractedCached); err != nil {
+		t.Fatalf("Failed to parse cached extracted JSON: %v", err)
+	}
+	selDataCached := extractedCached["selectors_data"].(map[string]interface{})
+	if selDataCached["heading"] != "MCP Extract Item" || selDataCached["status"] != "Active" {
+		t.Fatalf("Cached selector extraction failed: %+v", selDataCached)
 	}
 }
 
