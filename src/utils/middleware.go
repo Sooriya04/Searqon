@@ -60,16 +60,42 @@ func getClientLimiter(ip string) *rate.Limiter {
 	return actual.(clientLimiterEntry).limiter
 }
 
+// GetClientIP extracts the real client IP address from reverse proxy headers (X-Forwarded-For, X-Real-IP)
+// or falls back to RemoteAddr.
+func GetClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		for _, part := range parts {
+			ip := strings.TrimSpace(part)
+			if parsed := net.ParseIP(ip); parsed != nil {
+				return ip
+			}
+		}
+	}
+
+	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
+		if parsed := net.ParseIP(xrip); parsed != nil {
+			return xrip
+		}
+	}
+
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	if parsed := net.ParseIP(ip); parsed != nil {
+		return ip
+	}
+	if ip != "" {
+		return ip
+	}
+	return "127.0.0.1"
+}
+
 // InboundRateLimitMiddleware protects Searqon from client API rate limit abuse.
 func InboundRateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
-		}
-		if ip == "" {
-			ip = "127.0.0.1"
-		}
+		ip := GetClientIP(r)
 
 		limiter := getClientLimiter(ip)
 		if !limiter.Allow() {
