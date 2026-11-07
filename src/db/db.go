@@ -219,6 +219,8 @@ func initSQLiteTables() {
 		extraction_method   TEXT,
 		error_msg           TEXT,
 		fetch_duration_ms   INTEGER,
+		content_hash        TEXT,
+		scraped_at          DATETIME,
 		created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
 		expires_at          DATETIME
 	);
@@ -235,6 +237,48 @@ func initSQLiteTables() {
 	_, err := sqliteDB.Exec(schema)
 	if err != nil {
 		log.Printf("[Database] Error creating SQLite tables: %v", err)
+	}
+
+	migrateSQLiteTables()
+}
+
+func migrateSQLiteTables() {
+	if sqliteDB == nil {
+		return
+	}
+
+	rows, err := sqliteDB.Query("PRAGMA table_info(scrape_cache);")
+	if err != nil {
+		log.Printf("[Database] Failed to inspect scrape_cache columns: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	existingCols := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err == nil {
+			existingCols[strings.ToLower(name)] = true
+		}
+	}
+
+	if !existingCols["content_hash"] {
+		if _, err := sqliteDB.Exec("ALTER TABLE scrape_cache ADD COLUMN content_hash TEXT;"); err != nil {
+			log.Printf("[Database] Migration: failed to add column content_hash to scrape_cache: %v", err)
+		} else {
+			log.Println("[Database] Migration: added column content_hash to scrape_cache successfully")
+		}
+	}
+
+	if !existingCols["scraped_at"] {
+		if _, err := sqliteDB.Exec("ALTER TABLE scrape_cache ADD COLUMN scraped_at DATETIME;"); err != nil {
+			log.Printf("[Database] Migration: failed to add column scraped_at to scrape_cache: %v", err)
+		} else {
+			log.Println("[Database] Migration: added column scraped_at to scrape_cache successfully")
+		}
 	}
 }
 

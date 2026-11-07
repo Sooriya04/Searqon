@@ -30,26 +30,47 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := search.RunSearchPipeline(query, 5, true, false, 0, true, "")
+	search.RunSearchPipelineStream(r.Context(), query, 5, true, false, 0, true, "", func(evt search.SearchEvent) {
+		switch evt.Type {
+		case "discovery":
+			discBytes, _ := json.Marshal(map[string]interface{}{
+				"query":    query,
+				"provider": evt.Provider,
+				"total":    evt.Total,
+			})
+			fmt.Fprintf(w, "event: discovery\ndata: %s\n\n", discBytes)
+			flusher.Flush()
 
-	discBytes, _ := json.Marshal(map[string]interface{}{
-		"query":    query,
-		"provider": res.Provider,
-		"total":    res.Total,
+		case "scrape":
+			if evt.Result != nil {
+				itemBytes, _ := json.Marshal(evt.Result)
+				fmt.Fprintf(w, "event: scrape\ndata: %s\n\n", itemBytes)
+				flusher.Flush()
+			}
+
+		case "result":
+			if evt.Result != nil {
+				itemBytes, _ := json.Marshal(evt.Result)
+				fmt.Fprintf(w, "event: result\ndata: %s\n\n", itemBytes)
+				flusher.Flush()
+			}
+
+		case "synthesis":
+			dataBytes, _ := json.Marshal(evt.Data)
+			fmt.Fprintf(w, "event: synthesis\ndata: %s\n\n", dataBytes)
+			flusher.Flush()
+
+		case "summary":
+			dataBytes, _ := json.Marshal(map[string]interface{}{
+				"summary": evt.Summary,
+			})
+			fmt.Fprintf(w, "event: summary\ndata: %s\n\n", dataBytes)
+			flusher.Flush()
+
+		case "done":
+			doneBytes, _ := json.Marshal(evt.Data)
+			fmt.Fprintf(w, "event: done\ndata: %s\n\n", doneBytes)
+			flusher.Flush()
+		}
 	})
-	fmt.Fprintf(w, "event: discovery\ndata: %s\n\n", discBytes)
-	flusher.Flush()
-
-	for _, item := range res.Results {
-		itemBytes, _ := json.Marshal(item)
-		fmt.Fprintf(w, "event: result\ndata: %s\n\n", itemBytes)
-		flusher.Flush()
-	}
-
-	doneBytes, _ := json.Marshal(map[string]interface{}{
-		"duration_ms": res.Duration,
-		"summary":     res.Summary,
-	})
-	fmt.Fprintf(w, "event: done\ndata: %s\n\n", doneBytes)
-	flusher.Flush()
 }

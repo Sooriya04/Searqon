@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"src/models"
+	"src/utils"
 )
 
 func cosineSimilarity(a, b []float32) float64 {
@@ -33,7 +34,7 @@ func cosineSimilarity(a, b []float32) float64 {
 }
 
 func semanticRankResults(results []models.SearchResult, query string) []models.SearchResult {
-	if len(results) <= 1 || strings.TrimSpace(query) == "" {
+	if len(results) <= 1 || strings.TrimSpace(query) == "" || !utils.IsOllamaEnabled() {
 		return results
 	}
 

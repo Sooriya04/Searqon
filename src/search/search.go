@@ -165,12 +165,30 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 	return results, nil
 }
 
+// SearchEvent represents an incremental streaming event during pipeline execution.
+type SearchEvent struct {
+	Type     string               `json:"type"` // "discovery", "scrape", "result", "synthesis", "summary", "done"
+	Data     interface{}          `json:"data,omitempty"`
+	Result   *models.SearchResult `json:"result,omitempty"`
+	Summary  string               `json:"summary,omitempty"`
+	Provider string               `json:"provider,omitempty"`
+	Total    int                  `json:"total,omitempty"`
+}
+
+// SearchEventHandler is a callback invoked as events occur in the search pipeline.
+type SearchEventHandler func(SearchEvent)
+
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
 func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
 	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, summarize, extractSchema)
 }
 
 func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, summarize, extractSchema, nil)
+}
+
+// RunSearchPipelineStream executes the search pipeline and invokes onEvent for incremental streaming updates.
+func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
@@ -181,6 +199,15 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 	if err := ctx.Err(); err != nil {
 		response.Duration = time.Since(start).Milliseconds()
 		response.Provider = "aborted"
+		if onEvent != nil {
+			onEvent(SearchEvent{
+				Type: "done",
+				Data: map[string]interface{}{
+					"duration_ms": response.Duration,
+					"error":       "aborted",
+				},
+			})
+		}
 		return response
 	}
 
@@ -192,6 +219,33 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 			response.Total = len(cachedResults)
 			response.Provider = provider
 			response.Duration = time.Since(start).Milliseconds()
+
+			if onEvent != nil {
+				onEvent(SearchEvent{
+					Type:     "discovery",
+					Provider: provider,
+					Total:    len(cachedResults),
+					Data: map[string]interface{}{
+						"query":    query,
+						"provider": provider,
+						"total":    len(cachedResults),
+					},
+				})
+				for _, r := range cachedResults {
+					item := r
+					onEvent(SearchEvent{
+						Type:   "result",
+						Result: &item,
+						Data:   item,
+					})
+				}
+				onEvent(SearchEvent{
+					Type: "done",
+					Data: map[string]interface{}{
+						"duration_ms": response.Duration,
+					},
+				})
+			}
 			return response
 		}
 		utils.RecordSearchCacheMiss()
@@ -208,6 +262,24 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 	if len(results) == 0 {
 		response.Duration = time.Since(start).Milliseconds()
 		response.Provider = "none"
+		if onEvent != nil {
+			onEvent(SearchEvent{
+				Type:     "discovery",
+				Provider: "none",
+				Total:    0,
+				Data: map[string]interface{}{
+					"query":    query,
+					"provider": "none",
+					"total":    0,
+				},
+			})
+			onEvent(SearchEvent{
+				Type: "done",
+				Data: map[string]interface{}{
+					"duration_ms": response.Duration,
+				},
+			})
+		}
 		return response
 	}
 
@@ -226,6 +298,20 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 	slog.Info("Search Pipeline Discovered URLs", "query", query, "count", len(results), "provider", response.Provider)
 	for _, r := range results {
 		slog.Info("Discovered URL", "url", r.URL, "title", r.Title, "source", r.Source)
+	}
+
+	// Emit discovery event immediately upon search discovery & initial RRF
+	if onEvent != nil {
+		onEvent(SearchEvent{
+			Type:     "discovery",
+			Provider: response.Provider,
+			Total:    len(results),
+			Data: map[string]interface{}{
+				"query":    query,
+				"provider": response.Provider,
+				"total":    len(results),
+			},
+		})
 	}
 
 	// 4. Concurrent Scrape with 15s Deadline
@@ -248,8 +334,9 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 		var wg sync.WaitGroup
 
 		for i := 0; i < scrapeLimit; i++ {
+			targetURL := results[i].URL
 			wg.Add(1)
-			go func(idx int) {
+			go func(idx int, targetURL string) {
 				defer wg.Done()
 
 				select {
@@ -258,7 +345,7 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 				default:
 				}
 
-				scraped, _ := scraper.ScrapeSingleURLWithOptionsContext(scrapeCtx, results[idx].URL, scraper.ScrapeOptions{
+				scraped, _ := scraper.ScrapeSingleURLWithOptionsContext(scrapeCtx, targetURL, scraper.ScrapeOptions{
 					Format:        "markdown",
 					BypassCache:   bypassCache,
 					ExtractSchema: extractSchema,
@@ -266,7 +353,7 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 
 				select {
 				case <-scrapeCtx.Done():
-					slog.Warn("Scrape Timeout", "url", results[idx].URL)
+					slog.Warn("Scrape Timeout", "url", targetURL)
 					return
 				default:
 				}
@@ -278,40 +365,65 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 						content = utils.TruncateTextByWords(content, maxWords)
 					}
 
+					var itemCopy models.SearchResult
 					mu.Lock()
-					results[idx].Content = content
-					results[idx].Markdown = scraped.Markdown
-					results[idx].Metadata = scraped.Metadata
-					results[idx].Scraped = true
-					results[idx].ContentHash = scraped.ContentHash
-					if scraped.ScrapedAt != "" {
-						results[idx].FetchedAt = scraped.ScrapedAt
-					} else {
-						results[idx].FetchedAt = time.Now().UTC().Format(time.RFC3339)
+					if idx < len(results) {
+						results[idx].Content = content
+						results[idx].Markdown = scraped.Markdown
+						results[idx].Metadata = scraped.Metadata
+						results[idx].Scraped = true
+						results[idx].ContentHash = scraped.ContentHash
+						if scraped.ScrapedAt != "" {
+							results[idx].FetchedAt = scraped.ScrapedAt
+						} else {
+							results[idx].FetchedAt = time.Now().UTC().Format(time.RFC3339)
+						}
+						itemCopy = results[idx]
 					}
 					mu.Unlock()
 
-					slog.Info("Scrape Success", "url", results[idx].URL, "word_count", scraped.WordCount, "duration_ms", scraped.Duration)
+					slog.Info("Scrape Success", "url", targetURL, "word_count", scraped.WordCount, "duration_ms", scraped.Duration)
+
+					if onEvent != nil && itemCopy.URL != "" {
+						onEvent(SearchEvent{
+							Type:   "scrape",
+							Result: &itemCopy,
+							Data:   itemCopy,
+						})
+					}
 
 					// Async save embeddings if vector database is active
 					go func(urlStr, txt string) {
 						if emb, err := GetVectorEmbedding(txt); err == nil {
 							db.SavePageEmbedding(urlStr, emb)
 						}
-					}(results[idx].URL, scraped.Content)
+					}(targetURL, scraped.Content)
 				} else {
-					mu.Lock()
-					results[idx].Scraped = false
+					var itemCopy models.SearchResult
 					errReason := scraped.Error
 					if errReason == "" {
 						errReason = "Content too short (word count < 50)"
 					}
-					results[idx].ScrapeError = errReason
+
+					mu.Lock()
+					if idx < len(results) {
+						results[idx].Scraped = false
+						results[idx].ScrapeError = errReason
+						itemCopy = results[idx]
+					}
 					mu.Unlock()
 
-					slog.Error("Scrape Failed", "url", results[idx].URL, "error", errReason, "duration_ms", scraped.Duration)
+					slog.Error("Scrape Failed", "url", targetURL, "error", errReason, "duration_ms", scraped.Duration)
+
+					if onEvent != nil && itemCopy.URL != "" {
+						onEvent(SearchEvent{
+							Type:   "scrape",
+							Result: &itemCopy,
+							Data:   itemCopy,
+						})
+					}
 				}
-			}(i)
+			}(i, targetURL)
 		}
 
 		done := make(chan struct{})
@@ -330,11 +442,38 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 	results = DeduplicateResults(results)
 	results = HybridRankResults(results, query)
 
+	// Stream final ranked results
+	if onEvent != nil {
+		for _, item := range results {
+			it := item
+			onEvent(SearchEvent{
+				Type:   "result",
+				Result: &it,
+				Data:   it,
+			})
+		}
+	}
+
 	response.Results = results
 	response.Total = len(results)
 	if summarize && len(results) > 0 {
+		if onEvent != nil {
+			onEvent(SearchEvent{
+				Type: "synthesis",
+				Data: map[string]interface{}{"status": "synthesizing"},
+			})
+		}
 		if summary, err := SynthesizeAnswer(query, results); err == nil {
 			response.Summary = summary
+			if onEvent != nil {
+				onEvent(SearchEvent{
+					Type:    "summary",
+					Summary: summary,
+					Data: map[string]interface{}{
+						"summary": summary,
+					},
+				})
+			}
 		}
 	}
 	response.Duration = time.Since(start).Milliseconds()
@@ -342,6 +481,16 @@ func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, 
 	// 6. Save cache (only if we got results, to prevent caching transient timeouts)
 	if len(results) > 0 {
 		db.SaveSearchCache(query, results, response.Provider)
+	}
+
+	if onEvent != nil {
+		onEvent(SearchEvent{
+			Type: "done",
+			Data: map[string]interface{}{
+				"duration_ms": response.Duration,
+				"summary":     response.Summary,
+			},
+		})
 	}
 
 	return response

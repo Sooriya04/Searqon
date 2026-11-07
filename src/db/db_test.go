@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -58,6 +59,7 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 
 	// 2. Test Scrape Cache
+	nowISO := time.Now().UTC().Format(time.RFC3339)
 	scrapeRes := models.ScrapeResult{
 		URL:         "https://example.com/test",
 		Title:       "Test Page",
@@ -67,6 +69,8 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 		Scraped:     true,
 		StatusCode:  200,
 		ContentType: "text/html",
+		ContentHash: "a1b2c3d4e5f6",
+		ScrapedAt:   nowISO,
 	}
 	SaveScrapeCache(scrapeRes)
 
@@ -76,6 +80,12 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 	if cachedScrape.Title != "Test Page" || cachedScrape.WordCount != 8 {
 		t.Fatalf("unexpected scrape cache result: %+v", cachedScrape)
+	}
+	if cachedScrape.ContentHash != "a1b2c3d4e5f6" {
+		t.Fatalf("expected content_hash 'a1b2c3d4e5f6', got '%s'", cachedScrape.ContentHash)
+	}
+	if cachedScrape.ScrapedAt == "" {
+		t.Fatalf("expected scraped_at to be populated")
 	}
 
 	// 3. Test Sessions
@@ -104,5 +114,102 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 	if ftsResults[0].URL != "https://example.com/test" {
 		t.Fatalf("unexpected FTS result URL: %s", ftsResults[0].URL)
+	}
+}
+
+func TestSQLiteSchemaMigrationPreExistingDB(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "searqon_migration_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "legacy_searqon.db")
+
+	// Create legacy database lacking content_hash and scraped_at
+	legacyDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to create legacy db: %v", err)
+	}
+	legacySchema := `
+	CREATE TABLE scrape_cache (
+		url                 TEXT PRIMARY KEY,
+		canonical_url       TEXT,
+		domain              TEXT NOT NULL DEFAULT 'unknown',
+		title               TEXT,
+		content             TEXT,
+		markdown            TEXT,
+		metadata            TEXT DEFAULT '{}',
+		structured_data     TEXT DEFAULT 'null',
+		word_count          INTEGER DEFAULT 0,
+		description         TEXT,
+		author              TEXT,
+		published_at        DATETIME,
+		language            TEXT,
+		outbound_links      TEXT DEFAULT '[]',
+		status_code         INTEGER,
+		content_type        TEXT,
+		scraped             INTEGER DEFAULT 1,
+		extraction_method   TEXT,
+		error_msg           TEXT,
+		fetch_duration_ms   INTEGER,
+		created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+		expires_at          DATETIME
+	);
+	`
+	if _, err := legacyDB.Exec(legacySchema); err != nil {
+		legacyDB.Close()
+		t.Fatalf("failed to create legacy scrape_cache table: %v", err)
+	}
+	legacyDB.Close()
+
+	// Initialize with Searqon - this triggers initSQLite and migrateSQLiteTables
+	initSQLite(dbPath)
+	defer CloseDB()
+
+	// Verify columns exist now
+	rows, err := sqliteDB.Query("PRAGMA table_info(scrape_cache);")
+	if err != nil {
+		t.Fatalf("PRAGMA table_info failed: %v", err)
+	}
+	defer rows.Close()
+
+	cols := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err == nil {
+			cols[name] = true
+		}
+	}
+
+	if !cols["content_hash"] {
+		t.Errorf("migration failed: content_hash column missing")
+	}
+	if !cols["scraped_at"] {
+		t.Errorf("migration failed: scraped_at column missing")
+	}
+
+	// Verify SaveScrapeCache works on this migrated DB without error
+	nowISO := time.Now().UTC().Format(time.RFC3339)
+	res := models.ScrapeResult{
+		URL:         "https://migrated.local/article",
+		Title:       "Migrated Page",
+		Content:     "Content on migrated sqlite table",
+		Markdown:    "Content on migrated sqlite table",
+		Scraped:     true,
+		ContentHash: "hash-legacy-12345",
+		ScrapedAt:   nowISO,
+	}
+	SaveScrapeCache(res)
+
+	got, found := GetScrapeCache("https://migrated.local/article")
+	if !found {
+		t.Fatalf("expected to find saved scrape cache in migrated table")
+	}
+	if got.ContentHash != "hash-legacy-12345" {
+		t.Errorf("expected ContentHash 'hash-legacy-12345', got '%s'", got.ContentHash)
 	}
 }
