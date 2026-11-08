@@ -1,0 +1,96 @@
+package utcp
+
+import (
+	"encoding/json"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+)
+
+// Server handles UTCP manual discovery requests over HTTP.
+type Server struct {
+	mu            sync.RWMutex
+	cachedManuals map[string][]byte
+}
+
+// NewServer initializes a new Server for UTCP discovery.
+func NewServer() *Server {
+	return &Server{
+		cachedManuals: make(map[string][]byte),
+	}
+}
+
+// ResolveBaseURL dynamically calculates the public base URL based on environment variables,
+// reverse-proxy headers, and host headers.
+func (s *Server) ResolveBaseURL(r *http.Request) string {
+	// 1. Explicit override via SEARQON_PUBLIC_URL environment variable
+	if envURL := os.Getenv("SEARQON_PUBLIC_URL"); envURL != "" {
+		return strings.TrimRight(envURL, "/")
+	}
+
+	// 2. Resolve scheme (reverse-proxy aware)
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+
+	// 3. Resolve host (reverse-proxy aware)
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		// If multiple comma-separated hosts are provided, use the first one
+		if commaIdx := strings.Index(fwdHost, ","); commaIdx != -1 {
+			host = strings.TrimSpace(fwdHost[:commaIdx])
+		} else {
+			host = strings.TrimSpace(fwdHost)
+		}
+	}
+
+	if host == "" {
+		host = "localhost:7493"
+	}
+
+	return scheme + "://" + host
+}
+
+// ManualHandler serves the UTCP manual as formatted JSON with CORS headers.
+func (s *Server) ManualHandler(w http.ResponseWriter, r *http.Request) {
+	// Enable CORS for web-based or local agent runtimes
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	baseURL := s.ResolveBaseURL(r)
+
+	s.mu.RLock()
+	data, ok := s.cachedManuals[baseURL]
+	s.mu.RUnlock()
+
+	if !ok {
+		manual := BuildManual(baseURL)
+		marshaled, err := json.MarshalIndent(manual, "", "  ")
+		if err != nil {
+			http.Error(w, "Failed to encode UTCP manual", http.StatusInternalServerError)
+			return
+		}
+		data = marshaled
+
+		s.mu.Lock()
+		s.cachedManuals[baseURL] = data
+		s.mu.Unlock()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
