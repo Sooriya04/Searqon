@@ -8,16 +8,20 @@ import (
 	"sync"
 )
 
+const maxCachedManuals = 16
+
 // Server handles UTCP manual discovery requests over HTTP.
 type Server struct {
 	mu            sync.RWMutex
 	cachedManuals map[string][]byte
+	cacheOrder    []string // FIFO / LRU eviction tracker
 }
 
 // NewServer initializes a new Server for UTCP discovery.
 func NewServer() *Server {
 	return &Server{
 		cachedManuals: make(map[string][]byte),
+		cacheOrder:    make([]string, 0, maxCachedManuals),
 	}
 }
 
@@ -83,10 +87,22 @@ func (s *Server) ManualHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to encode UTCP manual", http.StatusInternalServerError)
 			return
 		}
-		data = marshaled
 
 		s.mu.Lock()
-		s.cachedManuals[baseURL] = data
+		// Double-checked locking to avoid redundant serialization and race conditions
+		if existing, found := s.cachedManuals[baseURL]; found {
+			data = existing
+		} else {
+			// Enforce LRU / FIFO cap of maxCachedManuals (16) to avoid host header DoS
+			if len(s.cachedManuals) >= maxCachedManuals && len(s.cacheOrder) > 0 {
+				oldest := s.cacheOrder[0]
+				s.cacheOrder = s.cacheOrder[1:]
+				delete(s.cachedManuals, oldest)
+			}
+			s.cachedManuals[baseURL] = marshaled
+			s.cacheOrder = append(s.cacheOrder, baseURL)
+			data = marshaled
+		}
 		s.mu.Unlock()
 	}
 

@@ -298,3 +298,30 @@ func TestScrapeHandler_LiveExecution(t *testing.T) {
 		t.Errorf("Extracted content missing expected text: %s", resp.Data.Markdown)
 	}
 }
+
+func TestCrawlHandler_ParameterParity(t *testing.T) {
+	var ts *httptest.Server
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, `<html><body><h1>Root</h1><a href="%s/sub">Sub</a></body></html>`, ts.URL)
+	}))
+	defer ts.Close()
+
+	// 1. Test using 'depth'
+	body1 := fmt.Sprintf(`{"url": "%s", "depth": 1, "limit": 2}`, ts.URL)
+	req1 := httptest.NewRequest(http.MethodPost, "/crawl", bytes.NewBufferString(body1))
+	rr1 := httptest.NewRecorder()
+	CrawlHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for crawl with depth, got %d: %s", rr1.Code, rr1.Body.String())
+	}
+
+	// 2. Test using 'max_depth' alias
+	body2 := fmt.Sprintf(`{"url": "%s", "max_depth": 1, "limit": 2}`, ts.URL)
+	req2 := httptest.NewRequest(http.MethodPost, "/crawl", bytes.NewBufferString(body2))
+	rr2 := httptest.NewRecorder()
+	CrawlHandler(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for crawl with max_depth, got %d: %s", rr2.Code, rr2.Body.String())
+	}
+}

@@ -185,14 +185,14 @@ func BuildManual(baseURL string) UtcpManual {
 						Type:        "string",
 						Description: "Root URL to begin crawling from.",
 					},
-					"max_depth": {
+					"depth": {
 						Type:        "integer",
-						Description: "Maximum recursive link traversal depth (default: 2, max: 5).",
+						Description: "Maximum recursive link traversal depth (default: 2, max: 3).",
 						Default:     2,
 					},
 					"limit": {
 						Type:        "integer",
-						Description: "Maximum total pages to scrape (default: 20, max: 100).",
+						Description: "Maximum total pages to scrape (default: 20, max: 50).",
 						Default:     20,
 					},
 				},

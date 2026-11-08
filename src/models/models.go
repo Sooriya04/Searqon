@@ -195,6 +195,7 @@ type CrawlRequest struct {
 	URL      string `json:"url"`
 	Limit    int    `json:"limit"`
 	Depth    int    `json:"depth"`
+	MaxDepth int    `json:"max_depth,omitempty"`
 	Format   string `json:"format"`
 	Stream   bool   `json:"stream"`
 	MaxWords int    `json:"max_words"`
