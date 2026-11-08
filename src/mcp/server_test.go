@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"src/models"
@@ -246,5 +247,69 @@ func TestMCPUnknownMethod(t *testing.T) {
 
 	if resp.Error == nil || !strings.Contains(resp.Error.Message, "Method not found") {
 		t.Errorf("Expected method not found error, got: %+v", resp.Error)
+	}
+}
+
+func TestMCPProgressNotifications(t *testing.T) {
+	server := NewServer()
+
+	var notifications []ProgressNotification
+	var notifyMu sync.Mutex
+
+	server.SetNotificationWriter(func(b []byte) {
+		notifyMu.Lock()
+		defer notifyMu.Unlock()
+		var n ProgressNotification
+		if err := json.Unmarshal(b, &n); err == nil {
+			notifications = append(notifications, n)
+		}
+	})
+
+	callReq := `{
+		"jsonrpc": "2.0",
+		"id": 42,
+		"method": "tools/call",
+		"params": {
+			"name": "searqon_search",
+			"arguments": {
+				"query": "golang mcp progress test"
+			},
+			"_meta": {
+				"progressToken": "token-xyz-123"
+			}
+		}
+	}`
+
+	respBytes, err := server.HandleMessage([]byte(callReq))
+	if err != nil {
+		t.Fatalf("HandleMessage failed: %v", err)
+	}
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("Unmarshal response failed: %v", err)
+	}
+
+	if resp.Error != nil {
+		t.Fatalf("Unexpected tool execution error: %+v", resp.Error)
+	}
+
+	notifyMu.Lock()
+	defer notifyMu.Unlock()
+
+	if len(notifications) == 0 {
+		t.Fatalf("Expected progress notifications to be emitted when progressToken is provided, got 0")
+	}
+
+	for _, notif := range notifications {
+		if notif.Method != "notifications/progress" {
+			t.Errorf("Expected method 'notifications/progress', got '%s'", notif.Method)
+		}
+		if notif.Params.ProgressToken != "token-xyz-123" {
+			t.Errorf("Expected progressToken 'token-xyz-123', got '%v'", notif.Params.ProgressToken)
+		}
+		if notif.Params.Total <= 0 {
+			t.Errorf("Expected positive total in progress notification, got %f", notif.Params.Total)
+		}
 	}
 }

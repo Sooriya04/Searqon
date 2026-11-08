@@ -211,7 +211,8 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 		return response
 	}
 
-	// 1. Check PostgreSQL cache first
+	// 1. Check exact cache first
+	var queryEmbedding []float32
 	if !bypassCache {
 		if cachedResults, provider, found := db.GetSearchCache(query); found {
 			utils.RecordSearchCacheHit()
@@ -248,6 +249,50 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 			}
 			return response
 		}
+
+		// 1b. Semantic query cache near-match lookup (Ollama / vector embeddings)
+		if utils.IsOllamaEnabled() {
+			if emb, err := GetVectorEmbedding(query); err == nil && len(emb) > 0 {
+				queryEmbedding = emb
+				if semResults, _, sim, found := db.GetSemanticSearchCache(query, queryEmbedding, 0.92); found {
+					utils.RecordSearchCacheHit()
+					response.Results = semResults
+					response.Total = len(semResults)
+					response.Provider = "semantic_cache"
+					response.Duration = time.Since(start).Milliseconds()
+
+					if onEvent != nil {
+						onEvent(SearchEvent{
+							Type:     "discovery",
+							Provider: "semantic_cache",
+							Total:    len(semResults),
+							Data: map[string]interface{}{
+								"query":      query,
+								"provider":   "semantic_cache",
+								"similarity": sim,
+								"total":      len(semResults),
+							},
+						})
+						for _, r := range semResults {
+							item := r
+							onEvent(SearchEvent{
+								Type:   "result",
+								Result: &item,
+								Data:   item,
+							})
+						}
+						onEvent(SearchEvent{
+							Type: "done",
+							Data: map[string]interface{}{
+								"duration_ms": response.Duration,
+							},
+						})
+					}
+					return response
+				}
+			}
+		}
+
 		utils.RecordSearchCacheMiss()
 	}
 
@@ -480,7 +525,12 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 
 	// 6. Save cache (only if we got results, to prevent caching transient timeouts)
 	if len(results) > 0 {
-		db.SaveSearchCache(query, results, response.Provider)
+		if len(queryEmbedding) == 0 && utils.IsOllamaEnabled() {
+			if emb, err := GetVectorEmbedding(query); err == nil && len(emb) > 0 {
+				queryEmbedding = emb
+			}
+		}
+		db.SaveSearchCacheWithEmbedding(query, results, response.Provider, queryEmbedding)
 	}
 
 	if onEvent != nil {

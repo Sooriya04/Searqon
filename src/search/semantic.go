@@ -10,27 +10,7 @@ import (
 )
 
 func cosineSimilarity(a, b []float32) float64 {
-	if len(a) == 0 || len(b) == 0 {
-		return 0
-	}
-
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-
-	var dot, magA, magB float64
-	for i := 0; i < n; i++ {
-		af := float64(a[i])
-		bf := float64(b[i])
-		dot += af * bf
-		magA += af * af
-		magB += bf * bf
-	}
-	if magA == 0 || magB == 0 {
-		return 0
-	}
-	return dot / (math.Sqrt(magA) * math.Sqrt(magB))
+	return utils.CosineSimilarity(a, b)
 }
 
 func semanticRankResults(results []models.SearchResult, query string) []models.SearchResult {

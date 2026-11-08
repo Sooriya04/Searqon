@@ -21,6 +21,7 @@ import (
 type inMemorySearchEntry struct {
 	results   []models.SearchResult
 	provider  string
+	embedding []float32
 	createdAt time.Time
 }
 
@@ -194,6 +195,7 @@ func initSQLiteTables() {
 		query TEXT PRIMARY KEY,
 		results TEXT NOT NULL,
 		provider TEXT NOT NULL,
+		embedding TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_search_cache_created_at ON search_cache(created_at);
@@ -280,6 +282,29 @@ func migrateSQLiteTables() {
 			log.Println("[Database] Migration: added column scraped_at to scrape_cache successfully")
 		}
 	}
+
+	// Migrate search_cache columns
+	sRows, err := sqliteDB.Query("PRAGMA table_info(search_cache);")
+	if err == nil {
+		defer sRows.Close()
+		existingSearchCols := make(map[string]bool)
+		for sRows.Next() {
+			var cid int
+			var name, ctype string
+			var notnull, pk int
+			var dfltValue interface{}
+			if err := sRows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err == nil {
+				existingSearchCols[strings.ToLower(name)] = true
+			}
+		}
+		if !existingSearchCols["embedding"] {
+			if _, err := sqliteDB.Exec("ALTER TABLE search_cache ADD COLUMN embedding TEXT;"); err != nil {
+				log.Printf("[Database] Migration: failed to add column embedding to search_cache: %v", err)
+			} else {
+				log.Println("[Database] Migration: added column embedding to search_cache successfully")
+			}
+		}
+	}
 }
 
 func initPostgresTables() {
@@ -291,6 +316,7 @@ func initPostgresTables() {
 		query TEXT PRIMARY KEY,
 		results JSONB NOT NULL,
 		provider TEXT NOT NULL,
+		embedding TEXT,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	);
 
