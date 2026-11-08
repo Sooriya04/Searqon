@@ -3,6 +3,7 @@
 [![Docker Hub](https://img.shields.io/docker/v/sooriya04/searqon?label=Docker%20Hub&color=2496ed)](https://hub.docker.com/r/sooriya04/searqon)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fsooriya04%2Fsearqon-24292e?logo=github)](https://github.com/Sooriya04/Searqon/pkgs/container/searqon)
 [![Version](https://img.shields.io/badge/version-v1.2.0-blue)](https://github.com/Sooriya04/Searqon/releases)
+[![UTCP Spec](https://img.shields.io/badge/UTCP-v1.0.1%2B-blueviolet)](https://github.com/universal-tool-calling-protocol)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Searqon is an open-source, self-hosted web intelligence engine that **searches, crawls, scrapes, ranks, and synthesizes** information from the internet. Built entirely in Go for maximum performance, minimal resource usage, and total transparency.
@@ -49,11 +50,44 @@ Full MCP integration guide: [`MCP.md`](./MCP.md) | [`docs/MCP.md`](./docs/MCP.md
 
 ---
 
+## 🔌 Dual Native Agent Protocols: MCP & UTCP (Universal Tool Calling Protocol)
+
+Searqon provides **first-class dual native protocol support** for modern AI agent architectures:
+
+| Dimension | MCP (Model Context Protocol) | UTCP (Universal Tool Calling Protocol) |
+| :--- | :--- | :--- |
+| **Primary Target** | Desktop chat harnesses (Claude Desktop, Cursor, Windsurf) | Autonomous agent frameworks, microservices, and Code-Mode sandboxes |
+| **Discovery Route** | `tools/list` JSON-RPC method | `GET /utcp` or `GET /utcp/manual` returning standard UTCP JSON manual |
+| **Transport** | Stdio pipe or stateful HTTP Server-Sent Events (`/mcp`) | Stateless HTTP REST (`/search`, `/scrape`) & SSE streams (`/search/stream`) |
+| **Execution Paradigm** | Sequential multi-turn round-trips: `Model → Tool Call → Model → Tool Call` | Single-turn batching via `@utcp/code-mode` scripts (`Promise.all`) |
+| **Intermediary Requirements** | Requires long-lived daemon process or stdio bridge | Zero daemons: direct HTTP calls to Searqon origin with full CORS |
+
+### Code-Mode Single-Turn Batching vs. Sequential MCP Round-Trips
+
+In typical multi-step research tasks (Search → Scrape URL 1 → Scrape URL 2 → Extract Tables), sequential MCP tool calling forces **4 to 8 iterative LLM inference round-trips**. Each turn incurs 2–5 seconds of inference latency and repeatedly burns context window tokens with serialized conversation turns.
+
+With **Searqon UTCP + Code-Mode (`@utcp/code-mode`)**, the agent writes a concise JavaScript/TypeScript snippet that batches operations:
+```typescript
+const search = await searqon.searqon_search({ query: "generative AI in robotics", limit: 3 });
+const pages = await Promise.all(search.results.map(r => searqon.searqon_scrape({ url: r.url })));
+return { query: search.query, dossier: pages.map(p => ({ title: p.title, markdown: p.markdown })) };
+```
+
+**Measurable Benefits:**
+- **Latency**: Cut by **60–80%** (1 LLM inference turn instead of 4–8 sequential turns).
+- **Token Efficiency**: Prevents repeated prompt/schema inflation across intermediate chat messages.
+- **Concurrency**: Parallelizes scraping directly over native HTTP pipelines.
+
+Complete UTCP specification, tool schemas, and recipes: [**`docs/utcp.md`**](./docs/utcp.md)
+
+---
+
 ## 📖 Documentation
 
 Complete documentation is available in the [`docs/`](./docs/index.md) directory:
 
 - [**MCP Integration Guide**](./MCP.md) — Claude Desktop, Cursor, Windsurf, and custom agents.
+- [**UTCP & Code-Mode Guide**](./docs/utcp.md) — Dynamic discovery manual, tool schemas, and Code-Mode batching.
 - [**Docker Hub Guide**](./docs/docker.md) — Docker setup, compose, and environment variables.
 - [**Orchestration Workflow**](./docs/workflow/workflow.md) — High-level query pipeline, fallback chains, and lifecycle.
 - [**Scraping Specification**](./docs/workflow/scraping.md) — Concurrency queues, robots.txt compliance, and Lightpanda.
@@ -115,6 +149,8 @@ make restart   # restart
 | POST   | `/map`           | Discover all internal URLs on a domain                  |
 | GET    | `/mcp`           | MCP Server-Sent Events endpoint                         |
 | POST   | `/mcp`           | MCP JSON-RPC endpoint (remote agents)                   |
+| GET    | `/utcp`          | UTCP discovery manual (dynamic tool catalog)            |
+| GET    | `/utcp/manual`   | UTCP discovery manual alias                             |
 | GET    | `/health`        | Health check and system status                          |
 | GET    | `/metrics`       | Prometheus-compatible telemetry                          |
 
