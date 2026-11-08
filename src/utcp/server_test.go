@@ -185,3 +185,55 @@ func TestServerConcurrencyAndCaching(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestServerCacheCapAndEviction(t *testing.T) {
+	server := NewServer()
+
+	// Send requests for 30 distinct hosts (cap is 16)
+	for i := 0; i < 30; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/utcp", nil)
+		req.Header.Set("X-Forwarded-Host", strings.Repeat("a", 1)+"-host-"+string(rune('a'+i))+".example.com")
+		rec := httptest.NewRecorder()
+		server.ManualHandler(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d failed with code %d", i, rec.Code)
+		}
+	}
+
+	server.mu.RLock()
+	cacheLen := len(server.cachedManuals)
+	orderLen := len(server.cacheOrder)
+	server.mu.RUnlock()
+
+	if cacheLen > maxCachedManuals {
+		t.Errorf("cache size exceeded cap: got %d, max %d", cacheLen, maxCachedManuals)
+	}
+	if orderLen > maxCachedManuals {
+		t.Errorf("cacheOrder size exceeded cap: got %d, max %d", orderLen, maxCachedManuals)
+	}
+}
+
+func TestCrawlParameterParityInManual(t *testing.T) {
+	manual := BuildManual("http://localhost:7493")
+
+	var crawlTool *Tool
+	for _, tool := range manual.Tools {
+		if tool.Name == "searqon_crawl" {
+			tCopy := tool
+			crawlTool = &tCopy
+			break
+		}
+	}
+
+	if crawlTool == nil {
+		t.Fatalf("searqon_crawl not found in manual")
+	}
+
+	if _, ok := crawlTool.Inputs.Properties["depth"]; !ok {
+		t.Errorf("expected 'depth' property in searqon_crawl inputs, got properties: %+v", crawlTool.Inputs.Properties)
+	}
+	if _, ok := crawlTool.Inputs.Properties["max_depth"]; ok {
+		t.Errorf("unexpected 'max_depth' property; should be standardized to 'depth'")
+	}
+}

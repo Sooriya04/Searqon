@@ -39,7 +39,7 @@ The table below lists all tools published in Searqon's UTCP manual:
 | `searqon_research` | `http` | `POST /pipeline` | One-shot deep research: search, concurrently scrape top authoritative pages, and synthesize chunked sources. | `query` (str, req), `max_sources` (int, def: 5), `bypass_cache` (bool, def: false) |
 | `searqon_map` | `http` | `POST /map` | Discover and map internal URLs and sitemap hierarchy across a target website or domain. | `url` (str, req), `limit` (int, def: 50, max: 150) |
 | `searqon_extract` | `http` | `POST /extract` | Targeted CSS selector or structured JSON schema extraction for DOM elements and tables. | `url` (str, req), `schema` (str, req), `bypass_cache` (bool, def: false) |
-| `searqon_crawl` | `http` | `POST /crawl` | Recursively discover and scrape linked pages under a target domain hierarchy up to a max depth. | `url` (str, req), `max_depth` (int, def: 2), `limit` (int, def: 20) |
+| `searqon_crawl` | `http` | `POST /crawl` | Recursively discover and scrape linked pages under a target domain hierarchy up to a max depth. | `url` (str, req), `depth` (int, def: 2, max: 3, accepts `max_depth` alias), `limit` (int, def: 20, max: 50) |
 | `searqon_search_stream` | `sse` | `GET /search/stream?query={query}` | Real-time streaming web search emitting discovery, scraping, and synthesis events over SSE. | `query` (str, req) |
 
 ---

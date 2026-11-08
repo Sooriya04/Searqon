@@ -53,6 +53,11 @@ func CrawlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Support both 'depth' and 'max_depth' parameter names for API & protocol parity
+	if req.Depth <= 0 && req.MaxDepth > 0 {
+		req.Depth = req.MaxDepth
+	}
+
 	if req.Limit > 50 {
 		req.Limit = 50
 	}
