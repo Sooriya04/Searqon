@@ -12,6 +12,7 @@ import (
 	"src/handlers"
 	"src/mcp"
 	"src/scraper"
+	"src/utcp"
 	"src/utils"
 )
 
@@ -63,6 +64,11 @@ func main() {
 	mcpServer := mcp.NewServer()
 	mux.HandleFunc("/mcp", mcpServer.SSEHandler())
 	mux.HandleFunc("/mcp/sse", mcpServer.SSEHandler())
+
+	// Universal Tool Calling Protocol (UTCP) Manual & Discovery
+	utcpServer := utcp.NewServer()
+	mux.HandleFunc("/utcp", utcpServer.ManualHandler)
+	mux.HandleFunc("/utcp/manual", utcpServer.ManualHandler)
 
 	// Discovery and Search
 	mux.HandleFunc("/search", handlers.SearchHandler)
