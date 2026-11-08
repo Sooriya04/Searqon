@@ -109,6 +109,42 @@ func TestResolveBaseURL(t *testing.T) {
 	}
 }
 
+func TestResolveBaseURL_PortStripping(t *testing.T) {
+	server := NewServer()
+
+	// 1. https with default port :443 should strip :443
+	req1 := httptest.NewRequest(http.MethodGet, "https://api.searqon.com:443/utcp", nil)
+	req1.Header.Set("X-Forwarded-Proto", "https")
+	req1.Header.Set("X-Forwarded-Host", "api.searqon.com:443")
+	if base := server.ResolveBaseURL(req1); base != "https://api.searqon.com" {
+		t.Errorf("expected 'https://api.searqon.com', got '%s'", base)
+	}
+
+	// 2. http with default port :80 should strip :80
+	req2 := httptest.NewRequest(http.MethodGet, "http://api.searqon.com:80/utcp", nil)
+	req2.Header.Set("X-Forwarded-Proto", "http")
+	req2.Header.Set("X-Forwarded-Host", "api.searqon.com:80")
+	if base := server.ResolveBaseURL(req2); base != "http://api.searqon.com" {
+		t.Errorf("expected 'http://api.searqon.com', got '%s'", base)
+	}
+
+	// 3. https with offloaded internal port :80 in forwarded host should strip :80
+	req3 := httptest.NewRequest(http.MethodGet, "http://api.searqon.com/utcp", nil)
+	req3.Header.Set("X-Forwarded-Proto", "https")
+	req3.Header.Set("X-Forwarded-Host", "api.searqon.com:80")
+	if base := server.ResolveBaseURL(req3); base != "https://api.searqon.com" {
+		t.Errorf("expected 'https://api.searqon.com', got '%s'", base)
+	}
+
+	// 4. Custom port :8443 or :7493 should NOT be stripped
+	req4 := httptest.NewRequest(http.MethodGet, "https://api.searqon.com:8443/utcp", nil)
+	req4.Header.Set("X-Forwarded-Proto", "https")
+	req4.Header.Set("X-Forwarded-Host", "api.searqon.com:8443")
+	if base := server.ResolveBaseURL(req4); base != "https://api.searqon.com:8443" {
+		t.Errorf("expected 'https://api.searqon.com:8443', got '%s'", base)
+	}
+}
+
 func TestServerManualHandler(t *testing.T) {
 	server := NewServer()
 
