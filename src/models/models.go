@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"math"
 	"time"
 )
 
@@ -231,4 +232,29 @@ type PipelineResponse struct {
 	TotalChunks int              `json:"total_chunks"`
 	DurationMS  int64            `json:"duration_ms"`
 	Context     string           `json:"context,omitempty"`
+}
+
+// CosineSimilarity computes cosine similarity between two float32 vectors.
+func CosineSimilarity(a, b []float32) float64 {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+
+	var dot, magA, magB float64
+	for i := 0; i < n; i++ {
+		af := float64(a[i])
+		bf := float64(b[i])
+		dot += af * bf
+		magA += af * af
+		magB += bf * bf
+	}
+	if magA == 0 || magB == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(magA) * math.Sqrt(magB))
 }

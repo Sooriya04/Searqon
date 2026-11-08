@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -51,6 +52,38 @@ type CallToolResult struct {
 	IsError bool          `json:"isError,omitempty"`
 }
 
+// ProgressNotification represents standard MCP progress notification format.
+type ProgressNotification struct {
+	JSONRPC string                     `json:"jsonrpc"`
+	Method  string                     `json:"method"`
+	Params  ProgressNotificationParams `json:"params"`
+}
+
+type ProgressNotificationParams struct {
+	ProgressToken interface{} `json:"progressToken"`
+	Progress      float64     `json:"progress"`
+	Total         float64     `json:"total,omitempty"`
+	Message       string      `json:"message,omitempty"`
+}
+
+// ProgressReporter is a callback func for emitting progress updates.
+type ProgressReporter func(progress, total float64, message string)
+
+type progressReporterContextKey struct{}
+
+// WithProgressReporter attaches a ProgressReporter to context.
+func WithProgressReporter(ctx context.Context, reporter ProgressReporter) context.Context {
+	return context.WithValue(ctx, progressReporterContextKey{}, reporter)
+}
+
+// GetProgressReporter extracts ProgressReporter from context if present.
+func GetProgressReporter(ctx context.Context) ProgressReporter {
+	if rep, ok := ctx.Value(progressReporterContextKey{}).(ProgressReporter); ok {
+		return rep
+	}
+	return nil
+}
+
 type ToolParamProperty struct {
 	Type        string   `json:"type"`
 	Description string   `json:"description"`
@@ -72,8 +105,9 @@ type ToolDefinition struct {
 
 // Server encapsulates the MCP protocol dispatcher.
 type Server struct {
-	tools []ToolDefinition
-	mu    sync.Mutex
+	tools       []ToolDefinition
+	writeNotify func([]byte)
+	mu          sync.Mutex
 }
 
 // NewServer initializes a new Searqon MCP server loaded with agent-optimized tools.
@@ -81,6 +115,13 @@ func NewServer() *Server {
 	s := &Server{}
 	s.registerTools()
 	return s
+}
+
+// SetNotificationWriter sets the function called whenever an asynchronous notification (e.g. $/progress) is sent.
+func (s *Server) SetNotificationWriter(fn func([]byte)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writeNotify = fn
 }
 
 func (s *Server) registerTools() {
@@ -277,13 +318,24 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 		var callParams struct {
 			Name      string                 `json:"name"`
 			Arguments map[string]interface{} `json:"arguments"`
+			Meta      *struct {
+				ProgressToken interface{} `json:"progressToken"`
+			} `json:"_meta,omitempty"`
 		}
 		if err := json.Unmarshal(req.Params, &callParams); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid tool call params"}
 			break
 		}
 
-		toolResult, err := s.executeToolContext(ctx, callParams.Name, callParams.Arguments)
+		toolCtx := ctx
+		if callParams.Meta != nil && callParams.Meta.ProgressToken != nil {
+			token := callParams.Meta.ProgressToken
+			toolCtx = WithProgressReporter(toolCtx, func(progress, total float64, message string) {
+				s.sendProgress(token, progress, total, message)
+			})
+		}
+
+		toolResult, err := s.executeToolContext(toolCtx, callParams.Name, callParams.Arguments)
 		if err != nil {
 			se := models.ClassifyError(500, "", err)
 			errJSON, _ := json.MarshalIndent(se, "", "  ")
@@ -309,6 +361,30 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 	}
 
 	return json.Marshal(resp)
+}
+
+func (s *Server) sendProgress(token interface{}, progress, total float64, message string) {
+	s.mu.Lock()
+	fn := s.writeNotify
+	s.mu.Unlock()
+	if fn == nil || token == nil {
+		return
+	}
+
+	notif := ProgressNotification{
+		JSONRPC: "2.0",
+		Method:  "notifications/progress",
+		Params: ProgressNotificationParams{
+			ProgressToken: token,
+			Progress:      progress,
+			Total:         total,
+			Message:       message,
+		},
+	}
+
+	if b, err := json.Marshal(notif); err == nil {
+		fn(b)
+	}
 }
 
 func (s *Server) executeTool(name string, args map[string]interface{}) (CallToolResult, error) {
@@ -355,7 +431,26 @@ func (s *Server) handleSearchContext(ctx context.Context, args map[string]interf
 		scrape = sc
 	}
 
-	searchResp := search.RunSearchPipelineWithContext(ctx, query, limit, scrape, false, 0, false, "")
+	reporter := GetProgressReporter(ctx)
+	if reporter != nil {
+		reporter(0, 3, fmt.Sprintf("Initiating search for query: %s", query))
+	}
+
+	var searchResp models.SearchResponse
+	if reporter != nil {
+		searchResp = search.RunSearchPipelineStream(ctx, query, limit, scrape, false, 0, false, "", func(evt search.SearchEvent) {
+			switch evt.Type {
+			case "discovery":
+				reporter(1, 3, fmt.Sprintf("Discovered %d candidate results via %s", evt.Total, evt.Provider))
+			case "scrape_progress":
+				reporter(2, 3, "Scraping page contents")
+			case "done":
+				reporter(3, 3, "Search pipeline complete")
+			}
+		})
+	} else {
+		searchResp = search.RunSearchPipelineWithContext(ctx, query, limit, scrape, false, 0, false, "")
+	}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("# Searqon Search Results for: %q\n", query))
@@ -520,6 +615,11 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 		maxTokensPerSource = int(mt)
 	}
 
+	reporter := GetProgressReporter(ctx)
+	if reporter != nil {
+		reporter(0, float64(maxSources+2), fmt.Sprintf("Initiating deep research for: %s", query))
+	}
+
 	// 1. Search across meta-engines
 	searchResp := search.RunSearchPipelineWithContext(ctx, query, maxSources+2, false, false, 0, false, "")
 	if len(searchResp.Results) == 0 {
@@ -528,6 +628,10 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 				{Type: "text", Text: fmt.Sprintf("No research material found for query: %q", query)},
 			},
 		}, nil
+	}
+
+	if reporter != nil {
+		reporter(1, float64(maxSources+2), fmt.Sprintf("Discovered %d candidate sources via %s", len(searchResp.Results), searchResp.Provider))
 	}
 
 	// 2. Select top unique URLs to scrape
@@ -579,6 +683,7 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 
 	docsChan := make(chan researchDoc, len(targets))
 	var wg sync.WaitGroup
+	var scrapedCount int64
 
 	for _, target := range targets {
 		wg.Add(1)
@@ -612,11 +717,20 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 				fetchedAt: res.ScrapedAt,
 				sha256:    res.ContentHash,
 			}
+
+			if reporter != nil {
+				sc := atomic.AddInt64(&scrapedCount, 1)
+				reporter(1+float64(sc), float64(len(targets)+2), fmt.Sprintf("Scraped page %d of %d: %s", sc, len(targets), t.Title))
+			}
 		}(target)
 	}
 
 	wg.Wait()
 	close(docsChan)
+
+	if reporter != nil {
+		reporter(float64(len(targets)+2), float64(len(targets)+2), "Research dossier synthesis complete")
+	}
 
 	// 4. Synthesize dossier
 	var sb strings.Builder
@@ -763,6 +877,14 @@ func (s *Server) StartStdioLoop() error {
 	os.Stdout.Sync()
 	reader := os.Stdin
 	writer := os.Stdout
+	var writeMu sync.Mutex
+
+	s.SetNotificationWriter(func(b []byte) {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		writer.Write(b)
+		writer.Write([]byte("\n"))
+	})
 
 	dec := json.NewDecoder(reader)
 	for {
@@ -781,8 +903,10 @@ func (s *Server) StartStdioLoop() error {
 		}
 
 		if len(respBytes) > 0 {
+			writeMu.Lock()
 			writer.Write(respBytes)
 			writer.Write([]byte("\n"))
+			writeMu.Unlock()
 		}
 	}
 }

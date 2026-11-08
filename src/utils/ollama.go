@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"src/config"
+	"src/models"
 )
 
 var (
@@ -183,4 +184,9 @@ func QueryOllamaEmbedding(text string) ([]float32, error) {
 	}
 
 	return res.Embedding, nil
+}
+
+// CosineSimilarity computes cosine similarity between two float32 vectors.
+func CosineSimilarity(a, b []float32) float64 {
+	return models.CosineSimilarity(a, b)
 }

@@ -45,7 +45,8 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 			Source:  "test",
 		},
 	}
-	SaveSearchCache("golang intelligence", testResults, "searxng")
+	embedding := []float32{0.1, 0.2, 0.3, 0.9}
+	SaveSearchCacheWithEmbedding("golang intelligence", testResults, "searxng", embedding)
 
 	cached, provider, found := GetSearchCache("golang intelligence")
 	if !found {
@@ -56,6 +57,29 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	}
 	if len(cached) != 1 || cached[0].Title != "Searqon Intelligence" {
 		t.Fatalf("unexpected cached results: %+v", cached)
+	}
+
+	// 1b. Test Semantic Cache Near-Match
+	nearEmbedding := []float32{0.1, 0.2, 0.31, 0.89}
+	semResults, semProvider, sim, semFound := GetSemanticSearchCache("golang ai agent intelligence", nearEmbedding, 0.92)
+	if !semFound {
+		t.Fatalf("expected semantic cache near match to be found")
+	}
+	if semProvider != "searxng" {
+		t.Fatalf("expected provider 'searxng', got '%s'", semProvider)
+	}
+	if sim < 0.92 {
+		t.Fatalf("expected similarity >= 0.92, got %f", sim)
+	}
+	if len(semResults) != 1 || semResults[0].Title != "Searqon Intelligence" {
+		t.Fatalf("unexpected semantic cached results: %+v", semResults)
+	}
+
+	// Dissimilar query should NOT match
+	dissimilarEmbedding := []float32{0.9, -0.2, 0.0, 0.1}
+	_, _, _, dissFound := GetSemanticSearchCache("completely different topic", dissimilarEmbedding, 0.92)
+	if dissFound {
+		t.Fatalf("expected dissimilar query not to match semantic cache")
 	}
 
 	// 2. Test Scrape Cache
