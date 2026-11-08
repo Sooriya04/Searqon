@@ -54,6 +54,17 @@ func (s *Server) ResolveBaseURL(r *http.Request) string {
 		host = "localhost:7493"
 	}
 
+	// 4. Strip redundant default ports matching scheme to prevent https://domain:80 or http://domain:443
+	if scheme == "https" && strings.HasSuffix(host, ":443") {
+		host = strings.TrimSuffix(host, ":443")
+	} else if scheme == "http" && strings.HasSuffix(host, ":80") {
+		host = strings.TrimSuffix(host, ":80")
+	} else if scheme == "https" && strings.HasSuffix(host, ":80") {
+		// When upstream reverse-proxy terminates TLS and sets X-Forwarded-Proto: https,
+		// but client/proxy forwarded Host retains internal plaintext port :80, strip it.
+		host = strings.TrimSuffix(host, ":80")
+	}
+
 	return scheme + "://" + host
 }
 
@@ -81,18 +92,18 @@ func (s *Server) ManualHandler(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	if !ok {
-		manual := BuildManual(baseURL)
-		marshaled, err := json.MarshalIndent(manual, "", "  ")
-		if err != nil {
-			http.Error(w, "Failed to encode UTCP manual", http.StatusInternalServerError)
-			return
-		}
-
 		s.mu.Lock()
 		// Double-checked locking to avoid redundant serialization and race conditions
 		if existing, found := s.cachedManuals[baseURL]; found {
 			data = existing
 		} else {
+			manual := BuildManual(baseURL)
+			marshaled, err := json.MarshalIndent(manual, "", "  ")
+			if err != nil {
+				s.mu.Unlock()
+				http.Error(w, "Failed to encode UTCP manual", http.StatusInternalServerError)
+				return
+			}
 			// Enforce LRU / FIFO cap of maxCachedManuals (16) to avoid host header DoS
 			if len(s.cachedManuals) >= maxCachedManuals && len(s.cacheOrder) > 0 {
 				oldest := s.cacheOrder[0]
