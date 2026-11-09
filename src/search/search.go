@@ -436,13 +436,6 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 							Data:   itemCopy,
 						})
 					}
-
-					// Async save embeddings if vector database is active
-					go func(urlStr, txt string) {
-						if emb, err := GetVectorEmbedding(txt); err == nil {
-							db.SavePageEmbedding(urlStr, emb)
-						}
-					}(targetURL, scraped.Content)
 				} else {
 					var itemCopy models.SearchResult
 					errReason := scraped.Error

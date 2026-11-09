@@ -72,6 +72,9 @@ func IndexScrapeInFTS(url, title, desc, content string) {
 		return
 	}
 
+	// Delete existing row for this URL to prevent duplicate search results on re-scrapes
+	_, _ = sDB.Exec(`DELETE FROM scrape_cache_fts WHERE url = ?`, url)
+
 	_, _ = sDB.Exec(`
 		INSERT INTO scrape_cache_fts (url, title, description, content)
 		VALUES (?, ?, ?, ?)

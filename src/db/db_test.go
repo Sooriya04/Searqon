@@ -127,17 +127,22 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 
 	// 4. Test Local Index FTS
 	IndexScrapeInFTS("https://example.com/test", "Test Page", "A short description", "This is full text content for extraction verification.")
+	// Re-indexing the same URL must not duplicate results
+	IndexScrapeInFTS("https://example.com/test", "Test Page Updated", "A short description", "This is full text content for extraction verification.")
 	time.Sleep(50 * time.Millisecond)
 
 	ftsResults, err := SearchLocalIndex("extraction verification", 5)
 	if err != nil {
 		t.Fatalf("failed to search local index: %v", err)
 	}
-	if len(ftsResults) == 0 {
-		t.Fatalf("expected at least 1 result from FTS search")
+	if len(ftsResults) != 1 {
+		t.Fatalf("expected exactly 1 deduplicated result from FTS search, got %d", len(ftsResults))
 	}
 	if ftsResults[0].URL != "https://example.com/test" {
 		t.Fatalf("unexpected FTS result URL: %s", ftsResults[0].URL)
+	}
+	if ftsResults[0].Title != "Test Page Updated" {
+		t.Fatalf("expected updated title in FTS index, got %s", ftsResults[0].Title)
 	}
 }
 

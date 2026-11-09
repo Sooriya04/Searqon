@@ -387,6 +387,14 @@ Resolved security and upstream resilience findings identified during the ponytai
 - **Hardened outbound scrapers against SSRF**: Implemented [`src/scraper/ssrf.go`](file:///home/sooriya/Documents/Searqon/src/scraper/ssrf.go) to validate scrape URLs before connection. Enforces `http`/`https` scheme validation and blocks requests to loopback (`127.0.0.1`, `localhost`), link-local metadata addresses (`169.254.169.254`), and private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) unless `ALLOW_INTERNAL_NETWORKS=true` or `scraper.allow_internal_networks` is explicitly configured. Added unit tests in [`src/scraper/ssrf_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/ssrf_test.go).
 - **Added half-open trial recovery to search engine circuit breaker**: Updated `engineCircuitBreaker.Allow()` in [`src/search/discovery.go`](file:///home/sooriya/Documents/Searqon/src/search/discovery.go#L27-L50) to reset accumulated failure counts once the 30-second cooldown expires. This enables recovering search providers (such as SearXNG or Wikipedia) to test upstream health on a clean slate rather than instantly re-tripping the breaker on a single subsequent network blip. Added verification test `TestCircuitBreaker_HalfOpenRecovery` in [`src/search/ranker_test.go`](file:///home/sooriya/Documents/Searqon/src/search/ranker_test.go#L119-L157).
 
+## fix(chunker, db): resolve pre-launch audit findings 6, 7, and 8 for lean search, chunker tests, and FTS deduplication
+
+Resolved code bloat, test gaps, and search index duplication identified in the pre-launch audit:
+- **Pruned dormant background Ollama embeddings**: Removed dead background vector embedding routine on scraped search results in [`src/search/search.go`](file:///home/sooriya/Documents/Searqon/src/search/search.go#L440-L446) that wrote to unqueried tables, preventing wasted Ollama CPU/GPU compute during active searches.
+- **Added comprehensive unit test suite for chunker package**: Added [`src/chunker/chunker_test.go`](file:///home/sooriya/Documents/Searqon/src/chunker/chunker_test.go) covering token estimation, sliding window markdown chunking, SimHash near-duplicate deduplication, and BM25 relevance scoring.
+- **Deduplicated SQLite FTS5 search index on re-scrapes**: Updated `IndexScrapeInFTS` in [`src/db/db_index.go`](file:///home/sooriya/Documents/Searqon/src/db/db_index.go#L64-L80) to delete existing entries for the target URL before inserting, preventing duplicated search hits and distorted BM25 ranking when re-scraping indexed pages. Verified in [`src/db/db_test.go`](file:///home/sooriya/Documents/Searqon/src/db/db_test.go#L128-L147).
+
+
 
 
 
