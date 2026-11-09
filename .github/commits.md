@@ -441,3 +441,10 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Pages Trigger Restriction**: Updated [`.github/workflows/pages.yml`](file:///home/sooriya/Documents/Searqon/.github/workflows/pages.yml) to only trigger on pushes to `main`.
 - **Environment Guard**: Added `if: github.ref == 'refs/heads/main'` to the `deploy` job to prevent rejected deployments from `dev` against GitHub Pages environment protection rules.
 
+
+## feat(docs): add interactive Archify architecture visualizer
+
+- **Installed Archify Skill**: Cloned `https://github.com/tt-a1i/archify.git`, configured it into `/home/sooriya/.gemini/config/skills/archify/` with full metadata and schemas, and symlinked the CLI executable to `/home/sooriya/.local/bin/archify`.
+- **Searqon Architecture Model**: Modeled the complete Searqon pipeline in [`.archify/searqon-architecture.json`](file:///home/sooriya/Documents/Searqon/.archify/searqon-architecture.json) covering clients (REST/MCP/UTCP), security guardrails, multi-engine discovery, the 4-tier anti-bot escalation ladder, RAG chunking, and dual storage backends.
+- **Rendered Interactive Visualizer**: Compiled into standalone interactive HTML at [`architecture.html`](file:///home/sooriya/Documents/Searqon/architecture.html) and [`docs/architecture.html`](file:///home/sooriya/Documents/Searqon/docs/architecture.html) with blueprint dark/light themes, path tracing, and vector export.
+
