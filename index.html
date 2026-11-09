@@ -451,6 +451,70 @@
         }
 
         /* ── Subsystems Grid (Balanced 2x2) ── */
+        .arch-preview-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-subtle);
+            overflow: hidden;
+            margin: 1.5rem 0 2rem;
+        }
+
+        .arch-preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.65rem 1rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .arch-tag {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-arch-launch {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: #FFFFFF !important;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-hover);
+            padding: 0.3rem 0.65rem;
+            border-radius: 4px;
+            text-decoration: none !important;
+            transition: all 120ms ease;
+        }
+
+        .btn-arch-launch:hover {
+            background: var(--surface-hover);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .arch-img-wrap {
+            display: block;
+            background: #080A0F;
+            border-bottom: 1px solid var(--border-subtle);
+            overflow: hidden;
+            text-decoration: none;
+        }
+
+        .arch-img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 180ms ease;
+        }
+
+        .arch-img-wrap:hover .arch-img {
+            transform: scale(1.008);
+        }
+
         .grid-2x2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -902,6 +966,19 @@
                 <div class="section-tag">Architecture</div>
                 <h2 class="section-title">Core Subsystems</h2>
                 <p class="section-desc">Designed to execute local search, anti-bot resolution, and structured extraction in a predictable, high-throughput pipeline.</p>
+            </div>
+
+            <div class="arch-preview-card">
+                <div class="arch-preview-header">
+                    <span class="arch-tag">System Architecture &middot; Archify Blueprint</span>
+                    <a href="architecture.html" target="_blank" class="btn-arch-launch">
+                        <span>Open Interactive Diagram</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                    </a>
+                </div>
+                <a href="architecture.html" target="_blank" class="arch-img-wrap" title="Click to launch interactive visualizer">
+                    <img src="docs/assets/architecture-dark.png" alt="Searqon Architecture Blueprint" class="arch-img" loading="lazy" />
+                </a>
             </div>
 
             <div class="grid-2x2">

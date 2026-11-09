@@ -537,6 +537,79 @@
                 padding: 2rem 0 4rem;
             }
         }
+
+        /* ── Architecture Blueprint Card ── */
+        .arch-preview-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-subtle);
+            overflow: hidden;
+            margin: 1.5rem 0 2rem;
+        }
+
+        .arch-preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.65rem 1rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .arch-tag {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-arch-launch {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: #FFFFFF !important;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-hover);
+            padding: 0.3rem 0.65rem;
+            border-radius: 4px;
+            text-decoration: none !important;
+            transition: all 120ms ease;
+        }
+
+        .btn-arch-launch:hover {
+            background: var(--surface-hover);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .arch-img-wrap {
+            display: block;
+            background: #080A0F;
+            border-bottom: 1px solid var(--border-subtle);
+            overflow: hidden;
+            text-decoration: none;
+        }
+
+        .arch-img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 180ms ease;
+        }
+
+        .arch-img-wrap:hover .arch-img {
+            transform: scale(1.008);
+        }
+
+        .arch-caption {
+            padding: 0.65rem 1rem;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            background: var(--surface);
+        }
     </style>
 </head>
 
@@ -552,11 +625,14 @@
 
             <div class="header-actions">
                 <a href="index.html" class="nav-link-btn">Home</a>
+                <a href="#architecture" class="nav-link-btn">Architecture</a>
                 <a href="#quickstart" class="nav-link-btn">Quick Start</a>
                 <a href="#mcp" class="nav-link-btn">Protocols</a>
                 <a href="#endpoints" class="nav-link-btn">Endpoints</a>
                 <a href="#settings" class="nav-link-btn">Config</a>
-                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="nav-link-btn btn-border">
+                <a href="architecture.html" target="_blank" class="nav-link-btn btn-border">
+                    <span>Interactive Map &nearr;</span>
+                </a>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     <span>GitHub</span>
                 </a>
@@ -621,6 +697,30 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- Architecture -->
+            <section id="architecture">
+                <h2>Architecture & Ingestion Pipeline</h2>
+                <p>
+                    Searqon is organized as a decoupled, multi-stage ingestion engine. Incoming queries and extraction requests flow through security guardrails, federated discovery, 4-tier anti-bot escalation, and semantic token chunking.
+                </p>
+
+                <div class="arch-preview-card">
+                    <div class="arch-preview-header">
+                        <span class="arch-tag">System Map &middot; Archify Blueprint</span>
+                        <a href="architecture.html" target="_blank" class="btn-arch-launch">
+                            <span>Open Interactive Diagram</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                    </div>
+                    <a href="architecture.html" target="_blank" class="arch-img-wrap" title="Click to launch interactive visualizer">
+                        <img src="docs/assets/architecture-dark.png" alt="Searqon Architecture Blueprint" class="arch-img" loading="lazy" />
+                    </a>
+                    <div class="arch-caption">
+                        High-resolution 2048&times;1320 architecture map. Click to launch the interactive viewer with live path tracing, dark/light themes, and pan/zoom controls.
+                    </div>
                 </div>
             </section>
 
@@ -1223,6 +1323,7 @@ services:
             <div class="toc-title">On This Page</div>
             <ul class="toc-list">
                 <li class="toc-item"><a href="#overview">Overview</a></li>
+                <li class="toc-item"><a href="#architecture">Architecture</a></li>
                 <li class="toc-item"><a href="#quickstart">Quick Start</a></li>
                 <li class="toc-item"><a href="#storage">Storage Backends</a></li>
                 <li class="toc-item"><a href="#utcp">UTCP Protocol</a></li>
