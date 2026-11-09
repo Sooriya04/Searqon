@@ -70,9 +70,9 @@ var defaultHeaders = map[string]string{
 
 // FetchHTML retrieves raw HTML from a target URL with a stealth user-agent.
 func FetchHTML(targetURL string, userAgent string) (string, *url.URL, int, string, error) {
-	parsedURL, err := url.Parse(targetURL)
-	if err != nil || parsedURL.Scheme == "" {
-		return "", nil, 0, "", fmt.Errorf("invalid URL")
+	parsedURL, err := ValidateScrapeURL(targetURL)
+	if err != nil {
+		return "", nil, 0, "", err
 	}
 
 	maxAttempts := 3

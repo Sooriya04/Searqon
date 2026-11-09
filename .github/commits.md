@@ -381,6 +381,13 @@ Resolved critical launch blockers identified during the ponytail pre-launch audi
 - **Eliminated concurrent write race conditions on streaming handlers**: Added `sync.Mutex` synchronization in `src/handlers/search_stream.go` and `src/handlers/crawler_handlers.go`, preventing concurrent writes to `http.ResponseWriter` and `flusher.Flush()` when parallel scraping and crawling workers complete pages simultaneously. Verified thread safety with `go test -race ./handlers`.
 - **Socket and connection pooling for outbound scraping**: Replaced unpooled per-request `http.Transport` instantiations in `src/scraper/escalation.go` with a singleton `SharedDirectTransport()` and a concurrent `proxyTransportPool` in `src/scraper/proxy.go`. Reuses persistent HTTP/1.1 and HTTP/2 keep-alive connections across scrapes, eliminating TCP socket exhaustion and `TIME_WAIT` file descriptor leaks under high-throughput agent workloads.
 
+## fix(security, search): resolve pre-launch audit findings 4 and 5 for SSRF guard and circuit breaker recovery
+
+Resolved security and upstream resilience findings identified during the ponytail pre-launch audit:
+- **Hardened outbound scrapers against SSRF**: Implemented [`src/scraper/ssrf.go`](file:///home/sooriya/Documents/Searqon/src/scraper/ssrf.go) to validate scrape URLs before connection. Enforces `http`/`https` scheme validation and blocks requests to loopback (`127.0.0.1`, `localhost`), link-local metadata addresses (`169.254.169.254`), and private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) unless `ALLOW_INTERNAL_NETWORKS=true` or `scraper.allow_internal_networks` is explicitly configured. Added unit tests in [`src/scraper/ssrf_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/ssrf_test.go).
+- **Added half-open trial recovery to search engine circuit breaker**: Updated `engineCircuitBreaker.Allow()` in [`src/search/discovery.go`](file:///home/sooriya/Documents/Searqon/src/search/discovery.go#L27-L50) to reset accumulated failure counts once the 30-second cooldown expires. This enables recovering search providers (such as SearXNG or Wikipedia) to test upstream health on a clean slate rather than instantly re-tripping the breaker on a single subsequent network blip. Added verification test `TestCircuitBreaker_HalfOpenRecovery` in [`src/search/ranker_test.go`](file:///home/sooriya/Documents/Searqon/src/search/ranker_test.go#L119-L157).
+
+
 
 
 

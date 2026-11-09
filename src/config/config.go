@@ -99,6 +99,7 @@ type ScraperConfig struct {
 	RateLimitPerDomainRPS int                 `yaml:"rate_limit_per_domain_rps"`
 	MaxConcurrentScrapes  int                 `yaml:"max_concurrent_scrapes"`
 	InsecureSkipVerify    bool                `yaml:"insecure_skip_verify"`
+	AllowInternalNetworks bool                `yaml:"allow_internal_networks"`
 	Lightpanda            BrowserEngineConfig `yaml:"lightpanda"`
 	Camoufox              BrowserEngineConfig `yaml:"camoufox"`
 }
@@ -391,6 +392,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if rot := os.Getenv("ROTATING_PROXIES"); rot != "" {
 		cfg.Proxies.Rotating = strings.Split(rot, ",")
+	}
+	if allowInternal := os.Getenv("ALLOW_INTERNAL_NETWORKS"); allowInternal != "" {
+		cfg.Scraper.AllowInternalNetworks = (allowInternal == "true" || allowInternal == "1")
 	}
 	if resURL := os.Getenv("RESIDENTIAL_PROXY_URL"); resURL != "" {
 		cfg.Proxies.ResidentialURL = resURL

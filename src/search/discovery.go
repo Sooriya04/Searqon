@@ -33,13 +33,23 @@ type engineCircuitBreaker struct {
 func (cb *engineCircuitBreaker) Allow() bool {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	return time.Now().After(cb.openUntil)
+	now := time.Now()
+	if now.After(cb.openUntil) {
+		// When the timeout expires, reset failures to allow half-open recovery trial
+		if !cb.openUntil.IsZero() {
+			cb.failures = 0
+			cb.openUntil = time.Time{}
+		}
+		return true
+	}
+	return false
 }
 
 func (cb *engineCircuitBreaker) RecordSuccess() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	cb.failures = 0
+	cb.openUntil = time.Time{}
 }
 
 func (cb *engineCircuitBreaker) RecordFailure() {

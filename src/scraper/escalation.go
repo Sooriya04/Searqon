@@ -29,9 +29,9 @@ const (
 
 // fetchHTTPRaw performs a single HTTP request with custom transport, headers, and decompression.
 func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.Transport, timeout time.Duration) (string, int, string, *url.URL, error) {
-	parsedURL, err := url.Parse(targetURL)
-	if err != nil || parsedURL.Scheme == "" {
-		return "", 0, "", nil, fmt.Errorf("invalid URL: %s", targetURL)
+	parsedURL, err := ValidateScrapeURL(targetURL)
+	if err != nil {
+		return "", 0, "", nil, err
 	}
 
 	if transport == nil {

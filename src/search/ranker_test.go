@@ -2,6 +2,7 @@ package search
 
 import (
 	"testing"
+	"time"
 
 	"src/models"
 )
@@ -110,5 +111,46 @@ func TestNormalizeDiscoveryURL(t *testing.T) {
 				t.Errorf("normalizeDiscoveryURL(%q) = %q, expected %q", tc.input, actual, tc.expected)
 			}
 		})
+	}
+}
+
+func TestCircuitBreaker_HalfOpenRecovery(t *testing.T) {
+	cb := &engineCircuitBreaker{}
+
+	if !cb.Allow() {
+		t.Fatalf("expected initially allowed")
+	}
+
+	// Record 3 failures to trip breaker
+	cb.RecordFailure()
+	cb.RecordFailure()
+	cb.RecordFailure()
+
+	if cb.Allow() {
+		t.Fatalf("expected tripped breaker to block")
+	}
+
+	// Artificially advance past cooldown
+	cb.mu.Lock()
+	cb.openUntil = time.Now().Add(-1 * time.Second)
+	cb.mu.Unlock()
+
+	// Should allow on half-open and reset failures
+	if !cb.Allow() {
+		t.Fatalf("expected breaker to allow trial after cooldown")
+	}
+
+	cb.mu.Lock()
+	failuresAfterReset := cb.failures
+	cb.mu.Unlock()
+
+	if failuresAfterReset != 0 {
+		t.Errorf("expected failures to reset to 0 upon entering half-open, got %d", failuresAfterReset)
+	}
+
+	// 1 failure should NOT immediately re-trip the breaker
+	cb.RecordFailure()
+	if !cb.Allow() {
+		t.Errorf("expected breaker to tolerate 1 failure after reset before reaching threshold 3")
 	}
 }
