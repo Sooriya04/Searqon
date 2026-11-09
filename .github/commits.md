@@ -455,3 +455,9 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Direct Interactive Launch**: Added one-click launch buttons and image links to open the standalone interactive visualizer at [`architecture.html`](file:///home/sooriya/Documents/Searqon/architecture.html).
 - **Nav & TOC Re-sync**: Re-introduced the Architecture anchor link to the sticky table-of-contents and top navigation bar.
 
+
+## chore(repo): configure .gitattributes to ignore HTML in GitHub language stats
+
+- Added [`.gitattributes`](file:///home/sooriya/Documents/Searqon/.gitattributes) with `linguist-detectable=false`, `linguist-documentation=true`, and `linguist-vendored=true` for HTML and documentation assets.
+- Fixes GitHub language breakdown so Searqon reports as **95%+ Go** instead of HTML-heavy.
+
