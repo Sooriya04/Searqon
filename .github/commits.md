@@ -435,3 +435,9 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Removed Architecture & Ingestion Pipeline**: Pruned the ASCII pipeline diagram section from `docs.html` and updated the TOC.
 - **Removed `v2.0` Version Badges**: Stripped `v2.0` badges from headers across `index.html` and `docs.html`.
 
+
+## fix(ci): restrict GitHub Pages deployment to main branch
+
+- **Pages Trigger Restriction**: Updated [`.github/workflows/pages.yml`](file:///home/sooriya/Documents/Searqon/.github/workflows/pages.yml) to only trigger on pushes to `main`.
+- **Environment Guard**: Added `if: github.ref == 'refs/heads/main'` to the `deploy` job to prevent rejected deployments from `dev` against GitHub Pages environment protection rules.
+
