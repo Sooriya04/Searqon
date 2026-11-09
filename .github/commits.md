@@ -427,3 +427,11 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **`index.html` Engineering Overhaul**: Removed glowing neon spans (`<span>AI agents</span>`) and floating pill badges. Added a structured 2x2 subsystem architecture matrix, clean copyable quick-run terminal box, and a high-density technical specifications matrix.
 - **Interactive Code Blocks**: Added one-click copy buttons with state feedback across all documentation code samples.
 
+
+## refactor(docs): remove redundant left sidebar, v2.0 badges, and architecture diagram
+
+- **Eliminated Left Sidebar**: Removed the duplicate left category sidebar on `docs.html` so navigation is cleanly handled by the right-hand "On This Page" TOC.
+- **Centered Layout**: Centered document container (`max-width: 860px` main content) with generous reading whitespace.
+- **Removed Architecture & Ingestion Pipeline**: Pruned the ASCII pipeline diagram section from `docs.html` and updated the TOC.
+- **Removed `v2.0` Version Badges**: Stripped `v2.0` badges from headers across `index.html` and `docs.html`.
+
