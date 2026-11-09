@@ -1,0 +1,6 @@
+# GitHub Linguist language overrides
+# Keep GitHub language stats reflecting Searqon as a pure Go engine
+*.html linguist-detectable=false
+*.html linguist-documentation=true
+docs/** linguist-documentation=true
+architecture.html linguist-vendored=true
