@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Searqon documentation — architecture, quick start, REST API reference, MCP, UTCP, configuration, and Docker deployment.">
+    <title>Searqon — Documentation</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #090D14;
+            --surface: #0F1623;
+            --surface-hover: #162032;
+            --surface-elevated: #1A2438;
+            --border: #232E42;
+            --border-muted: #172030;
+            --border-hover: #374661;
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --text-muted: #8493A8;
+            --text-link: #38BDF8;
+            --accent: #38BDF8;
+            --accent-hover: #0EA5E9;
+            --accent-subtle: rgba(56, 189, 248, 0.10);
+            --accent-border: rgba(56, 189, 248, 0.25);
+            --code-bg: #05080E;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --header-height: 60px;
+            --sidebar-width: 260px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: calc(var(--header-height) + 20px);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+            font-size: 15px;
+            line-height: 1.65;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        a {
+            color: var(--text-link);
+            text-decoration: none;
+            transition: color 150ms ease;
+        }
+        a:hover { color: #7DD3FC; text-decoration: underline; }
+
+        button { cursor: pointer; font-family: inherit; }
+
+        /* ── Header ── */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: var(--header-height);
+            background: rgba(9, 13, 20, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+        }
+
+        .header-inner {
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .brand-link:hover { text-decoration: none; color: var(--text-primary); }
+
+        .brand-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        .brand-badge {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--accent);
+            background: var(--accent-subtle);
+            border: 1px solid var(--accent-border);
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-nav {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary) !important;
+            text-decoration: none !important;
+            transition: all 150ms ease;
+            white-space: nowrap;
+        }
+        .btn-nav:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary) !important;
+            text-decoration: none !important;
+        }
+
+        /* ── Layout ── */
+        .layout-container {
+            display: flex;
+            min-height: calc(100vh - var(--header-height));
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+
+        /* ── Sidebar ── */
+        aside.sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            padding: 1.75rem 0 2rem;
+            position: sticky;
+            top: var(--header-height);
+            height: calc(100vh - var(--header-height));
+            overflow-y: auto;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        aside.sidebar::-webkit-scrollbar { display: none; }
+
+        .nav-group {
+            margin-bottom: 1.75rem;
+            padding: 0 1.25rem;
+        }
+
+        .nav-group-title {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .nav-list { list-style: none; }
+
+        .nav-item a {
+            display: block;
+            padding: 0.35rem 0.6rem;
+            border-radius: 5px;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 150ms ease;
+            text-decoration: none;
+        }
+        .nav-item a:hover {
+            color: var(--text-primary);
+            background: var(--surface);
+            text-decoration: none;
+        }
+        .nav-item.active a {
+            color: var(--accent);
+            background: var(--accent-subtle);
+            font-weight: 600;
+        }
+
+        /* ── Content ── */
+        main.content-area {
+            flex: 1;
+            padding: 2.5rem 3rem 4rem;
+            max-width: 900px;
+            overflow-wrap: break-word;
+            min-width: 0;
+        }
+
+        /* ── Typography ── */
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.03em;
+            line-height: 1.18;
+            margin-bottom: 0.65rem;
+        }
+
+        .doc-lead {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            line-height: 1.65;
+            max-width: 600px;
+        }
+
+        h2 {
+            font-size: 1.45rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.025em;
+            margin-top: 3rem;
+            margin-bottom: 0.9rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 2rem;
+            margin-bottom: 0.65rem;
+        }
+
+        p { margin-bottom: 1.15rem; color: var(--text-secondary); }
+
+        ul, ol {
+            padding-left: 1.4rem;
+            margin-bottom: 1.15rem;
+            color: var(--text-secondary);
+        }
+
+        li { margin-bottom: 0.4rem; }
+
+        /* ── Code ── */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 1.65;
+            margin: 1rem 0 1.75rem;
+            color: var(--text-secondary);
+        }
+
+        code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        /* ── Method Badges ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .badge-post { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border); }
+        .badge-get  { background: var(--surface-elevated); color: var(--text-primary); border: 1px solid var(--border-hover); }
+        .badge-sse  { background: rgba(248, 250, 252, 0.06); color: var(--accent); border: 1px solid var(--accent-border); }
+
+        /* ── Cards ── */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1.5rem 0 2rem;
+        }
+
+        .doc-card {
+            background: var(--surface);
+            padding: 1.25rem;
+            transition: background 150ms;
+        }
+        .doc-card:hover { background: var(--surface-hover); }
+
+        .doc-card h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.4rem;
+        }
+
+        .doc-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0;
+            line-height: 1.5;
+        }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0 2rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: var(--surface-elevated);
+            padding: 0.65rem 1rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid var(--border-muted);
+            color: var(--text-secondary);
+            vertical-align: middle;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        /* ── Callout ── */
+        .callout {
+            background: var(--surface);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 7px 7px 0;
+            padding: 0.9rem 1.1rem;
+            margin: 1.5rem 0;
+            border-top: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .callout-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Endpoint blocks ── */
+        .endpoint-block {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1.25rem 0;
+            background: var(--surface);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-elevated);
+        }
+
+        .endpoint-path {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .endpoint-desc {
+            padding: 0.9rem 1rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Footer ── */
+        footer.doc-footer {
+            margin-top: 4rem;
+            padding: 2rem 3rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        footer.doc-footer a { color: var(--text-muted); }
+        footer.doc-footer a:hover { color: var(--text-primary); }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            aside.sidebar { display: none; }
+            main.content-area { padding: 1.75rem 1.25rem 3rem; max-width: 100%; }
+            footer.doc-footer { padding: 1.5rem 1.25rem; flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-inner">
+            <a href="index.html" class="brand-link" aria-label="Searqon Home">
+                <span class="brand-name">Searqon</span>
+                <span class="brand-badge">Docs · v2.0</span>
+            </a>
+
+            <div class="header-actions">
+                <a href="index.html" class="btn-nav">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Overview
+                </a>
+                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-nav">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar" aria-label="Documentation navigation">
+            <div class="nav-group">
+                <div class="nav-group-title">Getting Started</div>
+                <ul class="nav-list">
+                    <li class="nav-item active"><a href="#overview">Overview</a></li>
+                    <li class="nav-item"><a href="#quickstart">Quick Start</a></li>
+                    <li class="nav-item"><a href="#storage">Storage Backends</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-title">AI Agent Protocols</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#utcp">UTCP</a></li>
+                    <li class="nav-item"><a href="#mcp">MCP</a></li>
+                    <li class="nav-item"><a href="#sse">SSE Streaming</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-title">API Reference</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#endpoints">Endpoints</a></li>
+                    <li class="nav-item"><a href="#scraping">Scraping &amp; Chunking</a></li>
+                    <li class="nav-item"><a href="#observability">Observability</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-title">Configuration</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#config">settings.yml</a></li>
+                    <li class="nav-item"><a href="#docker">Docker &amp; Compose</a></li>
+                    <li class="nav-item"><a href="#antibot">Anti-Bot Tiers</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Content -->
+        <main class="content-area">
+
+            <!-- Overview -->
+            <section id="overview">
+                <h1>Searqon</h1>
+                <p class="doc-lead">Self-hosted web search and scraping API for AI agents, RAG pipelines, and developer tooling. Single Go binary. No external services required.</p>
+
+                <div class="cards-grid">
+                    <div class="doc-card">
+                        <h4>REST API</h4>
+                        <p>JSON in, JSON out. Runs on :7493. No SDK needed — works with curl, any HTTP client, or your agent's native fetch.</p>
+                    </div>
+                    <div class="doc-card">
+                        <h4>MCP &amp; UTCP</h4>
+                        <p>Native Model Context Protocol server and Universal Tool Calling Protocol support for direct agent integration.</p>
+                    </div>
+                    <div class="doc-card">
+                        <h4>4-Tier Anti-Bot</h4>
+                        <p>Automatic escalation from plain HTTP to residential proxy. Zero configuration — Searqon handles fallback internally.</p>
+                    </div>
+                    <div class="doc-card">
+                        <h4>Embedded Storage</h4>
+                        <p>SQLite WAL mode by default, PostgreSQL + pgvector for scale. Redis optional L1 cache. No external DB required to run.</p>
+                    </div>
+                </div>
+
+                <h2>How it works</h2>
+                <p>A single POST to <code>/search</code> or <code>/pipeline</code> triggers the full ingestion chain:</p>
+                <ol>
+                    <li><strong>Discovery</strong> — query routes to configured search providers (SearXNG, DDG, Wikipedia, Arxiv)</li>
+                    <li><strong>Deduplication</strong> — results merged by content hash and ranked with reciprocal rank fusion + BM25</li>
+                    <li><strong>Scraping</strong> — each URL fetched through the 4-tier escalation ladder</li>
+                    <li><strong>Extraction</strong> — HTML stripped to clean Markdown; ads, navbars, tracking removed</li>
+                    <li><strong>Chunking</strong> — optional: splits into 500-token windows with heading breadcrumbs and overlap</li>
+                    <li><strong>Caching</strong> — results persisted with <code>content_hash</code> and <code>fetched_at</code> for citation provenance</li>
+                </ol>
+            </section>
+
+            <!-- Quick Start -->
+            <section id="quickstart">
+                <h2>Quick Start</h2>
+                <p>The fastest path is Docker. Searqon ships as a ~8 MB scratch image with no runtime dependencies.</p>
+
+                <h3>Docker (recommended)</h3>
+                <pre><code>docker run -d \
+  -p 7493:7493 \
+  -v $(pwd)/data:/app/data \
+  sooriya04/searqon:latest</code></pre>
+
+                <h3>Docker Compose</h3>
+                <pre><code>curl -O https://raw.githubusercontent.com/Sooriya04/Searqon/main/docker-compose.yml
+docker compose up -d</code></pre>
+
+                <h3>Build from source</h3>
+                <pre><code>git clone https://github.com/Sooriya04/Searqon.git
+cd Searqon/src
+go build -o searqon ./...
+./searqon</code></pre>
+
+                <h3>Verify</h3>
+                <pre><code>curl http://localhost:7493/health</code></pre>
+
+                <div class="callout">
+                    <div class="callout-title">Default port</div>
+                    <p>Searqon binds to <code>0.0.0.0:7493</code> by default. Change with <code>SERVER_PORT</code> env var or in <code>config/settings.yml</code>.</p>
+                </div>
+            </section>
+
+            <!-- Storage -->
+            <section id="storage">
+                <h2>Storage Backends</h2>
+                <p>Searqon uses SQLite (WAL mode) by default. No configuration needed — the database is created automatically at <code>data/searqon.db</code>.</p>
+
+                <h3>SQLite (default)</h3>
+                <pre><code># No config needed. Data directory is mounted via -v $(pwd)/data:/app/data
+# WAL mode enabled, BM25 FTS index built on first run</code></pre>
+
+                <h3>PostgreSQL + pgvector</h3>
+                <pre><code># settings.yml
+database:
+  driver: postgres
+  dsn: "postgres://user:pass@localhost:5432/searqon?sslmode=disable"</code></pre>
+
+                <p>pgvector enables approximate nearest-neighbor search over cached page embeddings. Requires the <code>vector</code> extension installed in Postgres.</p>
+
+                <h3>Redis (optional L1 cache)</h3>
+                <pre><code>cache:
+  redis_url: "redis://localhost:6379"
+  ttl: 3600  # seconds</code></pre>
+
+                <p>When configured, Redis sits in front of the SQLite/PG cache. Cache misses fall through to the DB tier.</p>
+            </section>
+
+            <!-- UTCP -->
+            <section id="utcp">
+                <h2>UTCP — Universal Tool Calling Protocol</h2>
+                <p>Searqon implements UTCP, allowing AI agents to invoke search and scraping as structured tool calls without writing custom glue code.</p>
+
+                <p>To discover available tools, fetch the UTCP manifest:</p>
+                <pre><code>curl http://localhost:7493/utcp/manifest</code></pre>
+
+                <p>The manifest describes all tools with JSON Schema parameter definitions. Agents that support UTCP can auto-configure from this endpoint.</p>
+
+                <div class="callout">
+                    <div class="callout-title">Code-mode</div>
+                    <p>UTCP also supports a code-mode variant where the agent generates a call expression from the schema rather than calling the HTTP endpoint directly. See the GitHub README for details.</p>
+                </div>
+            </section>
+
+            <!-- MCP -->
+            <section id="mcp">
+                <h2>MCP — Model Context Protocol</h2>
+                <p>Searqon runs a native MCP server, exposing its capabilities as MCP tools. Compatible with Claude Desktop, Continue, and any MCP host.</p>
+
+                <h3>stdio transport (Claude Desktop)</h3>
+                <p>Add to your <code>claude_desktop_config.json</code>:</p>
+                <pre><code>{
+  "mcpServers": {
+    "searqon": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-v", "/path/to/data:/app/data",
+        "sooriya04/searqon:latest",
+        "--mcp-stdio"
+      ]
+    }
+  }
+}</code></pre>
+
+                <h3>HTTP transport</h3>
+                <pre><code># MCP over HTTP (SSE transport)
+curl http://localhost:7493/mcp/sse</code></pre>
+
+                <p>Exposed MCP tools mirror the REST endpoints: <code>search</code>, <code>scrape</code>, <code>scrape_chunked</code>, <code>crawl</code>, <code>map</code>, and <code>pipeline</code>.</p>
+            </section>
+
+            <!-- SSE -->
+            <section id="sse">
+                <h2>SSE Streaming</h2>
+                <p>Progressive search results over Server-Sent Events. No polling — connect once and receive events as they emit.</p>
+
+                <pre><code>curl -N "http://localhost:7493/search/stream?query=golang+vector+databases&limit=5"</code></pre>
+
+                <p>Event types emitted in order:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Event</th><th>Payload</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>discovery</code></td><td>Search results from providers (title, url, snippet)</td></tr>
+                            <tr><td><code>scrape</code></td><td>Scraped Markdown content per URL as it completes</td></tr>
+                            <tr><td><code>synthesis</code></td><td>Final ranked and deduplicated result set</td></tr>
+                            <tr><td><code>error</code></td><td>Per-URL scrape failure with tier and reason</td></tr>
+                            <tr><td><code>done</code></td><td>Stream complete signal</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>Each event is a JSON object: <code>data: {"event": "scrape", "url": "...", "markdown": "..."}\n\n</code></p>
+            </section>
+
+            <!-- Endpoints -->
+            <section id="endpoints">
+                <h2>Core REST Endpoints</h2>
+                <p>All endpoints accept and return <code>application/json</code>. Base URL defaults to <code>http://localhost:7493</code>.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/search</code></td><td>Multi-engine web search with optional scraping and RRF ranking</td></tr>
+                            <tr><td><span class="badge badge-sse">GET</span></td><td><code>/search/stream</code></td><td>Progressive SSE stream: discovery → scrape → synthesis events</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/scrape</code></td><td>Single-URL fetch through 4-tier anti-bot ladder, returns Markdown</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/scrape/chunked</code></td><td>Pre-chunked RAG extraction with token counts and BM25 scores</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/scrape/batch</code></td><td>Concurrent batch scraping of multiple URLs</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/pipeline</code></td><td>Unified search → fetch → chunk → rank in one call</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/crawl</code></td><td>Recursive domain crawler with max depth and link deduplication</td></tr>
+                            <tr><td><span class="badge badge-post">POST</span></td><td><code>/map</code></td><td>Domain link sitemap extractor</td></tr>
+                            <tr><td><span class="badge badge-get">GET</span></td><td><code>/health</code></td><td>Engine status and active endpoint list</td></tr>
+                            <tr><td><span class="badge badge-get">GET</span></td><td><code>/metrics</code></td><td>Prometheus metrics exporter</td></tr>
+                            <tr><td><span class="badge badge-get">GET</span></td><td><code>/logs</code></td><td>Queryable structured request telemetry</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Scraping -->
+            <section id="scraping">
+                <h2>Scraping &amp; Chunking</h2>
+
+                <h3>POST /scrape</h3>
+                <pre><code>{
+  "url": "https://example.com/article",
+  "format": "markdown",           // "markdown" | "html" | "text"
+  "stealth_level": "auto",        // "auto" | "fast" | "stealth" | "headless"
+  "timeout_ms": 10000
+}</code></pre>
+
+                <p>Response includes <code>markdown</code>, <code>word_count</code>, <code>content_hash</code>, <code>fetched_at</code>, <code>bot_detected</code>, and <code>escalation_tier</code>.</p>
+
+                <h3>POST /scrape/chunked</h3>
+                <pre><code>{
+  "url": "https://arxiv.org/abs/2312.00752",
+  "chunk_size": 500,              // tokens per chunk
+  "chunk_overlap": 50,            // overlap tokens
+  "include_bm25": true
+}</code></pre>
+
+                <p>Returns an array of chunks, each with <code>index</code>, <code>token_count</code>, <code>bm25_score</code>, <code>heading_breadcrumb</code>, and <code>content</code>. Ready for direct vector DB ingestion.</p>
+
+                <h3>POST /pipeline</h3>
+                <pre><code>{
+  "query": "attention is all you need",
+  "limit": 5,
+  "scrape": true,
+  "chunk": true,
+  "chunk_size": 500
+}</code></pre>
+
+                <p>The pipeline endpoint is the recommended entry point for RAG workflows. It runs the full chain and returns ranked, chunked results in one response.</p>
+            </section>
+
+            <!-- Observability -->
+            <section id="observability">
+                <h2>Observability</h2>
+
+                <h3>Prometheus metrics</h3>
+                <p>Standard Prometheus format at <code>GET /metrics</code>:</p>
+                <pre><code>searqon_requests_total 4218
+searqon_search_requests_total 1284
+searqon_scrape_requests_total 2934
+searqon_cache_hits_total 1045
+searqon_cache_misses_total 1889
+searqon_active_connections 8
+searqon_escalation_tier1_total 2510
+searqon_escalation_tier2_total 310
+searqon_escalation_tier3_total 98
+searqon_escalation_tier4_total 16</code></pre>
+
+                <h3>Request logs</h3>
+                <p><code>GET /logs</code> returns structured JSON logs queryable by time range, endpoint, and status. Useful for debugging scrape failures and cache performance.</p>
+            </section>
+
+            <!-- Config -->
+            <section id="config">
+                <h2>settings.yml</h2>
+                <p>Searqon reads <code>config/settings.yml</code> at startup. All fields have environment variable overrides.</p>
+
+                <pre><code>server:
+  port: 7493
+  host: "0.0.0.0"
+
+database:
+  driver: sqlite           # sqlite | postgres
+  path: "data/searqon.db"  # sqlite only
+  # dsn: "postgres://..."  # postgres
+
+cache:
+  ttl: 3600                # cache TTL in seconds
+  # redis_url: "redis://localhost:6379"
+
+search:
+  default_provider: searxng
+  searxng_url: "http://localhost:8080"
+  providers:
+    - searxng
+    - duckduckgo
+    - wikipedia
+    - arxiv
+
+scraper:
+  timeout_ms: 10000
+  max_concurrency: 8
+  default_tier: auto       # auto | fast | stealth | headless
+
+rate_limiter:
+  requests_per_minute: 60
+  burst: 10</code></pre>
+
+                <h3>Environment variables</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>SERVER_PORT</code></td><td><code>7493</code></td><td>HTTP listen port</td></tr>
+                            <tr><td><code>DATABASE_DRIVER</code></td><td><code>sqlite</code></td><td><code>sqlite</code> or <code>postgres</code></td></tr>
+                            <tr><td><code>DATABASE_DSN</code></td><td>—</td><td>Postgres connection string</td></tr>
+                            <tr><td><code>SEARXNG_URL</code></td><td><code>http://localhost:8080</code></td><td>SearXNG instance URL</td></tr>
+                            <tr><td><code>REDIS_URL</code></td><td>—</td><td>Optional Redis cache URL</td></tr>
+                            <tr><td><code>CACHE_TTL</code></td><td><code>3600</code></td><td>Cache TTL in seconds</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Docker -->
+            <section id="docker">
+                <h2>Docker &amp; Compose</h2>
+
+                <h3>Minimal run</h3>
+                <pre><code>docker run -d \
+  --name searqon \
+  -p 7493:7493 \
+  -v $(pwd)/data:/app/data \
+  sooriya04/searqon:latest</code></pre>
+
+                <h3>With SearXNG</h3>
+                <pre><code>version: "3.9"
+services:
+  searqon:
+    image: sooriya04/searqon:latest
+    ports: ["7493:7493"]
+    volumes: ["./data:/app/data"]
+    environment:
+      SEARXNG_URL: http://searxng:8080
+    depends_on: [searxng]
+
+  searxng:
+    image: searxng/searxng:latest
+    ports: ["8080:8080"]</code></pre>
+
+                <h3>With PostgreSQL</h3>
+                <pre><code>version: "3.9"
+services:
+  searqon:
+    image: sooriya04/searqon:latest
+    ports: ["7493:7493"]
+    environment:
+      DATABASE_DRIVER: postgres
+      DATABASE_DSN: postgres://searqon:secret@db:5432/searqon
+    depends_on: [db]
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: searqon
+      POSTGRES_USER: searqon
+      POSTGRES_PASSWORD: secret
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+volumes:
+  pgdata:</code></pre>
+            </section>
+
+            <!-- Anti-Bot -->
+            <section id="antibot">
+                <h2>Anti-Bot Escalation Tiers</h2>
+                <p>Each scrape request starts at Tier 1. If blocked (detected via status codes, challenge pages, or redirect patterns), Searqon retries at the next tier automatically.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tier</th><th>Method</th><th>Typical Latency</th><th>Triggers for escalation</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>T1</strong></td>
+                                <td>Direct HTTP (Go net/http)</td>
+                                <td>50–200 ms</td>
+                                <td>403, bot detection signature in body</td>
+                            </tr>
+                            <tr>
+                                <td><strong>T2</strong></td>
+                                <td>Spoofed browser headers + TLS fingerprint</td>
+                                <td>200–600 ms</td>
+                                <td>Cloudflare 1s challenge, CAPTCHA page</td>
+                            </tr>
+                            <tr>
+                                <td><strong>T3</strong></td>
+                                <td>Lightpanda / Camoufox headless browser via CDP</td>
+                                <td>1–4 s</td>
+                                <td>JS-rendered challenge, Cloudflare 5s</td>
+                            </tr>
+                            <tr>
+                                <td><strong>T4</strong></td>
+                                <td>Residential proxy pool rotation</td>
+                                <td>2–8 s</td>
+                                <td>IP-rate-limited, geo-blocked targets</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>The <code>escalation_tier</code> field in every response tells you which tier ultimately succeeded. Use <code>stealth_level: "fast"</code> to cap at T2, or <code>"headless"</code> to start at T3.</p>
+
+                <div class="callout">
+                    <div class="callout-title">SSRF protection</div>
+                    <p>Scrape requests to private IP ranges (<code>127.x</code>, <code>10.x</code>, <code>192.168.x</code>, <code>169.254.x</code>) are blocked by default. Set <code>SEARQON_ALLOW_PRIVATE=1</code> to disable in trusted environments.</p>
+                </div>
+            </section>
+
+            <footer class="doc-footer">
+                <div>Searqon · MIT License</div>
+                <div><a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer">github.com/Sooriya04/Searqon</a></div>
+            </footer>
+
+        </main>
+    </div>
+
+</body>
+</html>

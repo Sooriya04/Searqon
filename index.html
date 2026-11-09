@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Searqon — Self-hosted web intelligence and search engine for AI agents and RAG. Pure Go, embedded SQLite, 4-tier anti-bot bypass, clean Markdown extraction.">
-    <title>Searqon — Web Intelligence Engine for AI Agents</title>
+    <meta name="description" content="Searqon — Self-hosted web search and scraping API for AI agents and RAG pipelines. Pure Go, embedded SQLite, 4-tier anti-bot escalation, clean Markdown output.">
+    <title>Searqon — Web Search API for AI Agents</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,6 @@
 
     <style>
         :root {
-            /* Monochromatic Terminal Dark Design Tokens */
             --bg: #090D14;
             --surface: #0F1623;
             --surface-hover: #162032;
@@ -21,34 +20,25 @@
             --border: #232E42;
             --border-muted: #172030;
             --border-hover: #374661;
-
             --text-primary: #F8FAFC;
             --text-secondary: #CBD5E1;
             --text-muted: #8493A8;
             --text-link: #38BDF8;
-
-            /* Monochromatic Tech Accent (Electric Cyan / Cold Steel) */
             --accent: #38BDF8;
             --accent-hover: #0EA5E9;
-            --accent-subtle: rgba(56, 189, 248, 0.12);
-            --accent-border: rgba(56, 189, 248, 0.28);
-
+            --accent-subtle: rgba(56, 189, 248, 0.10);
+            --accent-border: rgba(56, 189, 248, 0.25);
             --code-bg: #05080E;
-
             --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            --header-height: 64px;
+            --header-height: 60px;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         html {
             scroll-behavior: smooth;
-            scroll-padding-top: calc(var(--header-height) + 24px);
+            scroll-padding-top: calc(var(--header-height) + 20px);
         }
 
         html, body {
@@ -57,7 +47,7 @@
             background-color: var(--bg);
             color: var(--text-secondary);
             font-family: var(--font-sans);
-            font-size: 14.5px;
+            font-size: 15px;
             line-height: 1.6;
             -webkit-font-smoothing: antialiased;
         }
@@ -67,20 +57,13 @@
             text-decoration: none;
             transition: color 150ms ease;
         }
+        a:hover { color: #7DD3FC; text-decoration: underline; }
 
-        a:hover {
-            color: #7DD3FC;
-            text-decoration: underline;
-        }
-
-        button {
-            cursor: pointer;
-            font-family: inherit;
-        }
+        button { cursor: pointer; font-family: inherit; }
 
         .container {
             width: 100%;
-            max-width: 1120px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 0 1.5rem;
         }
@@ -91,9 +74,9 @@
             top: 0;
             z-index: 100;
             height: var(--header-height);
-            background: rgba(9, 13, 20, 0.94);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(9, 13, 20, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
@@ -109,14 +92,15 @@
         .brand-link {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.55rem;
             color: var(--text-primary);
             text-decoration: none;
         }
+        .brand-link:hover { text-decoration: none; color: var(--text-primary); }
 
         .brand-name {
             font-weight: 700;
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             letter-spacing: -0.02em;
             color: var(--text-primary);
             font-family: var(--font-mono);
@@ -124,12 +108,13 @@
 
         .brand-tag {
             font-family: var(--font-mono);
-            font-size: 11px;
+            font-size: 10px;
             color: var(--accent);
             background: var(--accent-subtle);
             border: 1px solid var(--accent-border);
             padding: 2px 7px;
-            border-radius: 12px;
+            border-radius: 10px;
+            font-weight: 500;
         }
 
         .nav-menu {
@@ -140,479 +125,446 @@
         }
 
         .nav-menu a {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
             font-weight: 500;
             text-decoration: none;
             transition: color 0.15s;
         }
-
-        .nav-menu a:hover {
-            color: var(--text-primary);
-        }
+        .nav-menu a:hover { color: var(--text-primary); text-decoration: none; }
 
         .nav-cta-group {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
-        }
-
-        .btn-nav-action {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            font-size: 0.84rem;
-            font-weight: 600;
-            padding: 0.45rem 0.85rem;
-            border-radius: 6px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text-primary) !important;
-            text-decoration: none !important;
-            transition: all 0.15s;
-            min-height: 36px;
-        }
-
-        .btn-nav-action:hover {
-            background: var(--surface-hover);
-            border-color: var(--accent);
-        }
-
-        .btn-nav-primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #030712 !important;
-        }
-
-        .btn-nav-primary:hover {
-            background: var(--accent-hover);
-            border-color: var(--accent-hover);
-            color: #030712 !important;
-        }
-
-        /* ── Hero Section ── */
-        .hero {
-            padding: 4.5rem 0 3rem;
-        }
-
-        .hero-badges {
-            display: flex;
-            align-items: center;
             gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1.25rem;
         }
 
-        .pill-badge {
+        .btn-nav {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            color: var(--text-primary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
             background: var(--surface);
             border: 1px solid var(--border);
-            padding: 0.2rem 0.65rem;
-            border-radius: 9999px;
-            text-decoration: none;
-            transition: border-color 0.15s;
+            color: var(--text-secondary) !important;
+            text-decoration: none !important;
+            transition: all 150ms ease;
+            white-space: nowrap;
+        }
+        .btn-nav:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary) !important;
+            text-decoration: none !important;
         }
 
-        .pill-badge:hover {
-            border-color: var(--accent);
-            text-decoration: none;
-        }
-
-        .pill-badge.accent {
-            color: var(--accent);
+        .btn-nav-primary {
             background: var(--accent-subtle);
             border-color: var(--accent-border);
+            color: var(--accent) !important;
+        }
+        .btn-nav-primary:hover {
+            background: rgba(56, 189, 248, 0.18);
+            color: #fff !important;
         }
 
-        .pill-badge span.dot {
+        /* ── Hero ── */
+        .hero {
+            padding: 5rem 0 3.5rem;
+            border-bottom: 1px solid var(--border-muted);
+        }
+
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            margin-bottom: 1.75rem;
+            letter-spacing: 0.02em;
+        }
+
+        .hero-eyebrow .dot {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: currentColor;
+            background: var(--accent);
+            flex-shrink: 0;
         }
 
         .hero h1 {
-            font-size: clamp(2rem, 4.5vw, 3.25rem);
-            font-weight: 800;
+            font-size: clamp(2rem, 4vw, 2.9rem);
+            font-weight: 700;
             color: var(--text-primary);
-            letter-spacing: -0.035em;
-            line-height: 1.15;
-            max-width: 860px;
+            line-height: 1.18;
+            letter-spacing: -0.03em;
+            max-width: 760px;
             margin-bottom: 1.25rem;
         }
 
-        .hero p.lead {
-            font-size: clamp(1rem, 1.7vw, 1.15rem);
-            color: var(--text-secondary);
-            max-width: 740px;
-            line-height: 1.6;
-            margin-bottom: 2rem;
+        .hero h1 span {
+            color: var(--accent);
         }
 
-        /* ── Terminal / Command Launcher ── */
+        .hero .lead {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            max-width: 620px;
+            margin-bottom: 2.25rem;
+            line-height: 1.65;
+        }
+
+        /* ── Terminal Box ── */
         .terminal-box {
             background: var(--code-bg);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            max-width: 800px;
-            margin-bottom: 3.5rem;
+            max-width: 680px;
+            margin-bottom: 2.5rem;
         }
 
         .terminal-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: var(--surface);
+            padding: 0 1rem;
             border-bottom: 1px solid var(--border);
-            padding: 0 0.75rem;
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-
-        .terminal-header::-webkit-scrollbar {
-            display: none;
+            height: 38px;
+            background: var(--surface);
         }
 
         .terminal-tabs {
             display: flex;
-            gap: 0.25rem;
+            gap: 0.1rem;
         }
 
         .t-tab {
-            padding: 0.65rem 1rem;
             background: transparent;
             border: none;
+            border-bottom: 2px solid transparent;
             color: var(--text-muted);
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            font-weight: 500;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            white-space: nowrap;
+            font-size: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: -1px;
             transition: all 0.15s;
         }
-
-        .t-tab:hover {
-            color: var(--text-primary);
-        }
-
+        .t-tab:hover { color: var(--text-secondary); }
         .t-tab.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
-            background: var(--code-bg);
         }
 
         .terminal-body {
-            padding: 1.1rem 1.25rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            padding: 0.9rem 1.1rem;
             gap: 1rem;
         }
 
         .terminal-code {
             font-family: var(--font-mono);
-            font-size: 0.85rem;
-            color: var(--accent);
-            overflow-x: auto;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            flex: 1;
             white-space: nowrap;
-            scrollbar-width: none;
-        }
-
-        .terminal-code::-webkit-scrollbar {
-            display: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .copy-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 0.35rem 0.75rem;
-            border-radius: 6px;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-hover);
+            color: var(--text-muted);
             font-family: var(--font-mono);
-            font-size: 0.76rem;
-            cursor: pointer;
-            flex-shrink: 0;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
+            font-size: 0.72rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 5px;
             transition: all 0.15s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
+        .copy-btn:hover { color: var(--text-primary); border-color: var(--accent-border); }
 
-        .copy-btn:hover {
-            background: var(--surface-hover);
-            border-color: var(--accent);
-        }
-
-        /* ── Specs Strip ── */
+        /* ── Stats Row ── */
         .specs-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 4rem;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            max-width: 680px;
         }
 
         .spec-item {
             background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.25rem;
-            transition: border-color 0.15s;
-        }
-
-        .spec-item:hover {
-            border-color: var(--border-hover);
+            padding: 1.1rem 1.25rem;
+            text-align: center;
         }
 
         .spec-item .num {
             font-family: var(--font-mono);
-            font-size: 1.45rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--text-primary);
+            margin-bottom: 0.2rem;
         }
 
         .spec-item .desc {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
-            margin-top: 0.25rem;
+            line-height: 1.4;
         }
 
-        /* ── Section Container ── */
+        /* ── Sections ── */
         .section {
-            padding: 3.5rem 0;
-            border-top: 1px solid var(--border);
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border-muted);
         }
 
-        .section-header {
-            margin-bottom: 2rem;
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.6rem;
         }
 
         .section-title {
-            font-size: 1.45rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--text-primary);
-            letter-spacing: -0.02em;
-            margin-bottom: 0.4rem;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.6rem;
+            line-height: 1.25;
         }
 
         .section-desc {
             font-size: 0.95rem;
             color: var(--text-muted);
-            max-width: 640px;
+            max-width: 560px;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
         }
 
-        /* ── Architectural Features ── */
+        /* ── Cards ── */
         .cards-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 1.25rem;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
         }
 
         .card {
             background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
             padding: 1.5rem;
+            transition: background 150ms;
+        }
+        .card:hover { background: var(--surface-hover); }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: all 0.2s ease;
-        }
-
-        .card:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
-            background: var(--surface-hover);
-        }
-
-        .card-num {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
+            align-items: center;
+            justify-content: center;
+            border-radius: 7px;
+            background: var(--accent-subtle);
+            border: 1px solid var(--accent-border);
+            margin-bottom: 1rem;
             color: var(--accent);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.6rem;
+            flex-shrink: 0;
         }
 
         .card-title {
-            font-size: 1.05rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 0.5rem;
         }
 
         .card-body {
-            font-size: 0.88rem;
-            color: var(--text-secondary);
-            line-height: 1.55;
-            margin-bottom: 1.25rem;
-        }
-
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-        }
-
-        .tag {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            padding: 0.15rem 0.45rem;
-            border-radius: 4px;
+            font-size: 0.875rem;
             color: var(--text-muted);
+            line-height: 1.55;
         }
 
-        /* ── Anti-Bot Table ── */
+        /* ── Escalation Ladder Table ── */
         .table-wrap {
-            background: var(--surface);
+            overflow-x: auto;
             border: 1px solid var(--border);
             border-radius: 8px;
-            overflow-x: auto;
+            background: var(--surface);
         }
 
         table.ladder-table {
             width: 100%;
             border-collapse: collapse;
-            text-align: left;
-            font-size: 0.88rem;
-        }
-
-        table.ladder-table th, table.ladder-table td {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
         }
 
         table.ladder-table th {
             background: var(--surface-elevated);
-            color: var(--text-muted);
+            padding: 0.65rem 1.1rem;
+            text-align: left;
             font-family: var(--font-mono);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            font-weight: 600;
+            border-bottom: 1px solid var(--border);
         }
 
-        table.ladder-table tr:last-child td {
-            border-bottom: none;
+        table.ladder-table td {
+            padding: 0.9rem 1.1rem;
+            border-bottom: 1px solid var(--border-muted);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            vertical-align: middle;
         }
 
-        .badge-tier {
+        table.ladder-table tr:last-child td { border-bottom: none; }
+
+        .tier-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
             font-family: var(--font-mono);
             font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.2rem 0.5rem;
+            font-weight: 700;
+            padding: 3px 9px;
             border-radius: 4px;
-            display: inline-block;
-            background: var(--accent-subtle);
-            color: var(--accent);
-            border: 1px solid var(--accent-border);
         }
+
+        .tier-1 { background: var(--accent-subtle); border: 1px solid var(--accent-border); color: var(--accent); }
+        .tier-2 { background: rgba(248, 250, 252, 0.06); border: 1px solid var(--border-hover); color: var(--text-secondary); }
+        .tier-3 { background: rgba(248, 250, 252, 0.04); border: 1px solid var(--border); color: var(--text-muted); }
+        .tier-4 { background: rgba(248, 250, 252, 0.03); border: 1px solid var(--border-muted); color: var(--text-muted); }
 
         /* ── API Explorer ── */
-        .api-card {
-            background: var(--code-bg);
+        .api-panel {
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
+            background: var(--code-bg);
         }
 
-        .api-nav {
+        .api-tabs {
             display: flex;
-            background: var(--surface);
             border-bottom: 1px solid var(--border);
+            background: var(--surface);
             overflow-x: auto;
-            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
         }
-
-        .api-nav::-webkit-scrollbar {
-            display: none;
-        }
+        .api-tabs::-webkit-scrollbar { display: none; }
 
         .api-tab-btn {
-            padding: 0.75rem 1.25rem;
             background: transparent;
             border: none;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            cursor: pointer;
             border-bottom: 2px solid transparent;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 0.65rem 1.1rem;
+            margin-bottom: -1px;
             white-space: nowrap;
             transition: all 0.15s;
         }
+        .api-tab-btn:hover { color: var(--text-secondary); }
+        .api-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-        .api-tab-btn:hover {
-            color: var(--text-primary);
-        }
-
-        .api-tab-btn.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
+        .api-endpoint-label {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 0.6rem 1.1rem;
+            border-bottom: 1px solid var(--border);
             background: var(--code-bg);
         }
 
         .api-content {
-            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
         }
 
-        .code-meta-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.6rem;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            color: var(--text-muted);
+        .api-col {
+            padding: 0;
         }
+
+        .api-col-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.65rem 1.1rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .api-col:first-child { border-right: 1px solid var(--border); }
 
         pre.code-viewer {
-            background: #03060B;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1.15rem;
+            background: transparent;
+            padding: 1rem 1.1rem;
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            line-height: 1.6;
+            font-size: 0.78rem;
+            line-height: 1.65;
             color: var(--text-secondary);
             overflow-x: auto;
             white-space: pre;
-            margin-bottom: 1.25rem;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            min-height: 180px;
         }
 
-        /* ── Webmaster & SearqonBot ── */
+        /* ── SearqonBot ── */
         .bot-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.25rem;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
         }
 
         .bot-card {
             background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.5rem;
+            padding: 1.75rem;
         }
 
         .bot-heading {
-            font-size: 1.05rem;
+            font-size: 1rem;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.5rem;
         }
 
         .bot-desc {
-            font-size: 0.88rem;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 1.1rem;
             line-height: 1.55;
         }
 
@@ -620,10 +572,10 @@
             background: var(--code-bg);
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 0.75rem 1rem;
+            padding: 0.65rem 1rem;
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            color: var(--text-primary);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
             word-break: break-all;
             display: flex;
             align-items: center;
@@ -634,32 +586,40 @@
         .recipe-switcher {
             display: flex;
             gap: 0.4rem;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.65rem;
+            flex-wrap: wrap;
         }
 
         .r-btn {
             background: var(--surface-elevated);
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 0.35rem 0.7rem;
+            padding: 0.3rem 0.65rem;
             border-radius: 4px;
             font-family: var(--font-mono);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             cursor: pointer;
+            transition: all 0.15s;
         }
+        .r-btn:hover { color: var(--text-secondary); }
+        .r-btn.active { color: #fff; border-color: var(--accent-border); background: var(--accent-subtle); }
 
-        .r-btn.active {
-            color: #fff;
-            border-color: var(--accent);
-            background: var(--accent-subtle);
+        pre.robots-preview {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin: 0;
         }
 
         /* ── Footer ── */
         footer {
             border-top: 1px solid var(--border);
-            padding: 3rem 0;
-            color: var(--text-muted);
-            font-size: 0.85rem;
+            padding: 2.5rem 0;
         }
 
         .footer-inner {
@@ -670,6 +630,19 @@
             gap: 1rem;
         }
 
+        .footer-brand {
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .footer-copy {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
         .footer-links {
             display: flex;
             gap: 1.5rem;
@@ -677,14 +650,12 @@
         }
 
         .footer-links a {
-            color: var(--text-secondary);
+            font-size: 0.85rem;
+            color: var(--text-muted);
         }
+        .footer-links a:hover { color: var(--text-primary); text-decoration: none; }
 
-        .footer-links a:hover {
-            color: var(--text-primary);
-        }
-
-        /* Toast */
+        /* ── Toast ── */
         .toast {
             position: fixed;
             bottom: 1.5rem;
@@ -692,107 +663,64 @@
             background: var(--surface-elevated);
             border: 1px solid var(--border-hover);
             color: #fff;
-            padding: 0.6rem 1rem;
+            padding: 0.55rem 1rem;
             border-radius: 6px;
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
-            transform: translateY(100px);
+            font-size: 0.78rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transform: translateY(80px);
             opacity: 0;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 100;
+            z-index: 200;
         }
+        .toast.show { transform: translateY(0); opacity: 1; }
 
-        .toast.show {
-            transform: translateY(0);
-            opacity: 1;
-        }
-
-        /* ── Mobile Layout Optimization ── */
+        /* ── Responsive ── */
         @media (max-width: 768px) {
-            .nav-menu {
-                display: none;
-            }
-
-            .hero {
-                padding: 3rem 0 2rem;
-            }
-
-            .specs-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.75rem;
-            }
-
-            .cards-3 {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-
-            .bot-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .terminal-body {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .copy-btn {
-                text-align: center;
-                justify-content: center;
-            }
-
-            .api-content {
-                padding: 1rem;
-            }
-
-            table.ladder-table th, table.ladder-table td {
-                padding: 0.75rem 0.85rem;
-                font-size: 0.82rem;
-            }
-
-            .footer-inner {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
+            .nav-menu { display: none; }
+            .hero { padding: 3rem 0 2rem; }
+            .specs-grid { grid-template-columns: repeat(2, 1fr); max-width: 100%; }
+            .terminal-box { max-width: 100%; }
+            .cards-3 { grid-template-columns: 1fr; }
+            .api-content { grid-template-columns: 1fr; }
+            .api-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+            .bot-grid { grid-template-columns: 1fr; }
+            .terminal-body { flex-direction: column; align-items: stretch; }
+            .copy-btn { text-align: center; justify-content: center; }
+            .footer-inner { flex-direction: column; align-items: flex-start; }
         }
 
         @media (max-width: 480px) {
-            .specs-grid {
-                grid-template-columns: 1fr;
-            }
+            .specs-grid { grid-template-columns: repeat(2, 1fr); }
+            .section-title { font-size: 1.5rem; }
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Header Navigation -->
+    <!-- Header -->
     <header>
         <div class="container nav-inner">
-            <a href="index.html" class="brand-link" aria-label="Searqon Home">
+            <a href="index.html" class="brand-link" aria-label="Searqon">
                 <span class="brand-name">Searqon</span>
                 <span class="brand-tag">v2.0</span>
             </a>
 
-            <ul class="nav-menu">
+            <ul class="nav-menu" role="navigation" aria-label="Main navigation">
                 <li><a href="#pipeline">Architecture</a></li>
                 <li><a href="#stealth">Anti-Bot</a></li>
-                <li><a href="#api">API Reference</a></li>
-                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="#api">API</a></li>
                 <li><a href="#botinfo">SearqonBot</a></li>
             </ul>
 
             <div class="nav-cta-group">
-                <a href="docs.html" class="btn-nav-action btn-nav-primary">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
-                    Documentation
+                <a href="docs.html" class="btn-nav btn-nav-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+                    Docs
                 </a>
-                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-nav-action">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                    </svg>
+                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-nav">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     GitHub
                 </a>
             </div>
@@ -800,253 +728,238 @@
     </header>
 
     <main class="container">
-        <!-- Hero Section -->
+
+        <!-- Hero -->
         <section class="hero">
-            <div class="hero-badges">
-                <a href="https://hub.docker.com/r/sooriya04/searqon" target="_blank" rel="noopener noreferrer" class="pill-badge">
-                    <span class="dot"></span>
-                    <span>sooriya04/searqon:latest</span>
-                </a>
-                <span class="pill-badge accent">
-                    <span class="dot"></span>
-                    <span>Pure Go · Zero External DB Required</span>
-                </span>
+            <div class="hero-eyebrow">
+                <span class="dot"></span>
+                <span>sooriya04/searqon:latest · Pure Go · MIT License</span>
             </div>
 
-            <h1>Self-Hosted Web Intelligence & Search Layer for AI Agents</h1>
+            <h1>Web search and scraping API<br>for <span>AI agents</span> and RAG pipelines.</h1>
 
             <p class="lead">
-                Searqon searches the web, resolves 4-tier anti-bot challenges, and returns clean, token-optimized Markdown. Single compiled binary with embedded SQLite WAL mode, BM25 ranker, and SearXNG integration.
+                Self-hosted. Single binary. POST a query, get back clean Markdown with citations. Handles anti-bot detection automatically — no browser farms, no third-party SaaS.
             </p>
 
-            <!-- Quick Run Box -->
+            <!-- Quick Start -->
             <div class="terminal-box">
                 <div class="terminal-header">
                     <div class="terminal-tabs">
-                        <button class="t-tab active" onclick="switchLauncher('run')">docker run</button>
-                        <button class="t-tab" onclick="switchLauncher('pull')">docker pull</button>
-                        <button class="t-tab" onclick="switchLauncher('compose')">docker compose</button>
+                        <button class="t-tab active" onclick="switchLauncher('run', event)">docker run</button>
+                        <button class="t-tab" onclick="switchLauncher('pull', event)">docker pull</button>
+                        <button class="t-tab" onclick="switchLauncher('compose', event)">compose</button>
                     </div>
                 </div>
                 <div class="terminal-body">
                     <span class="terminal-code" id="launcher-cmd">docker run -d -p 7493:7493 -v $(pwd)/data:/app/data sooriya04/searqon:latest</span>
-                    <button class="copy-btn" onclick="copyLauncher()">Copy</button>
+                    <button class="copy-btn" onclick="copyLauncher()" aria-label="Copy command">Copy</button>
                 </div>
             </div>
 
-            <!-- Specs Grid -->
+            <!-- Stats -->
             <div class="specs-grid">
                 <div class="spec-item">
-                    <div class="num">~8.2 MB</div>
-                    <div class="desc">Scratch Container Size</div>
+                    <div class="num">~8 MB</div>
+                    <div class="desc">Docker scratch image</div>
                 </div>
                 <div class="spec-item">
                     <div class="num">&lt; 20 MB</div>
-                    <div class="desc">Idle RAM Consumption</div>
+                    <div class="desc">Idle RAM usage</div>
                 </div>
                 <div class="spec-item">
-                    <div class="num">4 Tiers</div>
-                    <div class="desc">Anti-Bot Escalation Ladder</div>
+                    <div class="num">4 tiers</div>
+                    <div class="desc">Anti-bot escalation</div>
                 </div>
                 <div class="spec-item">
                     <div class="num">SQLite + PG</div>
-                    <div class="desc">Dual Storage Architecture</div>
+                    <div class="desc">Dual storage backends</div>
                 </div>
             </div>
         </section>
 
-        <!-- Pipeline Flow -->
+        <!-- Architecture -->
         <section id="pipeline" class="section">
-            <div class="section-header">
-                <h2 class="section-title">Engine Architecture</h2>
-                <p class="section-desc">How Searqon ingests, purifies, and structures web intelligence without external SaaS dependencies.</p>
-            </div>
+            <div class="section-label">Architecture</div>
+            <h2 class="section-title">Search → Fetch → Chunk → Rank</h2>
+            <p class="section-desc">One HTTP call triggers the full pipeline. Searqon handles provider routing, anti-bot escalation, content extraction, and BM25 ranking internally.</p>
 
             <div class="cards-3">
                 <div class="card">
-                    <div>
-                        <div class="card-num">Phase 1 · Discovery</div>
-                        <div class="card-title">Federated Search</div>
-                        <div class="card-body">Queries SearXNG, DuckDuckGo Lite, Wikipedia, and ArXiv concurrently. Deduplicates canonical URLs and ranks candidates via BM25 with freshness decay scoring.</div>
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                     </div>
-                    <div class="card-tags">
-                        <span class="tag">SearXNG</span>
-                        <span class="tag">BM25 Ranker</span>
-                        <span class="tag">Deduplication</span>
-                    </div>
+                    <div class="card-title">Multi-Engine Search</div>
+                    <div class="card-body">Routes queries across SearXNG, DuckDuckGo, Wikipedia, and Arxiv. Merges results with reciprocal rank fusion and deduplicates by content hash.</div>
                 </div>
-
                 <div class="card">
-                    <div>
-                        <div class="card-num">Phase 2 · Extraction</div>
-                        <div class="card-title">Token-Dense Markdown</div>
-                        <div class="card-body">Strips tracking scripts, ads, and navigation boilerplate. Produces clean Markdown with word counts and structured metadata ready for LLM context windows and RAG embeddings.</div>
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     </div>
-                    <div class="card-tags">
-                        <span class="tag">Clean Markdown</span>
-                        <span class="tag">RAG Chunks</span>
-                        <span class="tag">Ollama LLM</span>
-                    </div>
+                    <div class="card-title">4-Tier Anti-Bot</div>
+                    <div class="card-body">Escalates automatically: fast HTTP → spoofed browser headers → Lightpanda/Camoufox headless CDP → residential proxy. Zero manual configuration.</div>
                 </div>
-
                 <div class="card">
-                    <div>
-                        <div class="card-num">Phase 3 · Storage</div>
-                        <div class="card-title">Dual Storage Engine</div>
-                        <div class="card-body">Runs out of the box on embedded pure-Go SQLite with WAL mode, FTS5 full-text indexing, and vector tables. Seamlessly switches to PostgreSQL and Redis L1 cache when configured.</div>
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </div>
-                    <div class="card-tags">
-                        <span class="tag">SQLite FTS5</span>
-                        <span class="tag">PostgreSQL</span>
-                        <span class="tag">Redis L1</span>
+                    <div class="card-title">Clean Markdown Output</div>
+                    <div class="card-body">Strips ads, navigation boilerplate, and tracking scripts. Returns structured Markdown with word count and content hash — ready for LLM context windows.</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                     </div>
+                    <div class="card-title">SSE Streaming</div>
+                    <div class="card-body">GET /search/stream emits progressive Server-Sent Events: discovery → scrape → synthesis. No polling. Works directly in any HTTP client or AI agent SDK.</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <div class="card-title">MCP + UTCP Protocols</div>
+                    <div class="card-body">Native Model Context Protocol server and Universal Tool Calling Protocol support. Drop Searqon into any MCP-compatible agent without writing glue code.</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h7"/></svg>
+                    </div>
+                    <div class="card-title">RAG-Ready Chunking</div>
+                    <div class="card-body">POST /scrape/chunked splits content into token windows (500 tokens, 50-token overlap) with heading breadcrumbs and BM25 scores. Ready for vector DB ingestion.</div>
                 </div>
             </div>
         </section>
 
-        <!-- Anti-Bot Escalation Ladder -->
+        <!-- Anti-Bot Escalation -->
         <section id="stealth" class="section">
-            <div class="section-header">
-                <h2 class="section-title">4-Tier Anti-Bot Escalation</h2>
-                <p class="section-desc">Searqon avoids heavy browser compute on ordinary pages. It starts lightweight and escalates automatically through stealth tiers only when challenges are detected.</p>
-            </div>
+            <div class="section-label">Anti-Bot Escalation</div>
+            <h2 class="section-title">Four tiers. Automatic fallback.</h2>
+            <p class="section-desc">Each request starts at Tier 1 and escalates only when blocked. No configuration required — Searqon detects bot challenges and retries at the next tier.</p>
 
             <div class="table-wrap">
-                <table class="ladder-table">
+                <table class="ladder-table" aria-label="Anti-bot escalation tiers">
                     <thead>
                         <tr>
                             <th>Tier</th>
-                            <th>Mechanism</th>
-                            <th>Target Protections</th>
-                            <th>Avg Latency</th>
+                            <th>Method</th>
+                            <th>Latency</th>
+                            <th>Use Case</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><span class="badge-tier">Tier 1</span></td>
-                            <td><strong>Fast HTTP/2 Client</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Pure Go connection pooling, Brotli/Gzip decoding</span></td>
-                            <td>Unprotected pages & API endpoints</td>
-                            <td><code>2–10 ms</code></td>
+                            <td><span class="tier-badge tier-1">T1</span></td>
+                            <td>Direct HTTP with Go stdlib</td>
+                            <td>50–200 ms</td>
+                            <td>Static sites, open APIs, most news domains</td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier">Tier 2</span></td>
-                            <td><strong>Fingerprint & TLS Spoofing</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Chrome 128 / Safari 17 client hints (`Sec-CH-UA`)</span></td>
-                            <td>Basic WAFs & rate-limit challenges</td>
-                            <td><code>20–50 ms</code></td>
+                            <td><span class="tier-badge tier-2">T2</span></td>
+                            <td>Spoofed browser headers + TLS fingerprint</td>
+                            <td>200–600 ms</td>
+                            <td>Cloudflare-lite, basic bot detection</td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier">Tier 3</span></td>
-                            <td><strong>Headless Browser Subprocess</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Lightpanda / Camoufox JS DOM evaluation</span></td>
-                            <td>Cloudflare Turnstile, React/Next SPAs</td>
-                            <td><code>1.5–3.5 s</code></td>
+                            <td><span class="tier-badge tier-3">T3</span></td>
+                            <td>Lightpanda / Camoufox headless browser via CDP</td>
+                            <td>1–4 s</td>
+                            <td>JavaScript-rendered pages, Cloudflare 5s challenge</td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier">Tier 4</span></td>
-                            <td><strong>Residential Proxy Fallback</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Rotating residential & datacenter proxy pool</span></td>
-                            <td>Hard IP bans & geo-restrictions</td>
-                            <td><code>2.0–4.0 s</code></td>
+                            <td><span class="tier-badge tier-4">T4</span></td>
+                            <td>Residential proxy pool rotation</td>
+                            <td>2–8 s</td>
+                            <td>Aggressive geo-blocking, IP-rate-limited targets</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <!-- API Reference Explorer -->
+        <!-- API Explorer -->
         <section id="api" class="section">
-            <div class="section-header">
-                <h2 class="section-title">REST API Endpoints</h2>
-                <p class="section-desc">Clean, predictable JSON API designed for direct integration with Python, TypeScript, and Go AI agent runtimes.</p>
-            </div>
+            <div class="section-label">REST API</div>
+            <h2 class="section-title">HTTP-first. No SDK required.</h2>
+            <p class="section-desc">All endpoints accept JSON and return JSON. Runs on port 7493 by default. See <a href="docs.html">the full reference</a> for all parameters.</p>
 
-            <div class="api-card">
-                <div class="api-nav">
-                    <button class="api-tab-btn active" onclick="switchApi('search')">POST /search</button>
-                    <button class="api-tab-btn" onclick="switchApi('scrape')">POST /scrape</button>
-                    <button class="api-tab-btn" onclick="switchApi('chunked')">POST /scrape/chunked</button>
-                    <button class="api-tab-btn" onclick="switchApi('health')">GET /health</button>
+            <div class="api-panel">
+                <div class="api-tabs" role="tablist" aria-label="API endpoint examples">
+                    <button class="api-tab-btn active" onclick="switchApi('search', event)" role="tab" aria-selected="true">POST /search</button>
+                    <button class="api-tab-btn" onclick="switchApi('scrape', event)" role="tab" aria-selected="false">POST /scrape</button>
+                    <button class="api-tab-btn" onclick="switchApi('chunked', event)" role="tab" aria-selected="false">POST /scrape/chunked</button>
+                    <button class="api-tab-btn" onclick="switchApi('health', event)" role="tab" aria-selected="false">GET /health</button>
                 </div>
-
+                <div class="api-endpoint-label" id="api-endpoint-label">POST http://localhost:7493/search</div>
                 <div class="api-content">
-                    <div class="code-meta-bar">
-                        <span>REQUEST</span>
-                        <span id="api-endpoint-label">POST http://localhost:7493/search</span>
+                    <div class="api-col">
+                        <div class="api-col-label">Request</div>
+                        <pre class="code-viewer" id="api-req"></pre>
                     </div>
-                    <pre class="code-viewer" id="api-req"></pre>
-
-                    <div class="code-meta-bar">
-                        <span>RESPONSE (application/json)</span>
-                        <span>HTTP 200 OK</span>
+                    <div class="api-col">
+                        <div class="api-col-label">Response</div>
+                        <pre class="code-viewer" id="api-res"></pre>
                     </div>
-                    <pre class="code-viewer" id="api-res"></pre>
                 </div>
             </div>
         </section>
 
-        <!-- Webmaster & SearqonBot -->
+        <!-- SearqonBot -->
         <section id="botinfo" class="section">
-            <div class="section-header">
-                <h2 class="section-title">SearqonBot & Webmaster Verification</h2>
-                <p class="section-desc">Official crawler identity, RFC compliance policy, and robots.txt instructions for webmasters.</p>
-            </div>
+            <div class="section-label">Webmaster</div>
+            <h2 class="section-title">SearqonBot respects robots.txt</h2>
+            <p class="section-desc">The crawler identifies itself with a standard User-Agent. Configure access via robots.txt directives.</p>
 
             <div class="bot-grid">
                 <div class="bot-card">
-                    <div class="bot-heading">Crawler Identity</div>
-                    <p class="bot-desc">
-                        Searqon identifies itself on every crawl request with an explicit identity string pointing to this documentation. It respects crawl-delays, skips non-public content, and enforces a default 5 req/sec domain rate limit.
-                    </p>
-
+                    <div class="bot-heading">User-Agent</div>
+                    <div class="bot-desc">Sent on every request from the crawling tier. Use this string in your robots.txt rules.</div>
                     <div class="ua-snippet">
-                        <span id="ua-str">SearqonBot/1.0 (+https://sooriya04.github.io/Searqon/)</span>
-                        <button class="copy-btn" onclick="copyUA()">Copy</button>
+                        <span id="ua-str">SearqonBot/2.0 (+https://github.com/Sooriya04/Searqon)</span>
+                        <button class="copy-btn" onclick="copyUA()" aria-label="Copy user agent string">Copy</button>
                     </div>
                 </div>
-
                 <div class="bot-card">
-                    <div class="bot-heading">Robots.txt Directives</div>
-                    <p class="bot-desc">Site owners can easily configure or disallow SearqonBot using standard instructions:</p>
-
-                    <div class="recipe-switcher">
-                        <button class="r-btn active" onclick="setRecipe('block')">Block Bot</button>
-                        <button class="r-btn" onclick="setRecipe('delay')">Set Delay</button>
-                        <button class="r-btn" onclick="setRecipe('allow')">Allow</button>
+                    <div class="bot-heading">robots.txt Recipes</div>
+                    <div class="bot-desc">Common directives for controlling SearqonBot access.</div>
+                    <div class="recipe-switcher" role="group" aria-label="Robots.txt recipes">
+                        <button class="r-btn active" onclick="setRecipe('block', event)" aria-pressed="true">Block all</button>
+                        <button class="r-btn" onclick="setRecipe('delay', event)" aria-pressed="false">Rate limit</button>
+                        <button class="r-btn" onclick="setRecipe('allow', event)" aria-pressed="false">Allow only</button>
                     </div>
-
-                    <pre class="code-viewer" id="recipe-display" style="margin-bottom: 0;"></pre>
+                    <pre class="robots-preview" id="recipe-display"></pre>
                 </div>
             </div>
         </section>
+
     </main>
 
     <!-- Footer -->
     <footer>
         <div class="container footer-inner">
             <div>
-                <strong>Searqon</strong> — Open-source under the <a href="https://github.com/Sooriya04/Searqon/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>. Maintained by <a href="https://github.com/Sooriya04" target="_blank" rel="noopener noreferrer">Sooriya</a>.
+                <div class="footer-brand">Searqon</div>
+                <div class="footer-copy">Open source under MIT License</div>
             </div>
-
             <ul class="footer-links">
+                <li><a href="docs.html">Documentation</a></li>
                 <li><a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer">GitHub</a></li>
                 <li><a href="https://hub.docker.com/r/sooriya04/searqon" target="_blank" rel="noopener noreferrer">Docker Hub</a></li>
-                <li><a href="docs.html">Documentation</a></li>
-                <li><a href="#api">API Reference</a></li>
             </ul>
         </div>
     </footer>
 
-    <div class="toast" id="toast">Copied to clipboard</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script>
-        // Launcher commands
         const launchers = {
-            run: "docker run -d -p 7493:7493 -v $(pwd)/data:/app/data sooriya04/searqon:latest",
-            pull: "docker pull sooriya04/searqon:latest",
-            compose: "curl -sO https://raw.githubusercontent.com/Sooriya04/Searqon/main/docker-compose.yml && docker compose up -d"
+            run:     'docker run -d -p 7493:7493 -v $(pwd)/data:/app/data sooriya04/searqon:latest',
+            pull:    'docker pull sooriya04/searqon:latest',
+            compose: 'curl -O https://raw.githubusercontent.com/Sooriya04/Searqon/main/docker-compose.yml && docker compose up -d'
         };
 
         let currentLauncher = 'run';
 
-        function switchLauncher(key) {
+        function switchLauncher(key, event) {
             currentLauncher = key;
             document.querySelectorAll('.t-tab').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
@@ -1054,13 +967,12 @@
         }
 
         function copyLauncher() {
-            navigator.clipboard.writeText(launchers[currentLauncher]).then(() => showToast("Command copied!"));
+            navigator.clipboard.writeText(launchers[currentLauncher]).then(() => showToast('Copied'));
         }
 
-        // API Explorer data
         const apiData = {
             search: {
-                url: "POST http://localhost:7493/search",
+                url: 'POST http://localhost:7493/search',
                 req: `curl -X POST http://localhost:7493/search \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1079,10 +991,9 @@
       {
         "title": "Building a Vector DB in Go",
         "url": "https://example.org/vectordb-go",
-        "snippet": "Architecture of cosine similarity and HNSW index...",
-        "markdown": "# Vector DB in Go\\n\\nVector search enables...",
+        "snippet": "Architecture of cosine similarity...",
+        "markdown": "# Vector DB in Go\n\nVector search...",
         "word_count": 840,
-        "scraped": true,
         "escalation_tier": "fast_http"
       }
     ]
@@ -1090,7 +1001,7 @@
 }`
             },
             scrape: {
-                url: "POST http://localhost:7493/scrape",
+                url: 'POST http://localhost:7493/scrape',
                 req: `curl -X POST http://localhost:7493/scrape \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1104,16 +1015,15 @@
     "url": "https://news.ycombinator.com",
     "title": "Hacker News",
     "word_count": 1420,
-    "content_hash": "e3b0c44298fc1c149afbf4c8996fb924",
-    "markdown": "# Hacker News\\n\\n1. Show HN: Searqon...",
-    "scraped": true,
+    "content_hash": "e3b0c44298fc1c149afbf4c8",
+    "markdown": "# Hacker News\n\n1. Show HN: ...",
     "bot_detected": false,
     "escalation_tier": "fast_http"
   }
 }`
             },
             chunked: {
-                url: "POST http://localhost:7493/scrape/chunked",
+                url: 'POST http://localhost:7493/scrape/chunked',
                 req: `curl -X POST http://localhost:7493/scrape/chunked \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1130,38 +1040,39 @@
       {
         "index": 0,
         "token_count": 380,
-        "content": "### Abstract\\n\\nRecent advances in RAG retrieval..."
+        "content": "### Abstract\n\nRecent advances..."
       }
     ]
   }
 }`
             },
             health: {
-                url: "GET http://localhost:7493/health",
+                url: 'GET http://localhost:7493/health',
                 req: `curl http://localhost:7493/health`,
                 res: `{
   "success": true,
   "data": {
-    "endpoints": [
-      "/search",
-      "/scrape",
-      "/scrape/chunked",
-      "/scrape/batch",
-      "/map",
-      "/crawl",
-      "/health",
-      "/logs"
-    ],
+    "status": "ok",
     "engine": "src",
-    "status": "ok"
+    "endpoints": [
+      "/search", "/search/stream",
+      "/scrape", "/scrape/chunked",
+      "/scrape/batch", "/pipeline",
+      "/map", "/crawl",
+      "/health", "/metrics", "/logs"
+    ]
   }
 }`
             }
         };
 
-        function switchApi(key) {
-            document.querySelectorAll('.api-tab-btn').forEach(t => t.classList.remove('active'));
+        function switchApi(key, event) {
+            document.querySelectorAll('.api-tab-btn').forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
             event.target.classList.add('active');
+            event.target.setAttribute('aria-selected', 'true');
             document.getElementById('api-endpoint-label').textContent = apiData[key].url;
             document.getElementById('api-req').textContent = apiData[key].req;
             document.getElementById('api-res').textContent = apiData[key].res;
@@ -1170,39 +1081,34 @@
         document.getElementById('api-req').textContent = apiData['search'].req;
         document.getElementById('api-res').textContent = apiData['search'].res;
 
-        // Robots.txt recipes
         const recipes = {
-            block: `User-agent: SearqonBot
-Disallow: /`,
-            delay: `User-agent: SearqonBot
-Disallow: /admin/
-Crawl-delay: 5`,
-            allow: `User-agent: *
-Disallow: /
-
-User-agent: SearqonBot
-Disallow:`
+            block:  `User-agent: SearqonBot\nDisallow: /`,
+            delay:  `User-agent: SearqonBot\nDisallow: /admin/\nCrawl-delay: 5`,
+            allow:  `User-agent: *\nDisallow: /\n\nUser-agent: SearqonBot\nDisallow:`
         };
 
-        function setRecipe(key) {
-            document.querySelectorAll('.r-btn').forEach(b => b.classList.remove('active'));
+        function setRecipe(key, event) {
+            document.querySelectorAll('.r-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             event.target.classList.add('active');
+            event.target.setAttribute('aria-pressed', 'true');
             document.getElementById('recipe-display').textContent = recipes[key];
         }
 
         document.getElementById('recipe-display').textContent = recipes['block'];
 
-        // Toast
         const toast = document.getElementById('toast');
         function showToast(msg) {
             toast.textContent = msg;
             toast.classList.add('show');
-            setTimeout(() => { toast.classList.remove('show'); }, 1800);
+            setTimeout(() => toast.classList.remove('show'), 1800);
         }
 
         function copyUA() {
-            const ua = document.getElementById('ua-str').textContent;
-            navigator.clipboard.writeText(ua).then(() => showToast("User-Agent copied!"));
+            navigator.clipboard.writeText(document.getElementById('ua-str').textContent)
+                .then(() => showToast('Copied'));
         }
     </script>
 </body>
