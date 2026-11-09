@@ -359,3 +359,11 @@ Resolved protocol contract defects identified during ponytail audit:
 - Pruned unrouted `category` parameter from UTCP manual (`src/utcp/manual.go`), MCP tool definitions (`src/mcp/server.go`), and documentation (`docs/utcp.md`, `docs/MCP.md`) to maintain contract integrity until backend category routing is implemented.
 - Added test coverage in `src/handlers/search_stream_test.go` and `src/utcp/server_test.go` verifying parameter aliasing and clean tool schemas.
 
+## fix(utcp): deduplicate cache order, pre-allocate tool templates, and enforce endpoint contract tests
+
+Resolved findings 3, 4, and 5 from the ponytail audit:
+- Filtered duplicate entries from `s.cacheOrder` during cache eviction in `src/utcp/server.go`, ensuring eviction and cache maps remain strictly in sync under diverse multi-host traffic.
+- Added contract unit test `TestToolEndpointContracts` in `src/utcp/server_test.go` verifying all published tools in the UTCP manual have valid HTTP methods, JSON content-types, and matching endpoint URLs.
+- Pre-allocated static tool definitions into `rawTools` in `src/utcp/manual.go` to eliminate redundant schema allocations across discovery cache misses.
+
+

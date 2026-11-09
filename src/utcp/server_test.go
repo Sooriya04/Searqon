@@ -294,3 +294,42 @@ func TestSearchCategoryPrunedFromManual(t *testing.T) {
 		t.Errorf("unexpected 'category' parameter in searqon_search; unsupported fields should not be exposed")
 	}
 }
+
+func TestToolEndpointContracts(t *testing.T) {
+	manual := BuildManual("http://localhost:7493")
+
+	expectedPaths := map[string]string{
+		"searqon_search":        "/search",
+		"searqon_scrape":        "/scrape",
+		"searqon_research":      "/pipeline",
+		"searqon_map":           "/map",
+		"searqon_extract":       "/extract",
+		"searqon_crawl":         "/crawl",
+		"searqon_search_stream": "/search/stream",
+	}
+
+	for _, tool := range manual.Tools {
+		expectedPath, ok := expectedPaths[tool.Name]
+		if !ok {
+			t.Errorf("unrecognized tool in manual: %s", tool.Name)
+			continue
+		}
+
+		if !strings.Contains(tool.ToolCallTemplate.URL, expectedPath) {
+			t.Errorf("tool %s URL %q does not match expected endpoint %q", tool.Name, tool.ToolCallTemplate.URL, expectedPath)
+		}
+
+		if tool.ToolCallTemplate.CallTemplateType == "http" {
+			if tool.ToolCallTemplate.HTTPMethod != http.MethodPost {
+				t.Errorf("expected POST method for HTTP tool %s, got %s", tool.Name, tool.ToolCallTemplate.HTTPMethod)
+			}
+			if tool.ToolCallTemplate.ContentType != "application/json" {
+				t.Errorf("expected application/json content-type for tool %s, got %s", tool.Name, tool.ToolCallTemplate.ContentType)
+			}
+		} else if tool.ToolCallTemplate.CallTemplateType == "sse" {
+			if !strings.Contains(tool.ToolCallTemplate.URL, "query={query}") {
+				t.Errorf("expected sse query parameter template in %s URL, got %s", tool.Name, tool.ToolCallTemplate.URL)
+			}
+		}
+	}
+}

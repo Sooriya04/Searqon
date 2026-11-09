@@ -105,7 +105,16 @@ func (s *Server) ManualHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// Enforce LRU / FIFO cap of maxCachedManuals (16) to avoid host header DoS
-			if len(s.cachedManuals) >= maxCachedManuals && len(s.cacheOrder) > 0 {
+			// Filter out any existing instance of baseURL from cacheOrder to avoid duplicates
+			filteredOrder := s.cacheOrder[:0]
+			for _, item := range s.cacheOrder {
+				if item != baseURL {
+					filteredOrder = append(filteredOrder, item)
+				}
+			}
+			s.cacheOrder = filteredOrder
+
+			for len(s.cachedManuals) >= maxCachedManuals && len(s.cacheOrder) > 0 {
 				oldest := s.cacheOrder[0]
 				s.cacheOrder = s.cacheOrder[1:]
 				delete(s.cachedManuals, oldest)

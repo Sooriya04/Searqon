@@ -4,12 +4,14 @@ import (
 	"strings"
 )
 
-// BuildManual constructs the authoritative UtcpManual for Searqon with endpoints rooted at baseURL.
-func BuildManual(baseURL string) UtcpManual {
-	cleanBase := strings.TrimRight(baseURL, "/")
+type toolEndpointDef struct {
+	tool     Tool
+	pathTmpl string // e.g. "/search" or "/search/stream?query={query}"
+}
 
-	tools := []Tool{
-		{
+var rawTools = []toolEndpointDef{
+	{
+		tool: Tool{
 			Name: "searqon_search",
 			Description: "Search the web using Searqon meta-search engine (SearXNG, DuckDuckGo, Arxiv, and Wikipedia) " +
 				"with automatic reciprocal rank fusion and optional concurrent scraping of top results.",
@@ -40,12 +42,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/search",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/search",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_scrape",
 			Description: "Ultra-sophisticated 4-tier anti-bot web scraper designed specifically for AI agents. " +
 				"Extracts main readable content into clean Markdown (stripping navs, ads, scripts, and clutter).",
@@ -77,12 +81,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/scrape",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/scrape",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_research",
 			Description: "One-shot deep research tool for complex AI agent queries. " +
 				"Searches across engines, selects top authoritative pages, scrapes them concurrently with anti-bot evasion, and synthesizes chunked sources.",
@@ -108,12 +114,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/pipeline",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/pipeline",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_map",
 			Description: "Discover and map internal URLs across a target website or domain. " +
 				"Acts as a sitemap crawler to reveal page hierarchy and links for autonomous agent exploration.",
@@ -134,12 +142,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/map",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/map",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_extract",
 			Description: "Extract targeted data from a webpage using CSS selectors or structured schema instructions. " +
 				"Ideal for extracting structured tables, pricing, article metadata, or specific DOM elements.",
@@ -164,12 +174,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/extract",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/extract",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_crawl",
 			Description: "Recursively discover and scrape multiple linked pages under a target domain hierarchy up to a max depth and page limit.",
 			Inputs: ToolInputSchema{
@@ -194,12 +206,14 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "http",
-				URL:              cleanBase + "/crawl",
 				HTTPMethod:       "POST",
 				ContentType:      "application/json",
 			},
 		},
-		{
+		pathTmpl: "/crawl",
+	},
+	{
+		tool: Tool{
 			Name: "searqon_search_stream",
 			Description: "Real-time streaming web search over Server-Sent Events (SSE). Emits discovery, scraping progress, and final synthesized answers incrementally.",
 			Inputs: ToolInputSchema{
@@ -214,9 +228,20 @@ func BuildManual(baseURL string) UtcpManual {
 			},
 			ToolCallTemplate: CallTemplate{
 				CallTemplateType: "sse",
-				URL:              cleanBase + "/search/stream?query={query}",
 			},
 		},
+		pathTmpl: "/search/stream?query={query}",
+	},
+}
+
+// BuildManual constructs the authoritative UtcpManual for Searqon with endpoints rooted at baseURL.
+func BuildManual(baseURL string) UtcpManual {
+	cleanBase := strings.TrimRight(baseURL, "/")
+
+	tools := make([]Tool, len(rawTools))
+	for i, def := range rawTools {
+		tools[i] = def.tool
+		tools[i].ToolCallTemplate.URL = cleanBase + def.pathTmpl
 	}
 
 	return UtcpManual{
