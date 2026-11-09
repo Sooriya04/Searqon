@@ -49,8 +49,7 @@
             --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
             --header-height: 56px;
-            --sidebar-width: 250px;
-            --toc-width: 210px;
+            --toc-width: 220px;
         }
 
         *, *::before, *::after {
@@ -179,72 +178,18 @@
         /* ── Layout ── */
         .layout-container {
             display: flex;
-            max-width: 1440px;
+            justify-content: center;
+            max-width: 1200px;
             margin: 0 auto;
             min-height: calc(100vh - var(--header-height));
-        }
-
-        /* ── Left Sidebar ── */
-        aside.sidebar {
-            width: var(--sidebar-width);
-            flex-shrink: 0;
-            border-right: 1px solid var(--border);
-            padding: 1.5rem 0 2.5rem;
-            position: sticky;
-            top: var(--header-height);
-            height: calc(100vh - var(--header-height));
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--border) transparent;
-        }
-
-        .nav-group {
-            margin-bottom: 1.5rem;
-            padding: 0 1.25rem;
-        }
-
-        .nav-group-title {
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            margin-bottom: 0.4rem;
-            padding-left: 0.5rem;
-        }
-
-        .nav-list {
-            list-style: none;
-        }
-
-        .nav-item a {
-            display: block;
-            padding: 0.35rem 0.55rem;
-            border-radius: 4px;
-            color: var(--text-muted);
-            font-size: 0.86rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 120ms ease;
-        }
-
-        .nav-item a:hover {
-            color: var(--text-primary);
-            background: var(--surface);
-            text-decoration: none;
-        }
-
-        .nav-item.active a {
-            color: #FFFFFF;
-            background: var(--surface-hover);
-            font-weight: 600;
+            padding: 0 1.5rem;
+            gap: 3.5rem;
         }
 
         /* ── Main Content Area ── */
         main.content-area {
             flex: 1;
-            padding: 2.5rem 3.5rem 5rem;
+            padding: 2.5rem 0 5rem;
             max-width: 860px;
             min-width: 0;
         }
@@ -253,7 +198,7 @@
         aside.toc {
             width: var(--toc-width);
             flex-shrink: 0;
-            padding: 2.5rem 1.5rem 2rem 1rem;
+            padding: 2.5rem 0 2rem;
             position: sticky;
             top: var(--header-height);
             height: calc(100vh - var(--header-height));
@@ -583,22 +528,13 @@
         }
 
         /* ── Responsive ── */
-        @media (max-width: 1100px) {
+        @media (max-width: 960px) {
             aside.toc {
                 display: none;
             }
             main.content-area {
                 max-width: 100%;
-                padding: 2rem 2rem 4rem;
-            }
-        }
-
-        @media (max-width: 820px) {
-            aside.sidebar {
-                display: none;
-            }
-            main.content-area {
-                padding: 1.5rem 1.25rem 3.5rem;
+                padding: 2rem 0 4rem;
             }
         }
     </style>
@@ -611,12 +547,15 @@
         <div class="header-inner">
             <a href="index.html" class="brand-link" aria-label="Searqon Home">
                 <span class="brand-name">Searqon</span>
-                <span class="brand-badge">Docs · v2.0</span>
+                <span class="brand-badge">Docs</span>
             </a>
 
             <div class="header-actions">
-                <a href="index.html" class="nav-link-btn">Overview</a>
-                <a href="#endpoints" class="nav-link-btn">API Reference</a>
+                <a href="index.html" class="nav-link-btn">Home</a>
+                <a href="#quickstart" class="nav-link-btn">Quick Start</a>
+                <a href="#mcp" class="nav-link-btn">Protocols</a>
+                <a href="#endpoints" class="nav-link-btn">Endpoints</a>
+                <a href="#settings" class="nav-link-btn">Config</a>
                 <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="nav-link-btn btn-border">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     <span>GitHub</span>
@@ -626,48 +565,6 @@
     </header>
 
     <div class="layout-container">
-
-        <!-- Left Navigation Sidebar -->
-        <aside class="sidebar" aria-label="Documentation Navigation">
-            <div class="nav-group">
-                <div class="nav-group-title">Getting Started</div>
-                <ul class="nav-list">
-                    <li class="nav-item active"><a href="#overview">Overview</a></li>
-                    <li class="nav-item"><a href="#architecture">Architecture</a></li>
-                    <li class="nav-item"><a href="#quickstart">Quick Start & Docker</a></li>
-                    <li class="nav-item"><a href="#storage">Storage Backends</a></li>
-                </ul>
-            </div>
-
-            <div class="nav-group">
-                <div class="nav-group-title">AI Protocols</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><a href="#utcp">UTCP Protocol</a></li>
-                    <li class="nav-item"><a href="#mcp">Model Context Protocol</a></li>
-                    <li class="nav-item"><a href="#sse">SSE Event Stream</a></li>
-                </ul>
-            </div>
-
-            <div class="nav-group">
-                <div class="nav-group-title">REST API Reference</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><a href="#endpoints">Endpoint Matrix</a></li>
-                    <li class="nav-item"><a href="#search-api">Search API</a></li>
-                    <li class="nav-item"><a href="#scrape-api">Scrape & Chunking</a></li>
-                    <li class="nav-item"><a href="#crawl-api">Crawl & Map</a></li>
-                    <li class="nav-item"><a href="#observability">Telemetry & Metrics</a></li>
-                </ul>
-            </div>
-
-            <div class="nav-group">
-                <div class="nav-group-title">Configuration</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><a href="#settings">settings.yml</a></li>
-                    <li class="nav-item"><a href="#antibot">Anti-Bot Escalation</a></li>
-                    <li class="nav-item"><a href="#docker-compose">Docker Compose</a></li>
-                </ul>
-            </div>
-        </aside>
 
         <!-- Main Content Area -->
         <main class="content-area">
@@ -724,48 +621,6 @@
                             </tr>
                         </tbody>
                     </table>
-                </div>
-            </section>
-
-            <!-- Architecture -->
-            <section id="architecture">
-                <h2>Architecture & Ingestion Pipeline</h2>
-                <p>
-                    Every query or scraping job passes through a structured, observable pipeline designed to prevent blocking and produce clean Markdown citations.
-                </p>
-
-                <div class="ascii-diagram">
-+-----------------------------------------------------------------------------------+
-|                           CLIENT / AGENT / SDK                                    |
-|             (REST API :7493  |  MCP Server stdio/SSE  |  UTCP Manifest)           |
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼
-+───────────────────────────────────────────────────────────────────────────────────+
-|                                SEARQON ROUTER                                     |
-|             (Rate Limiter · SSRF Guard · Response Controller · Telemetry)         |
-+───────────────────────────────────────────────────────────────────────────────────+
-                     │                                         │
-                     ▼                                         ▼
-        [ SEARCH DISCOVERY ]                         [ SCRAPE & EXTRACTION ]
-   SearXNG · DDG · Wiki · Arxiv                 Tier 1: Direct net/http
-                     │                          Tier 2: Spoofed TLS / Headers
-                     ▼                          Tier 3: Lightpanda / Camoufox CDP
-         Reciprocal Rank Fusion                 Tier 4: Residential Proxy Rotation
-                     │                                         │
-                     └────────────────────┬────────────────────┘
-                                          ▼
-+───────────────────────────────────────────────────────────────────────────────────+
-|                               PURIFICATION & RAG                                  |
-|            Readability Parser &rarr; Markdown Conversion &rarr; Heading Pathing   |
-|            Token Sliding Window (500 tokens / 50 overlap) &rarr; BM25 Ranking    |
-+───────────────────────────────────────────────────────────────────────────────────+
-                                          │
-                                          ▼
-+───────────────────────────────────────────────────────────────────────────────────+
-|                               STORAGE & PERSISTENCE                               |
-|        SQLite WAL Mode (Default) | PostgreSQL + pgvector | Redis Cache (Optional) |
-+───────────────────────────────────────────────────────────────────────────────────+
                 </div>
             </section>
 
@@ -1368,7 +1223,6 @@ services:
             <div class="toc-title">On This Page</div>
             <ul class="toc-list">
                 <li class="toc-item"><a href="#overview">Overview</a></li>
-                <li class="toc-item"><a href="#architecture">Architecture</a></li>
                 <li class="toc-item"><a href="#quickstart">Quick Start</a></li>
                 <li class="toc-item"><a href="#storage">Storage Backends</a></li>
                 <li class="toc-item"><a href="#utcp">UTCP Protocol</a></li>
