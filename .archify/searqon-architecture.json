@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Searqon System Architecture",
+    "subtitle": "High-Throughput Web Search, 4-Tier Anti-Bot Escalation & RAG Extraction Pipeline",
+    "output": "searqon-architecture.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "clients", "type": "external", "label": "AI Agents & Clients", "sublabel": "Claude / Cursor / LangChain", "pos": [40, 200], "size": [140, 60], "tag": "REST / MCP / UTCP" },
+    { "id": "security", "type": "security", "label": "Security Guardrails", "sublabel": "SSRF & Token Bucket", "pos": [230, 80], "size": [150, 60], "tag": "IPv4/IPv6 Bounded" },
+    { "id": "gateway", "type": "backend", "label": "HTTP & Protocol Gateway", "sublabel": ":7493 Go stdlib router", "pos": [230, 200], "size": [150, 60], "tag": "SSE / stdio" },
+    { "id": "telemetry", "type": "backend", "label": "Telemetry & Metrics", "sublabel": "/metrics & /logs", "pos": [230, 320], "size": [150, 60], "tag": "Prometheus" },
+    { "id": "searxng", "type": "cloud", "label": "SearXNG Engine", "sublabel": "Local instance :8080", "pos": [440, 440], "size": [140, 56], "tag": "Multi-Engine" },
+    { "id": "public_apis", "type": "external", "label": "Public APIs", "sublabel": "DDG / Wikipedia / Arxiv", "pos": [650, 440], "size": [140, 56], "tag": "Direct Fallback" },
+    { "id": "search_hub", "type": "backend", "label": "Search & Discovery Hub", "sublabel": "Circuit breaker & fusion", "pos": [440, 140], "size": [150, 60], "tag": "RRF + BM25" },
+    { "id": "crawler", "type": "backend", "label": "Crawler & Link Mapper", "sublabel": "Depth & link dedup", "pos": [440, 260], "size": [150, 60], "tag": "BFS Crawler" },
+    { "id": "stealth", "type": "security", "label": "4-Tier Anti-Bot Engine", "sublabel": "Auto escalation ladder", "pos": [650, 200], "size": [150, 60], "tag": "CDP & Residential" },
+    { "id": "chunker", "type": "backend", "label": "RAG Chunker & BM25", "sublabel": "Sliding token window", "pos": [860, 140], "size": [140, 60], "tag": "500t Window / 50 Overlap" },
+    { "id": "extractor", "type": "backend", "label": "Content Extractor", "sublabel": "Readability & Markdown", "pos": [860, 260], "size": [140, 60], "tag": "SHA-256 Provenance" },
+    { "id": "sqlite", "type": "database", "label": "SQLite WAL Engine", "sublabel": "Embedded data/searqon.db", "pos": [860, 380], "size": [140, 60], "tag": "Default · FTS5" },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL + pgvector", "sublabel": "Scalable vector store", "pos": [1080, 140], "size": [140, 60], "tag": "Optional DB" },
+    { "id": "redis", "type": "database", "label": "Redis L1 Cache", "sublabel": "In-memory cache layer", "pos": [1080, 260], "size": [140, 60], "tag": "Optional :6379" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Searqon Standalone Engine (Go Binary)", "wraps": ["gateway", "security", "telemetry", "search_hub", "crawler", "stealth", "extractor", "chunker", "sqlite"] },
+    { "kind": "security-group", "label": "Core Pipeline", "wraps": ["search_hub", "crawler", "stealth", "extractor", "chunker"] },
+    { "kind": "region", "label": "External Discovery Providers", "wraps": ["searxng", "public_apis"] },
+    { "kind": "region", "label": "External Storage Services", "wraps": ["postgres", "redis"] }
+  ],
+  "connections": [
+    { "from": "clients", "to": "gateway", "label": "JSON / SSE", "variant": "emphasis" },
+    { "from": "security", "to": "gateway", "label": "filter request", "variant": "security" },
+    { "from": "gateway", "to": "telemetry", "label": "metrics", "variant": "dashed" },
+    { "from": "gateway", "to": "search_hub", "label": "query", "variant": "emphasis" },
+    { "from": "gateway", "to": "crawler", "label": "crawl", "variant": "default" },
+    { "from": "search_hub", "to": "searxng", "label": "federate", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "from": "search_hub", "to": "public_apis", "label": "fallback", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "from": "search_hub", "to": "stealth", "label": "scrape hits", "variant": "emphasis" },
+    { "from": "crawler", "to": "stealth", "label": "fetch link", "variant": "default" },
+    { "from": "stealth", "to": "extractor", "label": "raw HTML", "variant": "emphasis" },
+    { "from": "extractor", "to": "chunker", "label": "purify MD", "variant": "emphasis" },
+    { "from": "extractor", "to": "sqlite", "label": "FTS5 index", "variant": "default" },
+    { "from": "chunker", "to": "postgres", "label": "vectors", "variant": "dashed" },
+    { "from": "extractor", "to": "redis", "label": "cache MD", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Ingestion & Protocols",
+      "items": [
+        "First-class Model Context Protocol (MCP) over stdio and SSE",
+        "Universal Tool Calling Protocol (UTCP) dynamic schema discovery at /utcp/manifest",
+        "Non-blocking progressive search stream at GET /search/stream"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "4-Tier Anti-Bot Ladder",
+      "items": [
+        "Transparent step-up: Fast HTTP -> Spoofed TLS -> Lightpanda/Camoufox CDP -> Proxy pool",
+        "SSRF guard prevents access to RFC 1918 private subnets and cloud metadata",
+        "Token-bucket rate limiter with IPv6 CIDR parsing and write deadline safety"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Extraction & Persistence",
+      "items": [
+        "Readability extraction strips tracking scripts, ads, and navigation boilerplate",
+        "Token sliding window (500 tokens, 50 overlap) with BM25 relevance scoring",
+        "Embedded SQLite WAL mode by default; optional PostgreSQL + pgvector and Redis L1"
+      ]
+    }
+  ]
+}
