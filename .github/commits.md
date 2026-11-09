@@ -418,3 +418,12 @@ Rewrote both HTML pages from scratch — no AI marketing slop, no logos, no lett
 - Accessible: `aria-label`, `role="tab"`, `aria-pressed`, `aria-live` on toast
 - Responsive: mobile-first, sidebar collapses at 900px, nav hidden at 768px
 
+
+## feat(ui): refine documentation styling and replace generic landing layouts
+
+Replaced generic AI template patterns and broken card grids with a real technical documentation layout:
+- **Neutral Carbon Palette**: Purged the saturated navy and cyan colors (`#090D14` / `#38BDF8`). Adopted high-contrast neutral graphite and carbon tokens (`#0B0D11` background, `#141720` surface, `#232733` border, `#FFFFFF` headings).
+- **`docs.html` Restructuring**: Removed the broken 3-column overview card grid that left empty slot holes on the second row. Implemented a 3-zone documentation layout: left category navigation sidebar, center technical specification content with ASCII pipeline diagram and tables, and dynamic right "On This Page" Table of Contents observer.
+- **`index.html` Engineering Overhaul**: Removed glowing neon spans (`<span>AI agents</span>`) and floating pill badges. Added a structured 2x2 subsystem architecture matrix, clean copyable quick-run terminal box, and a high-density technical specifications matrix.
+- **Interactive Code Blocks**: Added one-click copy buttons with state feedback across all documentation code samples.
+
