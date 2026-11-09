@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
     paths:
       # Only deploy Pages when the landing page or docs are updated
       - 'index.html'
@@ -24,6 +24,7 @@ concurrency:
 jobs:
   deploy:
     name: Build & Publish Landing Page
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
