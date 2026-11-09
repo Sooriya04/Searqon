@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"src/search"
 	"src/utils"
@@ -17,6 +18,10 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+
+	// Disable global HTTP server write deadlines for streaming SSE responses
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

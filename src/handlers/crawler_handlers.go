@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"src/crawler"
 	"src/models"
@@ -71,6 +72,10 @@ func CrawlHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Transfer-Encoding", "chunked")
+
+		// Disable global HTTP server write deadlines for streaming crawl responses
+		rc := http.NewResponseController(w)
+		_ = rc.SetWriteDeadline(time.Time{})
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {

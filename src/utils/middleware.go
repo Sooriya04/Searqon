@@ -79,16 +79,19 @@ func GetClientIP(r *http.Request) string {
 		}
 	}
 
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
+	rawRemote := strings.TrimSpace(r.RemoteAddr)
+	if ip, _, err := net.SplitHostPort(rawRemote); err == nil {
+		if parsed := net.ParseIP(ip); parsed != nil {
+			return ip
+		}
+	} else {
+		// Clean possible bracketed IPv6 or plain IP without port
+		cleanRemote := strings.Trim(rawRemote, "[]")
+		if parsed := net.ParseIP(cleanRemote); parsed != nil {
+			return cleanRemote
+		}
 	}
-	if parsed := net.ParseIP(ip); parsed != nil {
-		return ip
-	}
-	if ip != "" {
-		return ip
-	}
+
 	return "127.0.0.1"
 }
 

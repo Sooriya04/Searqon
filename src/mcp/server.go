@@ -945,6 +945,10 @@ func (s *Server) SSEHandler() http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
+		// Disable global HTTP server write deadlines for long-lived MCP SSE streams
+		rc := http.NewResponseController(w)
+		_ = rc.SetWriteDeadline(time.Time{})
+
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)

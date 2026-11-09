@@ -43,6 +43,24 @@ func TestGetClientIP(t *testing.T) {
 			headers:    map[string]string{"X-Forwarded-For": "unknown, 198.51.100.88"},
 			expectedIP: "198.51.100.88",
 		},
+		{
+			name:       "Raw IP without port in RemoteAddr",
+			remoteAddr: "203.0.113.88",
+			headers:    nil,
+			expectedIP: "203.0.113.88",
+		},
+		{
+			name:       "Bracketed IPv6 without port in RemoteAddr",
+			remoteAddr: "[2001:db8::1]",
+			headers:    nil,
+			expectedIP: "2001:db8::1",
+		},
+		{
+			name:       "Bracketed IPv6 with port in RemoteAddr",
+			remoteAddr: "[2001:db8::1]:8080",
+			headers:    nil,
+			expectedIP: "2001:db8::1",
+		},
 	}
 
 	for _, tt := range tests {

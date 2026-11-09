@@ -394,6 +394,13 @@ Resolved code bloat, test gaps, and search index duplication identified in the p
 - **Added comprehensive unit test suite for chunker package**: Added [`src/chunker/chunker_test.go`](file:///home/sooriya/Documents/Searqon/src/chunker/chunker_test.go) covering token estimation, sliding window markdown chunking, SimHash near-duplicate deduplication, and BM25 relevance scoring.
 - **Deduplicated SQLite FTS5 search index on re-scrapes**: Updated `IndexScrapeInFTS` in [`src/db/db_index.go`](file:///home/sooriya/Documents/Searqon/src/db/db_index.go#L64-L80) to delete existing entries for the target URL before inserting, preventing duplicated search hits and distorted BM25 ranking when re-scraping indexed pages. Verified in [`src/db/db_test.go`](file:///home/sooriya/Documents/Searqon/src/db/db_test.go#L128-L147).
 
+## fix(middleware, stream): resolve pre-launch audit findings 9 and 10 for rate limiter IPv6 parsing and SSE write deadlines
+
+Resolved rate limiting IP grouping edge cases and long-lived SSE streaming timeout cuts:
+- **Hardened IP extraction in rate limiter middleware**: Updated `GetClientIP` in [`src/utils/middleware.go`](file:///home/sooriya/Documents/Searqon/src/utils/middleware.go#L80-L95) to cleanly parse port-less addresses and bracketed IPv6 strings without falling back to `127.0.0.1`. Added edge case test coverage in [`src/utils/middleware_test.go`](file:///home/sooriya/Documents/Searqon/src/utils/middleware_test.go#L47-L66).
+- **Cleared write deadlines on long-lived SSE connections**: Configured `http.NewResponseController(w).SetWriteDeadline(time.Time{})` in [`src/mcp/server.go`](file:///home/sooriya/Documents/Searqon/src/mcp/server.go#L947-L952), [`src/handlers/search_stream.go`](file:///home/sooriya/Documents/Searqon/src/handlers/search_stream.go#L20-L24), and [`src/handlers/crawler_handlers.go`](file:///home/sooriya/Documents/Searqon/src/handlers/crawler_handlers.go#L74-L78). Prevents the global 120-second server write timeout from cutting quiet MCP SSE agent connections or long-running crawl/search streams.
+
+
 
 
 
