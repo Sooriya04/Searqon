@@ -76,7 +76,6 @@ Searches across SearXNG and meta-engines with deduplication and relevance scorin
 **Parameters:**
 * `query` *(string, required)*: The search query.
 * `limit` *(integer, optional)*: Maximum results (default: `5`, max: `20`).
-* `category` *(string, optional)*: `"general"`, `"science"`, `"it"`, `"news"`.
 * `scrape` *(boolean, optional)*: If `true`, concurrently fetches and returns clean Markdown for top results.
 
 ---

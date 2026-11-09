@@ -273,3 +273,24 @@ func TestCrawlParameterParityInManual(t *testing.T) {
 		t.Errorf("unexpected 'max_depth' property; should be standardized to 'depth'")
 	}
 }
+
+func TestSearchCategoryPrunedFromManual(t *testing.T) {
+	manual := BuildManual("http://localhost:7493")
+
+	var searchTool *Tool
+	for _, tool := range manual.Tools {
+		if tool.Name == "searqon_search" {
+			tCopy := tool
+			searchTool = &tCopy
+			break
+		}
+	}
+
+	if searchTool == nil {
+		t.Fatalf("searqon_search not found in manual")
+	}
+
+	if _, ok := searchTool.Inputs.Properties["category"]; ok {
+		t.Errorf("unexpected 'category' parameter in searqon_search; unsupported fields should not be exposed")
+	}
+}

@@ -59,4 +59,12 @@ func TestSearchStreamHandler(t *testing.T) {
 	if !eventsFound["done"] {
 		t.Errorf("Expected 'done' event in SSE stream, found: %+v", eventsFound)
 	}
+
+	// Verify query parameter alias: 'query' (as published in UTCP template)
+	req2 := httptest.NewRequest(http.MethodGet, "/search/stream?query=golang-test-stream", nil)
+	w2 := httptest.NewRecorder()
+	SearchStreamHandler(w2, req2)
+	if w2.Result().StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK for 'query' param, got %d", w2.Result().StatusCode)
+	}
 }

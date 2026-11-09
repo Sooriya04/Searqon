@@ -145,11 +145,6 @@ func (s *Server) registerTools() {
 						Type:        "boolean",
 						Description: "If true, concurrently scrapes and returns the clean Markdown text of the top results.",
 					},
-					"category": {
-						Type:        "string",
-						Description: "Search category or intent: 'general', 'science', 'it', 'news'. Default: 'general'.",
-						Enum:        []string{"general", "science", "it", "news"},
-					},
 				},
 				Required: []string{"query"},
 			},

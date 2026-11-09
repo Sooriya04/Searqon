@@ -30,12 +30,6 @@ func BuildManual(baseURL string) UtcpManual {
 						Description: "If true, concurrently scrapes and returns clean Markdown text of the top results.",
 						Default:     false,
 					},
-					"category": {
-						Type:        "string",
-						Description: "Search category or intent: 'general', 'science', 'it', 'news'.",
-						Enum:        []string{"general", "science", "it", "news"},
-						Default:     "general",
-					},
 					"max_tokens": {
 						Type:        "integer",
 						Description: "Maximum token budget for scraped previews per result (default: 4000).",

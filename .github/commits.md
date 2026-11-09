@@ -291,7 +291,71 @@ Expanded the black-box Newman E2E test collection in `tests/searqon.postman_coll
 - Added `POST /pipeline` test verifying full Search → Fetch → Deduplicate → BM25 Ranking pipeline.
 - Verified 100% test pass rate (10/10 requests, 20/20 assertions) via `make newman-test`.
 
+## feat(mcp): implement Context Propagation (ctx) and Cryptographic Citation Provenance / Hashes (SHA-256 + RFC3339 fetched_at)
 
+Implemented end-to-end request context cancellation propagation and agent-verifiable citation provenance across search, scraping, and MCP layers:
+- Extended `SearchResult` and `ScrapeResult` in `src/models/models.go` with cryptographic citation provenance fields: `content_hash` (deterministic SHA-256 hash of extracted markdown/text) and `fetched_at` (RFC3339 UTC timestamp).
+- Wired cancellation propagation throughout `src/mcp/server.go` (`handleSearchContext`, `handleScrapeContext`, `handleResearchContext`, `handleMapContext`, `handleExtractContext`), terminating in-flight goroutines and network fetches immediately when clients close connections.
+- Persisted citation metadata across SQLite and PostgreSQL caches in `src/db/db_search.go` and `src/db/db_scrape.go`.
+- Added unit tests in `src/scraper/provenance_test.go` and `src/mcp/ctx_citation_test.go` verifying hash reproducibility, timestamp formats, and context cancellation.
 
+## fix(mcp): resolve MCP tool error spec violation and persist citation provenance in cache
 
+Resolved Model Context Protocol spec violations in `src/mcp/server.go`:
+- Fixed error responses to return `isError: true` inside standard JSON-RPC results rather than top-level JSON-RPC protocol error objects, strictly complying with the MCP specification for tool execution failures.
+- Ensured citation provenance (`content_hash`, `fetched_at`) is reliably restored from persistent cache hits in SQLite and PostgreSQL.
+
+## fix(url): preserve functional query params in URL normalization and fix cached extract selectors
+
+Hardened URL normalization and structured data extraction:
+- Updated `src/utils/utils.go` to preserve functional routing parameters (such as `v`, `id`, `article`, `p`) during URL canonicalization while continuing to strip marketing trackers (`utm_*`, `fbclid`, `ref`).
+- Fixed cached extraction handling in `src/handlers/extract.go` so specific CSS selector queries correctly re-evaluate against cached HTML rather than returning full-page defaults.
+
+## fix(crawler): restore crawler link extraction on cached pages and route PDF content directly to extractor
+
+Resolved crawler and PDF parsing pipeline defects:
+- Fixed an issue in `src/crawler/crawler.go` where cache hits bypassed link discovery, restoring internal hyperlink extraction from cached HTML records.
+- Updated PDF escalation in `src/scraper/escalation.go` and `src/scraper/pdf_extractor.go` to route binary application/pdf streams directly to the dedicated PDF text parser instead of attempting HTML readability extraction.
+
+## fix(proxy): resolve reverse-proxy client IP in rate limiter and make pgvector dimensions dynamic
+
+Fixed rate limiting and vector database scalability:
+- Updated `InboundRateLimitMiddleware` in `src/utils/middleware.go` to inspect `X-Forwarded-For` and `X-Real-IP` headers, preventing all clients behind reverse proxies (Nginx, Traefik, Docker) from sharing a single IP rate-limiting bucket.
+- Refactored `src/db/db_vector.go` to dynamically configure pgvector embedding dimensions based on active model configuration instead of hardcoding a 768-dimension column.
+
+## fix(core): real-time SSE stream, unified Ollama client, SQLite auto-migration, and parallel scraping panic guard
+
+Stabilized core background processes and database migrations:
+- Converted `/search/stream` SSE output to flush incremental events (`discovery`, `scrape`, `synthesis`, `done`) in true real-time.
+- Consolidated disparate Ollama API calls across search, scraper, and utils into a single unified client in `src/utils/ollama.go`.
+- Added auto-migration logic for SQLite schema updates in `src/db/db.go`.
+- Wrapped parallel scraper worker goroutines in `recover()` guards to protect the server process from unhandled panics during web extraction.
+
+## feat(utcp): native UTCP v1.0.1+ tool discovery and dynamic manual server
+
+Architected and implemented native Universal Tool Calling Protocol (UTCP v1.0.1+) dynamic discovery in Searqon:
+- Implemented `src/utcp/server.go`, `src/utcp/types.go`, and `src/utcp/manual.go` exposing `GET /utcp` and `GET /utcp/manual`.
+- Published agent-ready tool specifications (`searqon_search`, `searqon_scrape`, `searqon_research`, `searqon_map`, `searqon_extract`, `searqon_crawl`, `searqon_search_stream`) with JSON Schema Draft-07 inputs and `CallTemplate` bindings.
+- Built dynamic reverse-proxy-aware base URL resolution supporting `SEARQON_PUBLIC_URL`, `X-Forwarded-Proto`, and `X-Forwarded-Host`.
+- Added high-concurrency read-write caching for serialized discovery manuals with 100% unit test coverage.
+- Published comprehensive integration documentation and multi-language Code-Mode client recipes in `docs/utcp.md`.
+
+## fix(utcp): cap manual cache bounds with FIFO eviction and resolve crawl depth parameter parity
+
+Hardened UTCP cache bounds and API parameter parity:
+- Enforced a strict 16-entry FIFO eviction cap (`maxCachedManuals`) on `Server.cachedManuals` in `src/utcp/server.go` to eliminate memory leaks from Host-header spoofing.
+- Standardized crawl traversal depth parameter to `depth` across `src/utcp/manual.go` and added backward-compatible `max_depth` parameter aliasing in `src/handlers/crawler_handlers.go`.
+
+## fix(utcp): strip redundant default ports from forwarded hosts and enforce strict double-checked locking
+
+Resolved reverse proxy edge cases in UTCP discovery:
+- Enhanced `ResolveBaseURL` in `src/utcp/server.go` to strip redundant default ports (`:80`, `:443`) from `Host` and `X-Forwarded-Host` headers, including offloaded TLS setups where reverse proxies pass internal plaintext port `:80` with `X-Forwarded-Proto: https`.
+- Enforced double-checked locking inside `ManualHandler` to prevent redundant manual serialization races under concurrent cache misses.
+
+## fix(utcp): resolve streaming search parameter mismatch and prune speculative category parameter
+
+Resolved protocol contract defects identified during ponytail audit:
+- Fixed parameter mismatch in `src/handlers/search_stream.go` by accepting both `query` (published in UTCP `CallTemplate`) and `q` query parameters, unblocking streaming SSE search for UTCP and Code-Mode clients.
+- Pruned unrouted `category` parameter from UTCP manual (`src/utcp/manual.go`), MCP tool definitions (`src/mcp/server.go`), and documentation (`docs/utcp.md`, `docs/MCP.md`) to maintain contract integrity until backend category routing is implemented.
+- Added test coverage in `src/handlers/search_stream_test.go` and `src/utcp/server_test.go` verifying parameter aliasing and clean tool schemas.
 

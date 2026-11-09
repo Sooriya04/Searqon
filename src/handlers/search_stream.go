@@ -23,9 +23,12 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := r.URL.Query().Get("q")
-	if strings.TrimSpace(query) == "" {
-		fmt.Fprintf(w, "event: error\ndata: {\"error\":\"Query parameter 'q' is required\"}\n\n")
+	query := strings.TrimSpace(r.URL.Query().Get("query"))
+	if query == "" {
+		query = strings.TrimSpace(r.URL.Query().Get("q"))
+	}
+	if query == "" {
+		fmt.Fprintf(w, "event: error\ndata: {\"error\":\"Query parameter 'query' or 'q' is required\"}\n\n")
 		flusher.Flush()
 		return
 	}

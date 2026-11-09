@@ -34,7 +34,7 @@ The table below lists all tools published in Searqon's UTCP manual:
 
 | Tool Name | Transport | Endpoint / Method | Description | Key Parameters |
 | :--- | :--- | :--- | :--- | :--- |
-| `searqon_search` | `http` | `POST /search` | Real-time meta-search across SearXNG, DuckDuckGo, Arxiv, and Wikipedia with reciprocal rank fusion. | `query` (str, req), `limit` (int, def: 5), `scrape` (bool, def: false), `category` (enum: general/science/it/news), `max_tokens` (int, def: 4000) |
+| `searqon_search` | `http` | `POST /search` | Real-time meta-search across SearXNG, DuckDuckGo, Arxiv, and Wikipedia with reciprocal rank fusion. | `query` (str, req), `limit` (int, def: 5), `scrape` (bool, def: false), `max_tokens` (int, def: 4000) |
 | `searqon_scrape` | `http` | `POST /scrape` | 4-tier anti-bot scraper (Cloudflare/bot shield bypass) returning clean Markdown. | `url` (str, req), `format` (enum: markdown/text/html, def: markdown), `max_tokens` (int, def: 8000), `bypass_cache` (bool, def: false) |
 | `searqon_research` | `http` | `POST /pipeline` | One-shot deep research: search, concurrently scrape top authoritative pages, and synthesize chunked sources. | `query` (str, req), `max_sources` (int, def: 5), `bypass_cache` (bool, def: false) |
 | `searqon_map` | `http` | `POST /map` | Discover and map internal URLs and sitemap hierarchy across a target website or domain. | `url` (str, req), `limit` (int, def: 50, max: 150) |
