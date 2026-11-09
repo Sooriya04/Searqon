@@ -448,3 +448,10 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Searqon Architecture Model**: Modeled the complete Searqon pipeline in [`.archify/searqon-architecture.json`](file:///home/sooriya/Documents/Searqon/.archify/searqon-architecture.json) covering clients (REST/MCP/UTCP), security guardrails, multi-engine discovery, the 4-tier anti-bot escalation ladder, RAG chunking, and dual storage backends.
 - **Rendered Interactive Visualizer**: Compiled into standalone interactive HTML at [`architecture.html`](file:///home/sooriya/Documents/Searqon/architecture.html) and [`docs/architecture.html`](file:///home/sooriya/Documents/Searqon/docs/architecture.html) with blueprint dark/light themes, path tracing, and vector export.
 
+
+## feat(web): embed high-resolution architecture diagram into docs and landing page
+
+- **Embedded Architecture Blueprint**: Integrated 2048&times;1320 Archify blueprint map directly into [`docs.html`](file:///home/sooriya/Documents/Searqon/docs.html) and [`index.html`](file:///home/sooriya/Documents/Searqon/index.html).
+- **Direct Interactive Launch**: Added one-click launch buttons and image links to open the standalone interactive visualizer at [`architecture.html`](file:///home/sooriya/Documents/Searqon/architecture.html).
+- **Nav & TOC Re-sync**: Re-introduced the Architecture anchor link to the sticky table-of-contents and top navigation bar.
+
