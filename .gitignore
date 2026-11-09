@@ -1,5 +1,5 @@
 # Compiled binaries — never commit, users compile locally
-searqon
+/searqon
 src/src
 src/src_bin
 

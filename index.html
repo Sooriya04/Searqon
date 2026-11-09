@@ -9,36 +9,35 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            /* Official Developer Dark Theme (GitHub/Docker aligned) */
-            --bg: #0d1117;
-            --surface: #161b22;
-            --surface-hover: #21262d;
-            --surface-elevated: #1f242c;
-            --border: #30363d;
-            --border-muted: #21262d;
-            --border-hover: #484f58;
+            /* Monochromatic Terminal Dark Design Tokens */
+            --bg: #090D14;
+            --surface: #0F1623;
+            --surface-hover: #162032;
+            --surface-elevated: #1A2438;
+            --border: #232E42;
+            --border-muted: #172030;
+            --border-hover: #374661;
 
-            --text-primary: #f0f6fc;
-            --text-secondary: #c9d1d9;
-            --text-muted: #8b949e;
-            --text-link: #58a6ff;
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --text-muted: #8493A8;
+            --text-link: #38BDF8;
 
-            /* Docker Blue & Accents */
-            --docker-blue: #2496ed;
-            --docker-blue-hover: #1d83d4;
-            --docker-blue-subtle: rgba(36, 150, 237, 0.12);
-            --green: #3fb950;
-            --green-subtle: rgba(63, 185, 80, 0.12);
-            --amber: #d29922;
-            --amber-subtle: rgba(210, 153, 34, 0.12);
-            --red: #f85149;
-            --red-subtle: rgba(248, 81, 73, 0.12);
+            /* Monochromatic Tech Accent (Electric Cyan / Cold Steel) */
+            --accent: #38BDF8;
+            --accent-hover: #0EA5E9;
+            --accent-subtle: rgba(56, 189, 248, 0.12);
+            --accent-border: rgba(56, 189, 248, 0.28);
 
-            --code-bg: #0b0e14;
+            --code-bg: #05080E;
+
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --header-height: 64px;
         }
 
         * {
@@ -47,12 +46,17 @@
             padding: 0;
         }
 
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: calc(var(--header-height) + 24px);
+        }
+
         html, body {
             max-width: 100%;
             overflow-x: hidden;
             background-color: var(--bg);
             color: var(--text-secondary);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            font-family: var(--font-sans);
             font-size: 14.5px;
             line-height: 1.6;
             -webkit-font-smoothing: antialiased;
@@ -61,71 +65,69 @@
         a {
             color: var(--text-link);
             text-decoration: none;
+            transition: color 150ms ease;
         }
 
         a:hover {
+            color: #7DD3FC;
             text-decoration: underline;
+        }
+
+        button {
+            cursor: pointer;
+            font-family: inherit;
         }
 
         .container {
             width: 100%;
-            max-width: 1060px;
+            max-width: 1120px;
             margin: 0 auto;
-            padding: 0 1.25rem;
+            padding: 0 1.5rem;
         }
 
         /* ── Header ── */
         header {
             position: sticky;
             top: 0;
-            z-index: 50;
-            background: rgba(13, 17, 23, 0.92);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            z-index: 100;
+            height: var(--header-height);
+            background: rgba(9, 13, 20, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
         }
 
         .nav-inner {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            height: 64px;
+            width: 100%;
         }
 
         .brand-link {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.6rem;
             color: var(--text-primary);
             text-decoration: none;
         }
 
-        .brand-logo {
-            width: 26px;
-            height: 26px;
-            background: var(--docker-blue);
-            color: #fff;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
         .brand-name {
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             letter-spacing: -0.02em;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
         }
 
         .brand-tag {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 11px;
-            color: var(--text-muted);
-            background: var(--surface);
-            border: 1px solid var(--border);
+            color: var(--accent);
+            background: var(--accent-subtle);
+            border: 1px solid var(--accent-border);
             padding: 2px 7px;
             border-radius: 12px;
         }
@@ -146,7 +148,7 @@
         }
 
         .nav-menu a:hover {
-            color: #fff;
+            color: var(--text-primary);
         }
 
         .nav-cta-group {
@@ -155,43 +157,37 @@
             gap: 0.6rem;
         }
 
-        .btn-docker {
+        .btn-nav-action {
             display: inline-flex;
             align-items: center;
             gap: 0.45rem;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             font-weight: 600;
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            background: var(--docker-blue);
-            color: #ffffff !important;
-            border: 1px solid transparent;
-            text-decoration: none !important;
-            transition: background 0.15s;
-        }
-
-        .btn-docker:hover {
-            background: var(--docker-blue-hover);
-        }
-
-        .btn-github {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            font-size: 0.82rem;
-            font-weight: 600;
-            padding: 0.4rem 0.8rem;
+            padding: 0.45rem 0.85rem;
             border-radius: 6px;
             background: var(--surface);
             border: 1px solid var(--border);
             color: var(--text-primary) !important;
             text-decoration: none !important;
             transition: all 0.15s;
+            min-height: 36px;
         }
 
-        .btn-github:hover {
+        .btn-nav-action:hover {
             background: var(--surface-hover);
-            border-color: var(--border-hover);
+            border-color: var(--accent);
+        }
+
+        .btn-nav-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #030712 !important;
+        }
+
+        .btn-nav-primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+            color: #030712 !important;
         }
 
         /* ── Hero Section ── */
@@ -211,20 +207,26 @@
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.78rem;
-            color: var(--docker-blue);
-            background: var(--docker-blue-subtle);
-            border: 1px solid rgba(36, 150, 237, 0.25);
+            color: var(--text-primary);
+            background: var(--surface);
+            border: 1px solid var(--border);
             padding: 0.2rem 0.65rem;
             border-radius: 9999px;
             text-decoration: none;
+            transition: border-color 0.15s;
         }
 
-        .pill-badge.green {
-            color: var(--green);
-            background: var(--green-subtle);
-            border-color: rgba(63, 185, 80, 0.25);
+        .pill-badge:hover {
+            border-color: var(--accent);
+            text-decoration: none;
+        }
+
+        .pill-badge.accent {
+            color: var(--accent);
+            background: var(--accent-subtle);
+            border-color: var(--accent-border);
         }
 
         .pill-badge span.dot {
@@ -247,7 +249,7 @@
         .hero p.lead {
             font-size: clamp(1rem, 1.7vw, 1.15rem);
             color: var(--text-secondary);
-            max-width: 720px;
+            max-width: 740px;
             line-height: 1.6;
             margin-bottom: 2rem;
         }
@@ -258,7 +260,7 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             overflow: hidden;
-            max-width: 780px;
+            max-width: 800px;
             margin-bottom: 3.5rem;
         }
 
@@ -287,7 +289,7 @@
             background: transparent;
             border: none;
             color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
@@ -301,8 +303,8 @@
         }
 
         .t-tab.active {
-            color: var(--docker-blue);
-            border-bottom-color: var(--docker-blue);
+            color: var(--accent);
+            border-bottom-color: var(--accent);
             background: var(--code-bg);
         }
 
@@ -315,9 +317,9 @@
         }
 
         .terminal-code {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.85rem;
-            color: #58a6ff;
+            color: var(--accent);
             overflow-x: auto;
             white-space: nowrap;
             scrollbar-width: none;
@@ -333,7 +335,7 @@
             color: var(--text-primary);
             padding: 0.35rem 0.75rem;
             border-radius: 6px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.76rem;
             cursor: pointer;
             flex-shrink: 0;
@@ -345,10 +347,10 @@
 
         .copy-btn:hover {
             background: var(--surface-hover);
-            border-color: var(--border-hover);
+            border-color: var(--accent);
         }
 
-        /* ── Benchmark / Specs Strip ── */
+        /* ── Specs Strip ── */
         .specs-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -361,10 +363,15 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 1.25rem;
+            transition: border-color 0.15s;
+        }
+
+        .spec-item:hover {
+            border-color: var(--border-hover);
         }
 
         .spec-item .num {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 1.45rem;
             font-weight: 700;
             color: var(--text-primary);
@@ -415,12 +422,19 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            background: var(--surface-hover);
         }
 
         .card-num {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.72rem;
-            color: var(--docker-blue);
+            color: var(--accent);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -448,7 +462,7 @@
         }
 
         .tag {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.72rem;
             background: var(--code-bg);
             border: 1px solid var(--border);
@@ -480,6 +494,7 @@
         table.ladder-table th {
             background: var(--surface-elevated);
             color: var(--text-muted);
+            font-family: var(--font-mono);
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -491,18 +506,16 @@
         }
 
         .badge-tier {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.75rem;
             font-weight: 600;
             padding: 0.2rem 0.5rem;
             border-radius: 4px;
             display: inline-block;
+            background: var(--accent-subtle);
+            color: var(--accent);
+            border: 1px solid var(--accent-border);
         }
-
-        .b-t1 { background: var(--green-subtle); color: var(--green); }
-        .b-t2 { background: var(--docker-blue-subtle); color: var(--docker-blue); }
-        .b-t3 { background: var(--amber-subtle); color: var(--amber); }
-        .b-t4 { background: var(--red-subtle); color: var(--red); }
 
         /* ── API Explorer ── */
         .api-card {
@@ -529,7 +542,7 @@
             background: transparent;
             border: none;
             color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             cursor: pointer;
             border-bottom: 2px solid transparent;
@@ -542,8 +555,8 @@
         }
 
         .api-tab-btn.active {
-            color: var(--docker-blue);
-            border-bottom-color: var(--docker-blue);
+            color: var(--accent);
+            border-bottom-color: var(--accent);
             background: var(--code-bg);
         }
 
@@ -556,17 +569,17 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 0.6rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.75rem;
             color: var(--text-muted);
         }
 
         pre.code-viewer {
-            background: #06090e;
+            background: #03060B;
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 1.15rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             line-height: 1.6;
             color: var(--text-secondary);
@@ -608,7 +621,7 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 0.75rem 1rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             color: var(--text-primary);
             word-break: break-all;
@@ -630,15 +643,15 @@
             color: var(--text-muted);
             padding: 0.35rem 0.7rem;
             border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.75rem;
             cursor: pointer;
         }
 
         .r-btn.active {
             color: #fff;
-            border-color: var(--docker-blue);
-            background: var(--docker-blue-subtle);
+            border-color: var(--accent);
+            background: var(--accent-subtle);
         }
 
         /* ── Footer ── */
@@ -676,12 +689,12 @@
             position: fixed;
             bottom: 1.5rem;
             right: 1.5rem;
-            background: #1f242c;
+            background: var(--surface-elevated);
             border: 1px solid var(--border-hover);
             color: #fff;
             padding: 0.6rem 1rem;
             border-radius: 6px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
             transform: translateY(100px);
@@ -758,27 +771,25 @@
     <!-- Header Navigation -->
     <header>
         <div class="container nav-inner">
-            <a href="#" class="brand-link">
-                <div class="brand-logo">S</div>
+            <a href="index.html" class="brand-link" aria-label="Searqon Home">
                 <span class="brand-name">Searqon</span>
-                <span class="brand-tag">v1.2.0</span>
+                <span class="brand-tag">v2.0</span>
             </a>
 
             <ul class="nav-menu">
                 <li><a href="#pipeline">Architecture</a></li>
                 <li><a href="#stealth">Anti-Bot</a></li>
                 <li><a href="#api">API Reference</a></li>
+                <li><a href="docs.html">Documentation</a></li>
                 <li><a href="#botinfo">SearqonBot</a></li>
             </ul>
 
             <div class="nav-cta-group">
-                <a href="https://hub.docker.com/r/sooriya04/searqon" target="_blank" rel="noopener noreferrer" class="btn-docker">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.185 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3.574a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 00.186-.186V6.29a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.887c0 .102.082.186.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.29a.185.185 0 00-.185-.185H8.1a.185.185 0 00-.185.185v1.887c0 .102.083.186.185.186m-2.964 0h2.119a.186.186 0 00.185-.186V6.29a.185.185 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.887c0 .102.084.186.186.186m5.893 2.715h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186H5.136a.186.186 0 00-.186.185v1.888c0 .102.084.185.186.185m-2.928 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186H2.208a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185M23.959 9.87c-.092-.128-.485-.56-1.542-.647-.28-.023-.74-.012-1.32.187-.318-.465-.75-.826-1.27-1.077l-.234-.112-.132.222c-.443.74-.757 1.572-.94 2.457H.186a.186.186 0 00-.186.186c0 1.258.26 2.478.775 3.626 1.05 2.339 3.01 4.093 5.488 4.908 1.488.49 3.09.743 4.708.743 6.136 0 11.458-3.664 12.83-9.088.197-.779.234-1.385.158-1.405"/>
-                    </svg>
-                    Docker Hub
+                <a href="docs.html" class="btn-nav-action btn-nav-primary">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+                    Documentation
                 </a>
-                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-github">
+                <a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer" class="btn-nav-action">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.57-.18-3.21-.78-3.21-3.48 0-.77.27-1.4.71-1.9-.07-.18-.31-.9.07-1.87 0 0 .59-.19 1.95.73a6.83 6.83 0 011.82-.25c.62 0 1.25.08 1.82.25 1.36-.93 1.95-.73 1.95-.73.39.97.15 1.69.07 1.87.44.5.71 1.13.71 1.9 0 2.71-1.64 3.3-3.21 3.48.25.22.47.65.47 1.32 0 .95-.01 1.72-.01 1.96 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
                     </svg>
@@ -796,7 +807,7 @@
                     <span class="dot"></span>
                     <span>sooriya04/searqon:latest</span>
                 </a>
-                <span class="pill-badge green">
+                <span class="pill-badge accent">
                     <span class="dot"></span>
                     <span>Pure Go · Zero External DB Required</span>
                 </span>
@@ -912,25 +923,25 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td><span class="badge-tier b-t1">Tier 1</span></td>
+                            <td><span class="badge-tier">Tier 1</span></td>
                             <td><strong>Fast HTTP/2 Client</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Pure Go connection pooling, Brotli/Gzip decoding</span></td>
                             <td>Unprotected pages & API endpoints</td>
                             <td><code>2–10 ms</code></td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier b-t2">Tier 2</span></td>
+                            <td><span class="badge-tier">Tier 2</span></td>
                             <td><strong>Fingerprint & TLS Spoofing</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Chrome 128 / Safari 17 client hints (`Sec-CH-UA`)</span></td>
                             <td>Basic WAFs & rate-limit challenges</td>
                             <td><code>20–50 ms</code></td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier b-t3">Tier 3</span></td>
+                            <td><span class="badge-tier">Tier 3</span></td>
                             <td><strong>Headless Browser Subprocess</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Lightpanda / Camoufox JS DOM evaluation</span></td>
                             <td>Cloudflare Turnstile, React/Next SPAs</td>
                             <td><code>1.5–3.5 s</code></td>
                         </tr>
                         <tr>
-                            <td><span class="badge-tier b-t4">Tier 4</span></td>
+                            <td><span class="badge-tier">Tier 4</span></td>
                             <td><strong>Residential Proxy Fallback</strong><br><span style="color: var(--text-muted); font-size: 0.8rem;">Rotating residential & datacenter proxy pool</span></td>
                             <td>Hard IP bans & geo-restrictions</td>
                             <td><code>2.0–4.0 s</code></td>
@@ -1017,7 +1028,8 @@
             <ul class="footer-links">
                 <li><a href="https://github.com/Sooriya04/Searqon" target="_blank" rel="noopener noreferrer">GitHub</a></li>
                 <li><a href="https://hub.docker.com/r/sooriya04/searqon" target="_blank" rel="noopener noreferrer">Docker Hub</a></li>
-                <li><a href="#api">API Docs</a></li>
+                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="#api">API Reference</a></li>
             </ul>
         </div>
     </footer>

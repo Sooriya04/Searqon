@@ -2,10 +2,11 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
     paths:
       # Only deploy Pages when the landing page or docs are updated
       - 'index.html'
+      - 'docs.html'
       - 'docs/**'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 

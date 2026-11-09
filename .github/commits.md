@@ -366,4 +366,21 @@ Resolved findings 3, 4, and 5 from the ponytail audit:
 - Added contract unit test `TestToolEndpointContracts` in `src/utcp/server_test.go` verifying all published tools in the UTCP manual have valid HTTP methods, JSON content-types, and matching endpoint URLs.
 - Pre-allocated static tool definitions into `rawTools` in `src/utcp/manual.go` to eliminate redundant schema allocations across discovery cache misses.
 
+## feat(docs): establish ui-ux-pro-max design system, publish technical docs site, and configure GitHub Pages CI/CD
+
+Implemented a comprehensive developer tool design system and technical documentation portal:
+- Leveraged `ui-ux-pro-max` design intelligence to generate and persist `design-system/searqon/MASTER.md` and page override `design-system/searqon/pages/docs.md`.
+- Created a dedicated standalone technical documentation portal `docs.html` covering zero-dependency SQLite/PG architecture, UTCP v1.0.1+ dynamic discovery, Code-Mode recipes, MCP stdio/SSE configs, cryptographic citation provenance (`content_hash`, `fetched_at`), 4-tier anti-bot escalation ladder, and REST API catalogs.
+- Unified `index.html` and `docs.html` under a clean monochromatic terminal dark theme (`#090D14` background, `#232E42` borders, `#38BDF8` cyan accents), removing all logos and brand icons per minimalism guidelines.
+- Updated GitHub Actions Pages deployment workflow `.github/workflows/pages.yml` to trigger on both `main` and `dev` branches whenever `index.html`, `docs.html`, or `docs/**` are updated.
+
+## fix(stream, scraper): resolve pre-launch audit findings 1, 2, and 3 for production streaming and socket pooling
+
+Resolved critical launch blockers identified during the ponytail pre-launch audit:
+- **Preserved `http.Flusher` across middleware stack**: Implemented `Flush()` and `Unwrap()` on `responseWriter` and `gzipResponseWriter` in `src/utils/middleware.go`. Bypassed gzip compression for SSE endpoints (`/search/stream`, `/mcp`), resolving HTTP 500 `"Streaming unsupported"` failures on live streaming endpoints. Added middleware integration test `TestMiddleware_PreservesFlusher` in `src/utils/middleware_test.go`.
+- **Eliminated concurrent write race conditions on streaming handlers**: Added `sync.Mutex` synchronization in `src/handlers/search_stream.go` and `src/handlers/crawler_handlers.go`, preventing concurrent writes to `http.ResponseWriter` and `flusher.Flush()` when parallel scraping and crawling workers complete pages simultaneously. Verified thread safety with `go test -race ./handlers`.
+- **Socket and connection pooling for outbound scraping**: Replaced unpooled per-request `http.Transport` instantiations in `src/scraper/escalation.go` with a singleton `SharedDirectTransport()` and a concurrent `proxyTransportPool` in `src/scraper/proxy.go`. Reuses persistent HTTP/1.1 and HTTP/2 keep-alive connections across scrapes, eliminating TCP socket exhaustion and `TIME_WAIT` file descriptor leaks under high-throughput agent workloads.
+
+
+
 

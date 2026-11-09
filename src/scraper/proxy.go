@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"src/config"
@@ -139,15 +140,35 @@ func getNextProxy(req *http.Request) (*url.URL, error) {
 	return GetNextProxy()
 }
 
-// NewProxyTransport builds an HTTP transport routed explicitly through a proxy.
-func NewProxyTransport(proxyURL *url.URL) *http.Transport {
-	if proxyURL == nil {
-		return newBrowserTransport(nil)
-	}
-	return newBrowserTransport(http.ProxyURL(proxyURL))
+var (
+	sharedDirectTransport     *http.Transport
+	sharedDirectTransportOnce sync.Once
+	proxyTransportPool        sync.Map // string -> *http.Transport
+)
+
+// SharedDirectTransport returns a pooled unproxied HTTP transport with browser TLS emulation.
+func SharedDirectTransport() *http.Transport {
+	sharedDirectTransportOnce.Do(func() {
+		sharedDirectTransport = newBrowserTransport(nil)
+	})
+	return sharedDirectTransport
 }
 
-// NewDirectTransport builds an unproxied, direct HTTP transport with browser TLS emulation.
+// NewProxyTransport builds or reuses a pooled HTTP transport routed explicitly through a proxy.
+func NewProxyTransport(proxyURL *url.URL) *http.Transport {
+	if proxyURL == nil {
+		return SharedDirectTransport()
+	}
+	key := proxyURL.String()
+	if val, ok := proxyTransportPool.Load(key); ok {
+		return val.(*http.Transport)
+	}
+	t := newBrowserTransport(http.ProxyURL(proxyURL))
+	actual, _ := proxyTransportPool.LoadOrStore(key, t)
+	return actual.(*http.Transport)
+}
+
+// NewDirectTransport returns the shared, pooled unproxied HTTP transport.
 func NewDirectTransport() *http.Transport {
-	return newBrowserTransport(nil)
+	return SharedDirectTransport()
 }

@@ -119,10 +119,26 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 	return g.Writer.Write(b)
 }
 
+func (g *gzipResponseWriter) Flush() {
+	if gz, ok := g.Writer.(*gzip.Writer); ok {
+		_ = gz.Flush()
+	}
+	if f, ok := g.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (g *gzipResponseWriter) Unwrap() http.ResponseWriter {
+	return g.ResponseWriter
+}
+
 // GzipCompressionMiddleware automatically compresses JSON HTTP responses when client sends Accept-Encoding: gzip.
 func GzipCompressionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") ||
+			strings.Contains(r.Header.Get("Accept"), "text/event-stream") ||
+			strings.HasPrefix(r.URL.Path, "/search/stream") ||
+			strings.HasPrefix(r.URL.Path, "/mcp") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -155,6 +171,16 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 		rw.WriteHeader(http.StatusOK)
 	}
 	return rw.ResponseWriter.Write(b)
+}
+
+func (rw *responseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
 }
 
 // HTTPLogger is a middleware that logs all incoming HTTP requests using slog.

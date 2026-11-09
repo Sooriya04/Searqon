@@ -34,6 +34,10 @@ func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.T
 		return "", 0, "", nil, fmt.Errorf("invalid URL: %s", targetURL)
 	}
 
+	if transport == nil {
+		transport = SharedDirectTransport()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

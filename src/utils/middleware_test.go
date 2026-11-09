@@ -59,3 +59,33 @@ func TestGetClientIP(t *testing.T) {
 		})
 	}
 }
+
+func TestMiddleware_PreservesFlusher(t *testing.T) {
+	flushed := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatalf("expected w to implement http.Flusher through middleware stack")
+		}
+		flusher.Flush()
+		flushed = true
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	stack := InboundRateLimitMiddleware(GzipCompressionMiddleware(HTTPLogger(handler)))
+
+	req := httptest.NewRequest(http.MethodGet, "/search/stream?q=test", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Accept", "text/event-stream")
+	rec := httptest.NewRecorder()
+
+	stack.ServeHTTP(rec, req)
+
+	if !flushed {
+		t.Errorf("expected flusher.Flush() to be called successfully")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK, got %d", rec.Code)
+	}
+}

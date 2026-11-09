@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"src/search"
 	"src/utils"
@@ -23,13 +24,20 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var streamMu sync.Mutex
+	safeWrite := func(event string, data []byte) {
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+		flusher.Flush()
+	}
+
 	query := strings.TrimSpace(r.URL.Query().Get("query"))
 	if query == "" {
 		query = strings.TrimSpace(r.URL.Query().Get("q"))
 	}
 	if query == "" {
-		fmt.Fprintf(w, "event: error\ndata: {\"error\":\"Query parameter 'query' or 'q' is required\"}\n\n")
-		flusher.Flush()
+		safeWrite("error", []byte(`{"error":"Query parameter 'query' or 'q' is required"}`))
 		return
 	}
 
@@ -41,39 +49,33 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 				"provider": evt.Provider,
 				"total":    evt.Total,
 			})
-			fmt.Fprintf(w, "event: discovery\ndata: %s\n\n", discBytes)
-			flusher.Flush()
+			safeWrite("discovery", discBytes)
 
 		case "scrape":
 			if evt.Result != nil {
 				itemBytes, _ := json.Marshal(evt.Result)
-				fmt.Fprintf(w, "event: scrape\ndata: %s\n\n", itemBytes)
-				flusher.Flush()
+				safeWrite("scrape", itemBytes)
 			}
 
 		case "result":
 			if evt.Result != nil {
 				itemBytes, _ := json.Marshal(evt.Result)
-				fmt.Fprintf(w, "event: result\ndata: %s\n\n", itemBytes)
-				flusher.Flush()
+				safeWrite("result", itemBytes)
 			}
 
 		case "synthesis":
 			dataBytes, _ := json.Marshal(evt.Data)
-			fmt.Fprintf(w, "event: synthesis\ndata: %s\n\n", dataBytes)
-			flusher.Flush()
+			safeWrite("synthesis", dataBytes)
 
 		case "summary":
 			dataBytes, _ := json.Marshal(map[string]interface{}{
 				"summary": evt.Summary,
 			})
-			fmt.Fprintf(w, "event: summary\ndata: %s\n\n", dataBytes)
-			flusher.Flush()
+			safeWrite("summary", dataBytes)
 
 		case "done":
 			doneBytes, _ := json.Marshal(evt.Data)
-			fmt.Fprintf(w, "event: done\ndata: %s\n\n", doneBytes)
-			flusher.Flush()
+			safeWrite("done", doneBytes)
 		}
 	})
 }

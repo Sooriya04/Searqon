@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"src/crawler"
 	"src/models"
@@ -77,18 +78,23 @@ func CrawlHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		var streamMu sync.Mutex
 		onPageScraped := func(page models.ScrapeResult) {
 			data, err := json.Marshal(page)
 			if err == nil {
+				streamMu.Lock()
 				fmt.Fprintf(w, "data: %s\n\n", data)
 				flusher.Flush()
+				streamMu.Unlock()
 			}
 		}
 
 		crawler.CrawlSite(req.URL, req.Limit, req.Depth, req.Format, onPageScraped)
 
+		streamMu.Lock()
 		fmt.Fprintf(w, "event: done\ndata: {}\n\n")
 		flusher.Flush()
+		streamMu.Unlock()
 	} else {
 		result := crawler.CrawlSite(req.URL, req.Limit, req.Depth, req.Format, nil)
 		if result.Error != "" {
