@@ -406,3 +406,15 @@ Resolved rate limiting IP grouping edge cases and long-lived SSE streaming timeo
 
 
 
+## feat(web): rewrite index and docs as professional software landing pages
+
+Rewrote both HTML pages from scratch — no AI marketing slop, no logos, no lettermarks:
+
+- **`index.html`**: Hero with docker quick-start, 4-stat grid, feature cards (3-col grid), 4-tier anti-bot escalation table, tabbed API explorer (search/scrape/chunked/health), SearqonBot webmaster section with robots.txt recipes
+- **`docs.html`**: Sticky sidebar nav + full technical reference covering REST endpoints, MCP stdio/HTTP, UTCP manifest, SSE event types, storage backends (SQLite/PG/Redis), `settings.yml` reference, Docker Compose examples, and anti-bot tier details
+- Unified design system across both pages: `#090D14` bg, `#232E42` border, `#38BDF8` cyan accent, IBM Plex Sans + JetBrains Mono
+- Same nav pattern and footer on both pages
+- All interactive JS (tab switchers, copy buttons, toast) preserved
+- Accessible: `aria-label`, `role="tab"`, `aria-pressed`, `aria-live` on toast
+- Responsive: mobile-first, sidebar collapses at 900px, nav hidden at 768px
+
