@@ -494,6 +494,15 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Verified Clean Build**: All Go packages passing tests with zero deprecated converters.
 
 
+## fix(scraper): flush unclosed tags at EOF, handle nested anchors, and fast-path absolute URLs
+
+- **EOF Flushing**: Added `sm.flush()` to close unclosed `a`, `th`/`td`, `tr`, and `pre` tags when reaching EOF, preventing text loss on truncated or malformed documents.
+- **Nested Anchors**: Flushed and closed active links when a new `<a>` tag starts before `</a>`, preserving both URLs in malformed navigation menus.
+- **Fast-Path URL Resolution**: Skipped `url.Parse` for URLs containing `://`, speeding up link resolution on absolute URLs.
+- **Unit Test Coverage**: Added EOF unclosed link, unclosed table, and nested anchor tests in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go).
+
+
+
 
 
 
