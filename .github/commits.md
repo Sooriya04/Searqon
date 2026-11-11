@@ -468,3 +468,13 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - Added `design-system/` to ignore local UI design exploration files and keep working directory pristine.
 
 
+## feat(scraper): streaming zero-alloc HTML-to-Markdown state machine with bounded early exit
+
+- **Zero DOM Tree Allocations**: Implemented [`src/scraper/stream_markdown.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown.go) using standard library streaming tokenizer `golang.org/x/net/html`.
+- **Lightpanda-Style State Machine**: Emits clean GitHub-Flavored Markdown on the fly for headings, inline formatting, code blocks, links, tables, and nested lists (`[32]listState` stack) without intermediate ASTs.
+- **Bounded Early Exit**: Integrated [`LimitedWriter`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown.go) to halt tokenization the instant `max_tokens` / `max_bytes` is reached, saving CPU and memory on truncated scrapes.
+- **Scraper Pipeline Integration**: Updated [`src/scraper/scraper.go`](file:///home/sooriya/Documents/Searqon/src/scraper/scraper.go) with `htmlToMarkdownBounded` wired to agent `opts.MaxTokens`.
+- **Unit & Benchmark Verification**: Added tests and benchmarks in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go) executing in ~11µs per operation.
+
+
+
