@@ -19,7 +19,7 @@ ifneq (,$(wildcard .env))
 endif
 
 .PHONY: help run build clean test lint kill restart logs install-lightpanda \
-        docker-build docker-release docker-run docker-stop docker-logs docker-test \
+        docker-build docker-release docker-run docker-stop docker-logs docker-test test-docker \
         compose-up compose-down compose-logs
 
 help: ## Show this help
@@ -105,6 +105,42 @@ docker-test: ## Verify Docker container health and logs endpoints on port $(PORT
 	@echo "→ Testing container endpoints on :$(PORT)..."
 	@curl -s http://localhost:$(PORT)/health | grep -q '"status":"ok"' && echo "✓ /health: OK" || echo "✗ /health: FAIL"
 	@curl -s http://localhost:$(PORT)/logs | grep -q '"success":true' && echo "✓ /logs: OK" || echo "✗ /logs: FAIL"
+
+test-docker: ## Build Docker image and run full CI smoke test (health, SQLite volume, MCP stdio)
+	@echo "→ Building local Docker image searqon:ci..."
+	@docker build -t searqon:ci .
+	@echo "→ Booting container searqon-test..."
+	@-docker rm -f searqon-test 2>/dev/null || true
+	@rm -rf smoke-data && mkdir -p smoke-data
+	@docker run -d --name searqon-test -p $(PORT):$(PORT) -v $$(pwd)/smoke-data:/app/data searqon:ci
+	@echo "→ Polling health endpoint on :$(PORT)..."
+	@sh -c ' \
+		READY=0; \
+		for i in $$(seq 1 20); do \
+			if curl -sf http://localhost:$(PORT)/health | grep -q "\"status\":\"ok\""; then \
+				READY=1; break; \
+			fi; \
+			sleep 0.5; \
+		done; \
+		if [ $$READY -ne 1 ]; then \
+			echo "✗ Health check failed or timed out"; \
+			docker logs searqon-test; \
+			docker rm -f searqon-test; \
+			rm -rf smoke-data; \
+			exit 1; \
+		fi'
+	@echo "✓ Health check passed (HTTP 200 {\"status\":\"ok\"})"
+	@echo "→ Verifying SQLite volume initialization..."
+	@test -f smoke-data/searqon.db || { echo "✗ smoke-data/searqon.db missing"; docker rm -f searqon-test; rm -rf smoke-data; exit 1; }
+	@echo "✓ SQLite volume initialized (smoke-data/searqon.db exists)"
+	@echo "→ Testing MCP stdio pipeline..."
+	@echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | docker run -i --rm searqon:ci mcp | grep -q '"tools"' || \
+		{ echo "✗ MCP stdio tools/list test failed"; docker rm -f searqon-test; rm -rf smoke-data; exit 1; }
+	@echo "✓ MCP stdio tools/list responded with tools"
+	@echo "→ Tearing down smoke test container..."
+	@docker rm -f searqon-test >/dev/null
+	@rm -rf smoke-data
+	@echo "✓ Docker smoke test passed cleanly!"
 
 # ─── Full Stack Orchestration (Searqon + SearXNG + PG/SQLite + Redis) ────────
 
