@@ -35,7 +35,7 @@ func TestStreamMarkdownBasic(t *testing.T) {
 		</html>
 	`
 
-	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), 0)
+	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestStreamMarkdownTables(t *testing.T) {
 		</table>
 	`
 
-	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), 0)
+	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestStreamMarkdownBoundedTruncation(t *testing.T) {
 	longHTML := `<h1>Title</h1><p>` + strings.Repeat("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", 100) + `</p>`
 
 	maxBytes := 120
-	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(longHTML), maxBytes)
+	md, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(longHTML), "", maxBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestStreamMarkdownManualCheck(t *testing.T) {
 	</div>
 	`
 
-	output, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(sampleHTML), 0)
+	output, truncated, err := ConvertHTMLToMarkdownStream(strings.NewReader(sampleHTML), "", 0)
 	if err != nil {
 		t.Fatalf("conversion error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestStreamMarkdownManualCheck(t *testing.T) {
 	t.Logf("\n--- MANUAL CHECK OUTPUT (FULL) ---\n%s\n--- END FULL --- (truncated: %v)\n", output, truncated)
 
 	// Now check bounded output (e.g. 150 bytes limit)
-	boundedOut, isTrunc, err := ConvertHTMLToMarkdownStream(strings.NewReader(sampleHTML), 150)
+	boundedOut, isTrunc, err := ConvertHTMLToMarkdownStream(strings.NewReader(sampleHTML), "", 150)
 	if err != nil {
 		t.Fatalf("bounded error: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestStreamMarkdownManualCheck(t *testing.T) {
 func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 	// Must Fix 1: Nested formatting inside link
 	linkHTML := `<a href="https://example.com"><strong>Bold</strong> and <em>Italic</em> Link</a>`
-	mdLink, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(linkHTML), 0)
+	mdLink, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(linkHTML), "", 0)
 	if err != nil {
 		t.Fatalf("link test error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 
 	// Must Fix 2: Image link preserves anchor URL
 	imgLinkHTML := `<a href="https://example.com/dest"><img src="logo.png" alt="Company Logo"></a>`
-	mdImgLink, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(imgLinkHTML), 0)
+	mdImgLink, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(imgLinkHTML), "", 0)
 	if err != nil {
 		t.Fatalf("image link error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 
 	// Must Fix 3: Tables with only <td> still generate GFM separator
 	tableHTML := `<table><tr><td>Row 1</td><td>Val 1</td></tr><tr><td>Row 2</td><td>Val 2</td></tr></table>`
-	mdTable, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(tableHTML), 0)
+	mdTable, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(tableHTML), "", 0)
 	if err != nil {
 		t.Fatalf("table error: %v", err)
 	}
@@ -236,12 +236,25 @@ func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 
 	// Should Fix 4: Code block preserves language tag
 	codeHTML := `<pre><code class="language-python">print("hello")</code></pre>`
-	mdCode, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(codeHTML), 0)
+	mdCode, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(codeHTML), "", 0)
 	if err != nil {
 		t.Fatalf("code error: %v", err)
 	}
 	if !strings.Contains(mdCode, "```python\nprint(\"hello\")\n```") {
 		t.Errorf("code language hint missing or malformed: %s", mdCode)
+	}
+
+	// Relative URL resolution test
+	relHTML := `<p><a href="/blog/post-1">Article</a> and <img src="/assets/pic.png" alt="Pic"></p>`
+	mdRel, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(relHTML), "https://searqon.dev/home/", 0)
+	if err != nil {
+		t.Fatalf("relative URL error: %v", err)
+	}
+	if !strings.Contains(mdRel, "[Article](https://searqon.dev/blog/post-1)") {
+		t.Errorf("relative link was not resolved: %s", mdRel)
+	}
+	if !strings.Contains(mdRel, "![Pic](https://searqon.dev/assets/pic.png)") {
+		t.Errorf("relative image was not resolved: %s", mdRel)
 	}
 }
 
@@ -264,6 +277,6 @@ func BenchmarkStreamMarkdown(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), 0)
+		_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
 	}
 }

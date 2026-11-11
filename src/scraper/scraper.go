@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/PuerkitoBio/goquery"
 	readability "github.com/go-shiori/go-readability"
 
@@ -31,20 +30,6 @@ type ScrapeOptions struct {
 }
 
 var rawHTMLCache sync.Map // targetURL -> string
-
-
-func stripHTMLTagsForMarkdown(htmlStr string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
-	if err != nil || doc == nil {
-		return htmlStr
-	}
-	doc.Find("table, img, pre, code").Remove()
-	html, err := doc.Html()
-	if err != nil || html == "" {
-		return htmlStr
-	}
-	return html
-}
 
 // ScrapeHTMLContent extracts structural text from HTML content directly.
 func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) models.ScrapeResult {
@@ -122,8 +107,7 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 			if opts.MaxTokens > 0 {
 				maxBytes = opts.MaxTokens * 4
 			}
-			cleanedHTML := stripHTMLTagsForMarkdown(article.Content)
-			if markdownStr, merr := htmlToMarkdownBounded(cleanedHTML, parsedURL.String(), maxBytes); merr == nil {
+			if markdownStr, merr := htmlToMarkdownBounded(article.Content, parsedURL.String(), maxBytes); merr == nil {
 				result.Markdown = markdownStr
 			} else {
 				result.Markdown = plainText
@@ -441,9 +425,9 @@ func htmlToMarkdown(htmlContent string, baseURL string) (string, error) {
 }
 
 func htmlToMarkdownBounded(htmlContent string, baseURL string, maxBytes int) (string, error) {
-	mdStr, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlContent), maxBytes)
-	if err != nil || strings.TrimSpace(mdStr) == "" {
-		return md.ConvertString(htmlContent)
+	mdStr, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlContent), baseURL, maxBytes)
+	if err != nil {
+		return "", err
 	}
 	return mdStr, nil
 }

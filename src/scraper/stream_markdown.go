@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -88,6 +89,7 @@ type listState struct {
 // MarkdownStateMachine streams HTML tokens into clean GitHub-Flavored Markdown.
 type MarkdownStateMachine struct {
 	w               *LimitedWriter
+	baseURL         *url.URL
 	skipDepth       int
 	inPre           bool
 	preFenceWritten bool
@@ -118,20 +120,28 @@ type MarkdownStateMachine struct {
 }
 
 // NewMarkdownStateMachine initializes state for streaming conversion.
-func NewMarkdownStateMachine(w *LimitedWriter) *MarkdownStateMachine {
+func NewMarkdownStateMachine(w *LimitedWriter, rawBaseURL string) *MarkdownStateMachine {
+	var parsedBase *url.URL
+	if rawBaseURL != "" {
+		if u, err := url.Parse(rawBaseURL); err == nil && u.Scheme != "" && u.Host != "" {
+			parsedBase = u
+		}
+	}
 	return &MarkdownStateMachine{
 		w:                w,
+		baseURL:          parsedBase,
 		trailingNewlines: 2, // avoid leading newlines at start of document
 		lastCharSpace:    true,
 	}
 }
 
 // ConvertHTMLToMarkdownStream converts HTML reader to Markdown bounded by maxBytes.
+// If baseURL is provided, relative links and images are resolved to absolute URLs.
 // If maxBytes <= 0, no truncation limit is enforced.
-func ConvertHTMLToMarkdownStream(r io.Reader, maxBytes int) (string, bool, error) {
+func ConvertHTMLToMarkdownStream(r io.Reader, baseURL string, maxBytes int) (string, bool, error) {
 	var buf bytes.Buffer
 	lw := NewLimitedWriter(&buf, maxBytes)
-	sm := NewMarkdownStateMachine(lw)
+	sm := NewMarkdownStateMachine(lw, baseURL)
 
 	z := html.NewTokenizer(r)
 	for {
@@ -289,7 +299,7 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 		href := extractAttr(z, hasAttr, "href")
 		if href != "" && !strings.HasPrefix(href, "javascript:") {
 			sm.inLink = true
-			sm.linkHref = href
+			sm.linkHref = sm.resolveURL(href)
 			sm.linkText.Reset()
 		}
 
@@ -300,7 +310,7 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 			if alt == "" {
 				alt = "image"
 			}
-			return sm.writeRaw(fmt.Sprintf("![%s](%s)", alt, src))
+			return sm.writeRaw(fmt.Sprintf("![%s](%s)", alt, sm.resolveURL(src)))
 		}
 
 	case "table":
@@ -545,4 +555,16 @@ func extractCodeLanguage(class string) string {
 	}
 	return ""
 }
+
+func (sm *MarkdownStateMachine) resolveURL(ref string) string {
+	if sm.baseURL == nil || ref == "" || strings.HasPrefix(ref, "#") || strings.HasPrefix(ref, "mailto:") || strings.HasPrefix(ref, "tel:") {
+		return ref
+	}
+	parsed, err := url.Parse(ref)
+	if err != nil || parsed.IsAbs() {
+		return ref
+	}
+	return sm.baseURL.ResolveReference(parsed).String()
+}
+
 
