@@ -477,4 +477,14 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Unit & Benchmark Verification**: Added tests and benchmarks in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go) executing in ~11µs per operation.
 
 
+## fix(scraper): resolve nested link formatting, image anchors, table separators, and code language hints
+
+- **Nested Formatting inside Links**: Buffered inline styling (`**`, `*`, `~~`, `code`) into `sm.linkText` instead of writing raw markers directly to output, producing clean `[**Bold**](url)` syntax.
+- **Image Links**: Routed `![alt](src)` into `sm.linkText` while `sm.inLink` is active so clickable images properly render as `[![alt](src)](href)`.
+- **Table Separators**: Guaranteed `| --- | --- |` separator row output on the first row of all tables even if `<th>` tags are omitted.
+- **Code Language Hints**: Extracted `language-*` and `lang-*` classes from inner `<code>` blocks to render ```` ```[lang] ```` fences.
+- **Unit Test Coverage**: Added `TestStreamMarkdownMustFixEdgeCases` in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go).
+
+
+
 
