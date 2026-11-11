@@ -486,5 +486,14 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Unit Test Coverage**: Added `TestStreamMarkdownMustFixEdgeCases` in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go).
 
 
+## refactor(scraper): prune legacy html-to-markdown dependency and add relative baseURL resolution
+
+- **Pruned External Dependency**: Dropped `github.com/JohannesKaufmann/html-to-markdown/v2` and `github.com/JohannesKaufmann/dom` from [`src/go.mod`](file:///home/sooriya/Documents/Searqon/src/go.mod) and [`src/scraper/scraper.go`](file:///home/sooriya/Documents/Searqon/src/scraper/scraper.go).
+- **Deleted Tag Stripping Hack**: Removed `stripHTMLTagsForMarkdown` from [`src/scraper/scraper.go`](file:///home/sooriya/Documents/Searqon/src/scraper/scraper.go), preserving tables, code blocks, and images in Readability output.
+- **Relative BaseURL Resolution**: Added automatic resolution of relative link anchors (`/path`) and image sources (`/img.png`) against target page `baseURL`.
+- **Verified Clean Build**: All Go packages passing tests with zero deprecated converters.
+
+
+
 
 
