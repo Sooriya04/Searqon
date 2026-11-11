@@ -256,6 +256,36 @@ func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 	if !strings.Contains(mdRel, "![Pic](https://searqon.dev/assets/pic.png)") {
 		t.Errorf("relative image was not resolved: %s", mdRel)
 	}
+
+	// Edge case: unclosed link at EOF
+	unclosedHTML := `<p>Check out our <a href="https://example.com">documentation`
+	mdUnclosed, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(unclosedHTML), "", 0)
+	if err != nil {
+		t.Fatalf("unclosed link error: %v", err)
+	}
+	if !strings.Contains(mdUnclosed, "[documentation](https://example.com)") {
+		t.Errorf("unclosed link text was dropped at EOF: %s", mdUnclosed)
+	}
+
+	// Edge case: unclosed table at EOF
+	unclosedTable := `<table><tr><td>Col 1</td><td>Col 2`
+	mdTableEOF, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(unclosedTable), "", 0)
+	if err != nil {
+		t.Fatalf("unclosed table error: %v", err)
+	}
+	if !strings.Contains(mdTableEOF, "| Col 1 | Col 2 |") {
+		t.Errorf("unclosed table row was dropped at EOF: %s", mdTableEOF)
+	}
+
+	// Edge case: nested <a> tags without </a>
+	nestedA := `<a href="https://example.com/1">First <a href="https://example.com/2">Second</a>`
+	mdNestedA, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(nestedA), "", 0)
+	if err != nil {
+		t.Fatalf("nested A error: %v", err)
+	}
+	if !strings.Contains(mdNestedA, "[First](https://example.com/1)") || !strings.Contains(mdNestedA, "[Second](https://example.com/2)") {
+		t.Errorf("nested anchors did not preserve both links: %s", mdNestedA)
+	}
 }
 
 func BenchmarkStreamMarkdown(b *testing.B) {

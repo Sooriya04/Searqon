@@ -148,6 +148,7 @@ func ConvertHTMLToMarkdownStream(r io.Reader, baseURL string, maxBytes int) (str
 		tt := z.Next()
 		if tt == html.ErrorToken {
 			err := z.Err()
+			sm.flush()
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -164,6 +165,21 @@ func ConvertHTMLToMarkdownStream(r io.Reader, baseURL string, maxBytes int) (str
 	}
 
 	return strings.TrimSpace(buf.String()), lw.truncated, nil
+}
+
+func (sm *MarkdownStateMachine) flush() {
+	if sm.inLink {
+		_ = sm.handleEndTag("a")
+	}
+	if sm.inCell {
+		_ = sm.handleEndTag("td")
+	}
+	if len(sm.currentRow) > 0 {
+		_ = sm.handleEndTag("tr")
+	}
+	if sm.inPre {
+		_ = sm.handleEndTag("pre")
+	}
 }
 
 func (sm *MarkdownStateMachine) processToken(z *html.Tokenizer, tt html.TokenType) error {
@@ -296,6 +312,9 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 		return sm.writeRaw("* ")
 
 	case "a":
+		if sm.inLink {
+			_ = sm.handleEndTag("a")
+		}
 		href := extractAttr(z, hasAttr, "href")
 		if href != "" && !strings.HasPrefix(href, "javascript:") {
 			sm.inLink = true
@@ -557,7 +576,7 @@ func extractCodeLanguage(class string) string {
 }
 
 func (sm *MarkdownStateMachine) resolveURL(ref string) string {
-	if sm.baseURL == nil || ref == "" || strings.HasPrefix(ref, "#") || strings.HasPrefix(ref, "mailto:") || strings.HasPrefix(ref, "tel:") {
+	if sm.baseURL == nil || ref == "" || strings.HasPrefix(ref, "#") || strings.HasPrefix(ref, "mailto:") || strings.HasPrefix(ref, "tel:") || strings.Contains(ref, "://") {
 		return ref
 	}
 	parsed, err := url.Parse(ref)
