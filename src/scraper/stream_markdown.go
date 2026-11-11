@@ -87,11 +87,12 @@ type listState struct {
 
 // MarkdownStateMachine streams HTML tokens into clean GitHub-Flavored Markdown.
 type MarkdownStateMachine struct {
-	w            *LimitedWriter
-	skipDepth    int
-	inPre        bool
-	inCode       bool
-	inBlockquote bool
+	w               *LimitedWriter
+	skipDepth       int
+	inPre           bool
+	preFenceWritten bool
+	inCode          bool
+	inBlockquote    bool
 
 	// Links
 	inLink   bool
@@ -229,13 +230,17 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 			sm.inCode = true
 			return sm.writeRaw("`")
 		}
+		if !sm.preFenceWritten {
+			class := extractAttr(z, hasAttr, "class")
+			lang := extractCodeLanguage(class)
+			sm.preFenceWritten = true
+			return sm.writeRaw("```" + lang + "\n")
+		}
 
 	case "pre":
 		sm.inPre = true
-		if err := sm.ensureNewlines(2); err != nil {
-			return err
-		}
-		return sm.writeRaw("```\n")
+		sm.preFenceWritten = false
+		return sm.ensureNewlines(2)
 
 	case "blockquote":
 		sm.inBlockquote = true
@@ -359,6 +364,10 @@ func (sm *MarkdownStateMachine) handleEndTag(tag string) error {
 
 	case "pre":
 		sm.inPre = false
+		if !sm.preFenceWritten {
+			_ = sm.writeRaw("```\n")
+			sm.preFenceWritten = true
+		}
 		if err := sm.ensureNewlines(1); err != nil {
 			return err
 		}
@@ -383,7 +392,7 @@ func (sm *MarkdownStateMachine) handleEndTag(tag string) error {
 	case "a":
 		if sm.inLink {
 			sm.inLink = false
-			txt := strings.TrimSpace(sm.linkText.String())
+			txt := strings.Join(strings.Fields(sm.linkText.String()), " ")
 			sm.linkText.Reset()
 			if txt != "" {
 				return sm.writeRaw(fmt.Sprintf("[%s](%s)", txt, sm.linkHref))
@@ -404,7 +413,7 @@ func (sm *MarkdownStateMachine) handleEndTag(tag string) error {
 			if err := sm.writeRaw(rowStr); err != nil {
 				return err
 			}
-			if sm.isHeader && !sm.tableHeaderDone {
+			if !sm.tableHeaderDone {
 				sm.headerColCount = len(sm.currentRow)
 				dashes := make([]string, sm.headerColCount)
 				for i := range dashes {
@@ -429,6 +438,12 @@ func (sm *MarkdownStateMachine) handleEndTag(tag string) error {
 
 func (sm *MarkdownStateMachine) handleText(raw []byte) error {
 	if sm.inPre {
+		if !sm.preFenceWritten {
+			if err := sm.writeRaw("```\n"); err != nil {
+				return err
+			}
+			sm.preFenceWritten = true
+		}
 		return sm.writeRaw(string(raw))
 	}
 
@@ -479,6 +494,14 @@ func (sm *MarkdownStateMachine) writeRaw(s string) error {
 	if len(s) == 0 {
 		return nil
 	}
+	if sm.inLink {
+		sm.linkText.WriteString(s)
+		return nil
+	}
+	if sm.inCell {
+		sm.currentCell.WriteString(s)
+		return nil
+	}
 	for i := 0; i < len(s); i++ {
 		if s[i] == '\n' {
 			sm.trailingNewlines++
@@ -509,3 +532,17 @@ func extractAttr(z *html.Tokenizer, hasAttr bool, targetKey string) string {
 	}
 	return ""
 }
+
+func extractCodeLanguage(class string) string {
+	for _, part := range strings.Fields(class) {
+		part = strings.ToLower(part)
+		if strings.HasPrefix(part, "language-") {
+			return strings.TrimPrefix(part, "language-")
+		}
+		if strings.HasPrefix(part, "lang-") {
+			return strings.TrimPrefix(part, "lang-")
+		}
+	}
+	return ""
+}
+
