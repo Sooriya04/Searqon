@@ -23,3 +23,10 @@ data/
 *.db
 *.db-wal
 *.db-shm
+
+# Archify captures and build summaries
+.archify/captures/
+docs/architecture.*.json
+
+# Design system workspace
+design-system/
