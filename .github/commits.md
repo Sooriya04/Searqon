@@ -461,3 +461,10 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - Added [`.gitattributes`](file:///home/sooriya/Documents/Searqon/.gitattributes) with `linguist-detectable=false`, `linguist-documentation=true`, and `linguist-vendored=true` for HTML and documentation assets.
 - Fixes GitHub language breakdown so Searqon reports as **95%+ Go** instead of HTML-heavy.
 
+
+## chore(repo): update .gitignore for archify artifacts and design system
+
+- Added `.archify/captures/` and `docs/architecture.*.json` build artifacts to [`.gitignore`](file:///home/sooriya/Documents/Searqon/.gitignore).
+- Added `design-system/` to ignore local UI design exploration files and keep working directory pristine.
+
+
