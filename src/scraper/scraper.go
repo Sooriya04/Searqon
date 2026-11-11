@@ -118,8 +118,12 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 		result.WordCount = utils.CountWords(plainText)
 
 		if format == "markdown" {
+			maxBytes := 0
+			if opts.MaxTokens > 0 {
+				maxBytes = opts.MaxTokens * 4
+			}
 			cleanedHTML := stripHTMLTagsForMarkdown(article.Content)
-			if markdownStr, merr := htmlToMarkdown(cleanedHTML, parsedURL.String()); merr == nil {
+			if markdownStr, merr := htmlToMarkdownBounded(cleanedHTML, parsedURL.String(), maxBytes); merr == nil {
 				result.Markdown = markdownStr
 			} else {
 				result.Markdown = plainText
@@ -181,8 +185,12 @@ func ScrapeHTMLContentWithOptions(htmlContent string, targetURL string, finalURL
 	result.WordCount = utils.CountWords(content)
 
 	if format == "markdown" {
+		maxBytes := 0
+		if opts.MaxTokens > 0 {
+			maxBytes = opts.MaxTokens * 4
+		}
 		cleanedHTML, _ := cleanDoc.Find("body").Html()
-		if markdownStr, merr := htmlToMarkdown(cleanedHTML, parsedURL.String()); merr == nil {
+		if markdownStr, merr := htmlToMarkdownBounded(cleanedHTML, parsedURL.String(), maxBytes); merr == nil {
 			result.Markdown = markdownStr
 		} else {
 			result.Markdown = content
@@ -429,8 +437,17 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 }
 
 func htmlToMarkdown(htmlContent string, baseURL string) (string, error) {
-	return md.ConvertString(htmlContent)
+	return htmlToMarkdownBounded(htmlContent, baseURL, 0)
 }
+
+func htmlToMarkdownBounded(htmlContent string, baseURL string, maxBytes int) (string, error) {
+	mdStr, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlContent), maxBytes)
+	if err != nil || strings.TrimSpace(mdStr) == "" {
+		return md.ConvertString(htmlContent)
+	}
+	return mdStr, nil
+}
+
 
 func extractStructuredData(schema string, result models.ScrapeResult) (json.RawMessage, error) {
 	prompt := fmt.Sprintf(`Extract the requested structured data from the page content.
