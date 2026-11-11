@@ -502,6 +502,14 @@ Replaced generic AI template patterns and broken card grids with a real technica
 - **Unit Test Coverage**: Added EOF unclosed link, unclosed table, and nested anchor tests in [`src/scraper/stream_markdown_test.go`](file:///home/sooriya/Documents/Searqon/src/scraper/stream_markdown_test.go).
 
 
+## ci: enforce Makefile build verification and Docker container smoke test
+
+- **Makefile Build Verification**: Added CI step in [`.github/workflows/ci.yml`](file:///home/sooriya/Documents/Searqon/.github/workflows/ci.yml) verifying `make build` generates `bin/searqon` and `make clean` removes it.
+- **Automated Docker Smoke Test**: Added `make test-docker` to [`Makefile`](file:///home/sooriya/Documents/Searqon/Makefile) and wired into CI to build `searqon:ci`, boot the container in the background, poll `GET /health` HTTP 200, verify SQLite `smoke-data/searqon.db` initialization, and test `echo '{"jsonrpc":"2.0",...}' | docker run -i ... mcp` stdio tool listing before teardown.
+- **PR #17 Merged**: Merged into `main` and verified green on GitHub Actions.
+
+
+
 
 
 
