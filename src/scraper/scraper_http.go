@@ -49,6 +49,9 @@ func init() {
 			if len(via) >= 5 {
 				return fmt.Errorf("too many redirects")
 			}
+			if _, err := ValidateScrapeURL(req.URL.String()); err != nil {
+				return fmt.Errorf("redirect blocked by SSRF protection: %w", err)
+			}
 			return nil
 		},
 	}
