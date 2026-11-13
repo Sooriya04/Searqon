@@ -377,9 +377,10 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 
 		var mu sync.Mutex
 		var wg sync.WaitGroup
+		scrapeResults := results
 
 		for i := 0; i < scrapeLimit; i++ {
-			targetURL := results[i].URL
+			targetURL := scrapeResults[i].URL
 			wg.Add(1)
 			go func(idx int, targetURL string) {
 				defer wg.Done()
@@ -412,18 +413,18 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 
 					var itemCopy models.SearchResult
 					mu.Lock()
-					if idx < len(results) {
-						results[idx].Content = content
-						results[idx].Markdown = scraped.Markdown
-						results[idx].Metadata = scraped.Metadata
-						results[idx].Scraped = true
-						results[idx].ContentHash = scraped.ContentHash
+					if idx < len(scrapeResults) {
+						scrapeResults[idx].Content = content
+						scrapeResults[idx].Markdown = scraped.Markdown
+						scrapeResults[idx].Metadata = scraped.Metadata
+						scrapeResults[idx].Scraped = true
+						scrapeResults[idx].ContentHash = scraped.ContentHash
 						if scraped.ScrapedAt != "" {
-							results[idx].FetchedAt = scraped.ScrapedAt
+							scrapeResults[idx].FetchedAt = scraped.ScrapedAt
 						} else {
-							results[idx].FetchedAt = time.Now().UTC().Format(time.RFC3339)
+							scrapeResults[idx].FetchedAt = time.Now().UTC().Format(time.RFC3339)
 						}
-						itemCopy = results[idx]
+						itemCopy = scrapeResults[idx]
 					}
 					mu.Unlock()
 
@@ -444,10 +445,10 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 					}
 
 					mu.Lock()
-					if idx < len(results) {
-						results[idx].Scraped = false
-						results[idx].ScrapeError = errReason
-						itemCopy = results[idx]
+					if idx < len(scrapeResults) {
+						scrapeResults[idx].Scraped = false
+						scrapeResults[idx].ScrapeError = errReason
+						itemCopy = scrapeResults[idx]
 					}
 					mu.Unlock()
 
@@ -474,6 +475,13 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 		case <-done:
 		case <-scrapeCtx.Done():
 		}
+
+		// Clone results under mu.Lock() to prevent data races with lingering background scraper goroutines
+		mu.Lock()
+		resultsCopy := make([]models.SearchResult, len(scrapeResults))
+		copy(resultsCopy, scrapeResults)
+		mu.Unlock()
+		results = resultsCopy
 	}
 
 	// 5. Content Deduplication & Relevance Ranking

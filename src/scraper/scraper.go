@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -29,7 +30,78 @@ type ScrapeOptions struct {
 	MaxTokens     int
 }
 
-var rawHTMLCache sync.Map // targetURL -> string
+const maxRawHTMLCacheEntries = 256
+
+type rawHTMLEntry struct {
+	key   string
+	value string
+}
+
+// boundedRawHTMLCache implements a thread-safe LRU cache for raw HTML payloads,
+// preventing unbounded heap growth during deep or sustained crawls.
+type boundedRawHTMLCache struct {
+	mu       sync.Mutex
+	capacity int
+	items    map[string]*list.Element
+	evict    *list.List
+}
+
+func newBoundedRawHTMLCache(capacity int) *boundedRawHTMLCache {
+	return &boundedRawHTMLCache{
+		capacity: capacity,
+		items:    make(map[string]*list.Element),
+		evict:    list.New(),
+	}
+}
+
+func (c *boundedRawHTMLCache) Load(key string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, found := c.items[key]; found {
+		c.evict.MoveToFront(elem)
+		return elem.Value.(*rawHTMLEntry).value, true
+	}
+	return "", false
+}
+
+func (c *boundedRawHTMLCache) Store(key, value string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, found := c.items[key]; found {
+		c.evict.MoveToFront(elem)
+		elem.Value.(*rawHTMLEntry).value = value
+		return
+	}
+
+	for c.evict.Len() >= c.capacity && c.capacity > 0 {
+		oldest := c.evict.Back()
+		if oldest == nil {
+			break
+		}
+		c.evict.Remove(oldest)
+		delete(c.items, oldest.Value.(*rawHTMLEntry).key)
+	}
+
+	elem := c.evict.PushFront(&rawHTMLEntry{key: key, value: value})
+	c.items[key] = elem
+}
+
+func (c *boundedRawHTMLCache) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.items)
+}
+
+func (c *boundedRawHTMLCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items = make(map[string]*list.Element)
+	c.evict.Init()
+}
+
+var rawHTMLCache = newBoundedRawHTMLCache(maxRawHTMLCacheEntries)
 
 // ScrapeHTMLContent extracts structural text from HTML content directly.
 func ScrapeHTMLContent(htmlContent string, targetURL string, finalURL string, format string, startTime time.Time) models.ScrapeResult {
@@ -332,7 +404,7 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 			populateScrapeMetadata(&cached)
 			cachedRaw := ""
 			if val, ok := rawHTMLCache.Load(targetURL); ok {
-				cachedRaw = val.(string)
+				cachedRaw = val
 			}
 			return cached, cachedRaw
 		}
