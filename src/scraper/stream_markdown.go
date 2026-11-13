@@ -476,13 +476,13 @@ func (sm *MarkdownStateMachine) handleText(raw []byte) error {
 		return sm.writeRaw(string(raw))
 	}
 
-	if sm.inCell {
-		sm.currentCell.Write(raw)
+	if sm.inLink {
+		sm.linkText.Write(raw)
 		return nil
 	}
 
-	if sm.inLink {
-		sm.linkText.Write(raw)
+	if sm.inCell {
+		sm.currentCell.Write(raw)
 		return nil
 	}
 
