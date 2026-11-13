@@ -288,6 +288,30 @@ func TestStreamMarkdownMustFixEdgeCases(t *testing.T) {
 	}
 }
 
+func TestStreamMarkdown_HyperlinkInsideTableCell(t *testing.T) {
+	htmlInput := `<table>
+		<thead>
+			<tr><th>Resource</th><th>Link</th></tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>Documentation</td>
+				<td>Check <a href="https://example.com/docs">here</a> for details</td>
+			</tr>
+		</tbody>
+	</table>`
+
+	md, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedCell := "| Check [here](https://example.com/docs) for details |"
+	if !strings.Contains(md, expectedCell) {
+		t.Errorf("expected markdown table to contain %q, got:\n%s", expectedCell, md)
+	}
+}
+
 func BenchmarkStreamMarkdown(b *testing.B) {
 	htmlInput := `
 		<div class="article">

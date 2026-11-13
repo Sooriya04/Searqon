@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -462,7 +463,7 @@ func (s *Server) handleSearchContext(ctx context.Context, args map[string]interf
 			if scrape && r.Markdown != "" {
 				preview := r.Markdown
 				if len(preview) > 1500 {
-					preview = preview[:1500] + "\n...[truncated for search summary]..."
+					preview = truncateUTF8Safe(preview, 1500) + "\n...[truncated for search summary]..."
 				}
 				sb.WriteString(fmt.Sprintf("\n<scraped_content>\n%s\n</scraped_content>\n", preview))
 			}
@@ -556,7 +557,7 @@ func (s *Server) handleScrapeContext(ctx context.Context, args map[string]interf
 		charLimit := maxTokens * 4
 		truncatedNote := ""
 		if len(content) > charLimit {
-			content = content[:charLimit]
+			content = truncateUTF8Safe(content, charLimit)
 			truncatedNote = fmt.Sprintf("\n\n> [!NOTE]\n> Content truncated at %d tokens (%d characters) to protect your context window. To fetch deeper, use targeted CSS selectors or increase max_tokens.", maxTokens, charLimit)
 		}
 
@@ -698,7 +699,7 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 			// Token budget clamp
 			charLimit := maxTokensPerSource * 4
 			if len(body) > charLimit {
-				body = body[:charLimit] + "\n...[truncated for token budget]..."
+				body = truncateUTF8Safe(body, charLimit) + "\n...[truncated for token budget]..."
 			}
 
 			docsChan <- researchDoc{
@@ -974,4 +975,18 @@ func (s *Server) SSEHandler() http.HandlerFunc {
 			}
 		}
 	}
+}
+
+// truncateUTF8Safe trims s to at most maxBytes, stepping backwards to avoid splitting multi-byte UTF-8 runes.
+func truncateUTF8Safe(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	if maxBytes <= 0 {
+		return ""
+	}
+	for maxBytes > 0 && !utf8.RuneStart(s[maxBytes]) {
+		maxBytes--
+	}
+	return s[:maxBytes]
 }

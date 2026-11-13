@@ -140,7 +140,6 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 	}
 
 	jobs := make(chan crawlTask, limit*10)
-	discoveredLinksChan := make(chan []crawlTask, limit*10)
 
 	var mu sync.Mutex
 	var pages []models.ScrapeResult
@@ -150,12 +149,26 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 	var pendingTasks int32 = 1
 	var wg sync.WaitGroup
 
+	crawlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
 	numWorkers := 5
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for task := range jobs {
+			for {
+				var task crawlTask
+				select {
+				case <-crawlCtx.Done():
+					return
+				case t, ok := <-jobs:
+					if !ok {
+						return
+					}
+					task = t
+				}
+
 				atomic.AddInt32(&activeWorkers, 1)
 
 				scraped, htmlContent := scraper.ScrapeSingleURLNative(task.url, format, false)
@@ -213,56 +226,45 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 				}
 
 				if len(newLinks) > 0 {
-					select {
-					case discoveredLinksChan <- newLinks:
-					default:
+					var toSchedule []crawlTask
+					mu.Lock()
+					for _, link := range newLinks {
+						if !visited[link.url] && len(visited) < limit {
+							visited[link.url] = true
+							toSchedule = append(toSchedule, link)
+						}
+					}
+					mu.Unlock()
+
+					if len(toSchedule) > 0 {
+						atomic.AddInt32(&pendingTasks, int32(len(toSchedule)))
+						for _, item := range toSchedule {
+							select {
+							case jobs <- item:
+							case <-crawlCtx.Done():
+								atomic.AddInt32(&pendingTasks, -1)
+							}
+						}
 					}
 				}
 
 				atomic.AddInt32(&activeWorkers, -1)
-				atomic.AddInt32(&pendingTasks, -1)
+				if atomic.AddInt32(&pendingTasks, -1) == 0 {
+					// All pending tasks finished and no more tasks remain
+					close(jobs)
+				}
 			}
 		}()
 	}
 
 	jobs <- crawlTask{url: targetURL, depth: 0}
 
-	crawlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	for atomic.LoadInt32(&pendingTasks) > 0 {
-		select {
-		case <-crawlCtx.Done():
-			result.Error = "crawl timeout exceeded"
-			atomic.StoreInt32(&pendingTasks, 0)
-			break
-		case newLinks := <-discoveredLinksChan:
-			var addedCount int32
-			mu.Lock()
-			for _, link := range newLinks {
-				if !visited[link.url] && len(visited) < limit {
-					visited[link.url] = true
-					addedCount++
-					select {
-					case jobs <- link:
-					case <-crawlCtx.Done():
-						break
-					}
-				}
-			}
-			mu.Unlock()
-			if addedCount > 0 {
-				atomic.AddInt32(&pendingTasks, addedCount)
-			}
-		case <-time.After(20 * time.Millisecond):
-		}
-	}
-
-	close(jobs)
 	wg.Wait()
 
-	close(discoveredLinksChan)
-	for range discoveredLinksChan {
+	if err := crawlCtx.Err(); err != nil && ctx.Err() != nil {
+		result.Error = ctx.Err().Error()
+	} else if err := crawlCtx.Err(); err != nil && len(pages) == 0 {
+		result.Error = "crawl timeout exceeded"
 	}
 
 	result.Pages = pages

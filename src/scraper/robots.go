@@ -55,6 +55,15 @@ func startRobotsCleanup() {
 
 var robotsHttpClient = &http.Client{
 	Timeout: 5 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects")
+		}
+		if _, err := ValidateScrapeURL(req.URL.String()); err != nil {
+			return fmt.Errorf("redirect blocked by SSRF protection: %w", err)
+		}
+		return nil
+	},
 }
 
 var agentUserAgents = map[string]string{
@@ -110,6 +119,9 @@ func fetchRobotsData(baseURL *url.URL) *RobotsData {
 	}
 
 	robotsURL := fmt.Sprintf("%s://%s/robots.txt", baseURL.Scheme, host)
+	if _, err := ValidateScrapeURL(robotsURL); err != nil {
+		return &RobotsData{Rules: make(map[string]*AgentRules)}
+	}
 	data := &RobotsData{
 		Rules: make(map[string]*AgentRules),
 	}

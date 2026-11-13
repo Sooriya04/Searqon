@@ -313,3 +313,58 @@ func TestMCPProgressNotifications(t *testing.T) {
 		}
 	}
 }
+
+func TestTruncateUTF8Safe(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxBytes int
+		expected string
+	}{
+		{
+			name:     "ASCII within limit",
+			input:    "hello world",
+			maxBytes: 20,
+			expected: "hello world",
+		},
+		{
+			name:     "ASCII exact boundary",
+			input:    "hello world",
+			maxBytes: 5,
+			expected: "hello",
+		},
+		{
+			name:     "Zero or negative maxBytes",
+			input:    "hello world",
+			maxBytes: 0,
+			expected: "",
+		},
+		{
+			name:     "3-byte UTF-8 character split cleanly",
+			input:    "Searqon 世界", // "Searqon " = 8 bytes, 世 = 3 bytes (bytes 8,9,10), 界 = 3 bytes (bytes 11,12,13)
+			maxBytes: 9,          // lands in middle of 世
+			expected: "Searqon ", // should step back to byte 8
+		},
+		{
+			name:     "3-byte UTF-8 character exact boundary",
+			input:    "Searqon 世界",
+			maxBytes: 11, // exactly captures "Searqon 世"
+			expected: "Searqon 世",
+		},
+		{
+			name:     "4-byte UTF-8 emoji split safely",
+			input:    "Searqon 🚀 engine", // 🚀 is 4 bytes
+			maxBytes: 10,             // 8 + 2 bytes into 🚀
+			expected: "Searqon ",     // steps back to exclude corrupted emoji prefix
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := truncateUTF8Safe(tc.input, tc.maxBytes)
+			if actual != tc.expected {
+				t.Errorf("truncateUTF8Safe(%q, %d) = %q; want %q", tc.input, tc.maxBytes, actual, tc.expected)
+			}
+		})
+	}
+}
