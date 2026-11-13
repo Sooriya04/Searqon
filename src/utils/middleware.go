@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -60,26 +61,40 @@ func getClientLimiter(ip string) *rate.Limiter {
 	return actual.(clientLimiterEntry).limiter
 }
 
-// GetClientIP extracts the real client IP address from reverse proxy headers (X-Forwarded-For, X-Real-IP)
-// or falls back to RemoteAddr.
+// GetClientIP extracts the real client IP address.
+// If the direct remote client IP is a trusted proxy (e.g. loopback, private network, or configured TRUSTED_PROXIES),
+// it inspects X-Forwarded-For or X-Real-IP.
+// If the direct remote IP is untrusted (e.g. direct public internet client), proxy headers are ignored to prevent rate limit bypass spoofing.
 func GetClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		for _, part := range parts {
-			ip := strings.TrimSpace(part)
-			if parsed := net.ParseIP(ip); parsed != nil {
-				return ip
+	remoteIP := extractRemoteIP(r.RemoteAddr)
+
+	if remoteIP != "" && isTrustedProxy(remoteIP) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			for _, part := range parts {
+				ip := strings.TrimSpace(part)
+				if parsed := net.ParseIP(ip); parsed != nil {
+					return ip
+				}
+			}
+		}
+
+		if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
+			if parsed := net.ParseIP(xrip); parsed != nil {
+				return xrip
 			}
 		}
 	}
 
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
-		if parsed := net.ParseIP(xrip); parsed != nil {
-			return xrip
-		}
+	if remoteIP != "" {
+		return remoteIP
 	}
 
-	rawRemote := strings.TrimSpace(r.RemoteAddr)
+	return "127.0.0.1"
+}
+
+func extractRemoteIP(rawRemote string) string {
+	rawRemote = strings.TrimSpace(rawRemote)
 	if ip, _, err := net.SplitHostPort(rawRemote); err == nil {
 		if parsed := net.ParseIP(ip); parsed != nil {
 			return ip
@@ -91,8 +106,45 @@ func GetClientIP(r *http.Request) string {
 			return cleanRemote
 		}
 	}
+	return ""
+}
 
-	return "127.0.0.1"
+func isTrustedProxy(ipStr string) bool {
+	parsed := net.ParseIP(ipStr)
+	if parsed == nil {
+		return false
+	}
+
+	// 1. Check explicit TRUSTED_PROXIES env var if configured
+	if env := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES")); env != "" {
+		if env == "*" {
+			return true
+		}
+		for _, item := range strings.Split(env, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			if _, cidr, err := net.ParseCIDR(item); err == nil {
+				if cidr.Contains(parsed) {
+					return true
+				}
+			} else if targetIP := net.ParseIP(item); targetIP != nil {
+				if targetIP.Equal(parsed) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// 2. Check if proxy trusting is explicitly disabled
+	if trustEnv := strings.ToLower(strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS"))); trustEnv == "false" || trustEnv == "0" {
+		return false
+	}
+
+	// 3. By default, trust loopback and private network proxies (Docker, Nginx, K8s internal IPs)
+	return parsed.IsLoopback() || parsed.IsPrivate()
 }
 
 // InboundRateLimitMiddleware protects Searqon from client API rate limit abuse.

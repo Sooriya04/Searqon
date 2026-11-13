@@ -61,6 +61,18 @@ func TestGetClientIP(t *testing.T) {
 			headers:    nil,
 			expectedIP: "2001:db8::1",
 		},
+		{
+			name:       "Untrusted public client spoofed X-Forwarded-For rejected",
+			remoteAddr: "203.0.113.195:45821",
+			headers:    map[string]string{"X-Forwarded-For": "1.2.3.4"},
+			expectedIP: "203.0.113.195",
+		},
+		{
+			name:       "Untrusted public client spoofed X-Real-IP rejected",
+			remoteAddr: "198.51.100.22:12345",
+			headers:    map[string]string{"X-Real-IP": "10.0.0.99"},
+			expectedIP: "198.51.100.22",
+		},
 	}
 
 	for _, tt := range tests {
@@ -105,5 +117,42 @@ func TestMiddleware_PreservesFlusher(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200 OK, got %d", rec.Code)
+	}
+}
+
+func TestGetClientIP_TrustedProxiesConfig(t *testing.T) {
+	t.Setenv("TRUSTED_PROXIES", "198.51.100.200/32")
+
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+	req.RemoteAddr = "198.51.100.200:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.77")
+
+	ip := GetClientIP(req)
+	if ip != "203.0.113.77" {
+		t.Errorf("expected 203.0.113.77 from explicitly trusted proxy, got %s", ip)
+	}
+
+	// Untrusted proxy should still be rejected
+	req2 := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+	req2.RemoteAddr = "198.51.100.201:12345"
+	req2.Header.Set("X-Forwarded-For", "203.0.113.77")
+
+	ip2 := GetClientIP(req2)
+	if ip2 != "198.51.100.201" {
+		t.Errorf("expected 198.51.100.201 from untrusted proxy, got %s", ip2)
+	}
+}
+
+func TestGetClientIP_DisabledProxyTrust(t *testing.T) {
+	t.Setenv("TRUST_PROXY_HEADERS", "false")
+
+	// Even private IP should not have headers trusted when disabled
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+	req.RemoteAddr = "172.18.0.1:51234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.42")
+
+	ip := GetClientIP(req)
+	if ip != "172.18.0.1" {
+		t.Errorf("expected 172.18.0.1 when proxy headers disabled, got %s", ip)
 	}
 }
