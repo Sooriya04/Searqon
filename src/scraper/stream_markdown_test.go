@@ -312,6 +312,47 @@ func TestStreamMarkdown_HyperlinkInsideTableCell(t *testing.T) {
 	}
 }
 
+func TestStreamMarkdown_ImageAttributesOrder(t *testing.T) {
+	tests := []struct {
+		name     string
+		html     string
+		expected string
+	}{
+		{
+			name:     "Alt before src",
+			html:     `<img alt="foo" src="bar.png">`,
+			expected: `![foo](bar.png)`,
+		},
+		{
+			name:     "Src before alt",
+			html:     `<img src="bar.png" alt="foo">`,
+			expected: `![foo](bar.png)`,
+		},
+		{
+			name:     "Multiple attributes with alt first",
+			html:     `<img alt="logo" class="header-img" src="https://example.com/logo.svg" width="100">`,
+			expected: `![logo](https://example.com/logo.svg)`,
+		},
+		{
+			name:     "Image without alt uses default image alt",
+			html:     `<img src="test.jpg">`,
+			expected: `![image](test.jpg)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			md, _, err := ConvertHTMLToMarkdownStream(strings.NewReader(tt.html), "", 0)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(md, tt.expected) {
+				t.Errorf("expected markdown to contain %q, got %q", tt.expected, md)
+			}
+		})
+	}
+}
+
 func BenchmarkStreamMarkdown(b *testing.B) {
 	htmlInput := `
 		<div class="article">

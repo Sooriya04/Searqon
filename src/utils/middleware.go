@@ -2,7 +2,6 @@ package utils
 
 import (
 	"compress/gzip"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -167,16 +166,65 @@ func InboundRateLimitMiddleware(next http.Handler) http.Handler {
 
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	Writer io.Writer
+	gz          *gzip.Writer
+	status      int
+	wroteHeader bool
+	headerSent  bool
+}
+
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	if g.wroteHeader {
+		return
+	}
+	g.status = code
+	g.wroteHeader = true
+	if !canCompressStatus(code) {
+		g.ResponseWriter.WriteHeader(code)
+		g.headerSent = true
+	}
 }
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-	return g.Writer.Write(b)
+	if len(b) == 0 {
+		return 0, nil
+	}
+	if !g.wroteHeader {
+		g.status = http.StatusOK
+		g.wroteHeader = true
+	}
+	if !canCompressStatus(g.status) {
+		if !g.headerSent {
+			g.ResponseWriter.WriteHeader(g.status)
+			g.headerSent = true
+		}
+		return g.ResponseWriter.Write(b)
+	}
+
+	if g.gz == nil {
+		if g.ResponseWriter.Header().Get("Content-Encoding") != "" {
+			if !g.headerSent {
+				g.ResponseWriter.WriteHeader(g.status)
+				g.headerSent = true
+			}
+			return g.ResponseWriter.Write(b)
+		}
+		g.ResponseWriter.Header().Del("Content-Length")
+		g.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+		if !g.headerSent {
+			g.ResponseWriter.WriteHeader(g.status)
+			g.headerSent = true
+		}
+		g.gz = gzip.NewWriter(g.ResponseWriter)
+	}
+	return g.gz.Write(b)
 }
 
 func (g *gzipResponseWriter) Flush() {
-	if gz, ok := g.Writer.(*gzip.Writer); ok {
-		_ = gz.Flush()
+	if g.gz != nil {
+		_ = g.gz.Flush()
+	} else if !g.headerSent && g.wroteHeader {
+		g.ResponseWriter.WriteHeader(g.status)
+		g.headerSent = true
 	}
 	if f, ok := g.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
@@ -187,7 +235,14 @@ func (g *gzipResponseWriter) Unwrap() http.ResponseWriter {
 	return g.ResponseWriter
 }
 
-// GzipCompressionMiddleware automatically compresses JSON HTTP responses when client sends Accept-Encoding: gzip.
+func canCompressStatus(status int) bool {
+	if status == http.StatusNoContent || status == http.StatusNotModified || (status >= 100 && status < 200) {
+		return false
+	}
+	return true
+}
+
+// GzipCompressionMiddleware automatically compresses HTTP responses when client sends Accept-Encoding: gzip.
 func GzipCompressionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") ||
@@ -197,10 +252,17 @@ func GzipCompressionMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		defer gz.Close()
-		gzw := &gzipResponseWriter{ResponseWriter: w, Writer: gz}
+
+		gzw := &gzipResponseWriter{ResponseWriter: w}
+		defer func() {
+			if gzw.gz != nil {
+				_ = gzw.gz.Close()
+			} else if !gzw.headerSent && gzw.wroteHeader {
+				gzw.ResponseWriter.WriteHeader(gzw.status)
+				gzw.headerSent = true
+			}
+		}()
+
 		next.ServeHTTP(gzw, r)
 	})
 }

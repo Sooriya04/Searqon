@@ -257,7 +257,8 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 			return sm.writeRaw("`")
 		}
 		if !sm.preFenceWritten {
-			class := extractAttr(z, hasAttr, "class")
+			attrs := extractAttrs(z, hasAttr)
+			class := attrs["class"]
 			lang := extractCodeLanguage(class)
 			sm.preFenceWritten = true
 			return sm.writeRaw("```" + lang + "\n")
@@ -315,7 +316,8 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 		if sm.inLink {
 			_ = sm.handleEndTag("a")
 		}
-		href := extractAttr(z, hasAttr, "href")
+		attrs := extractAttrs(z, hasAttr)
+		href := attrs["href"]
 		if href != "" && !strings.HasPrefix(href, "javascript:") {
 			sm.inLink = true
 			sm.linkHref = sm.resolveURL(href)
@@ -323,8 +325,9 @@ func (sm *MarkdownStateMachine) handleStartTag(tag string, hasAttr bool, z *html
 		}
 
 	case "img":
-		src := extractAttr(z, hasAttr, "src")
-		alt := extractAttr(z, hasAttr, "alt")
+		attrs := extractAttrs(z, hasAttr)
+		src := attrs["src"]
+		alt := attrs["alt"]
 		if src != "" {
 			if alt == "" {
 				alt = "image"
@@ -546,20 +549,24 @@ func (sm *MarkdownStateMachine) writeRaw(s string) error {
 	return err
 }
 
-func extractAttr(z *html.Tokenizer, hasAttr bool, targetKey string) string {
+func extractAttrs(z *html.Tokenizer, hasAttr bool) map[string]string {
 	if !hasAttr {
-		return ""
+		return nil
 	}
+	attrs := make(map[string]string)
 	for {
 		key, val, more := z.TagAttr()
-		if string(key) == targetKey {
-			return string(val)
-		}
+		attrs[strings.ToLower(string(key))] = string(val)
 		if !more {
 			break
 		}
 	}
-	return ""
+	return attrs
+}
+
+func extractAttr(z *html.Tokenizer, hasAttr bool, targetKey string) string {
+	attrs := extractAttrs(z, hasAttr)
+	return attrs[strings.ToLower(targetKey)]
 }
 
 func extractCodeLanguage(class string) string {

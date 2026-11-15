@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -155,4 +157,129 @@ func TestGetClientIP_DisabledProxyTrust(t *testing.T) {
 	if ip != "172.18.0.1" {
 		t.Errorf("expected 172.18.0.1 when proxy headers disabled, got %s", ip)
 	}
+}
+
+func TestGzipCompressionMiddleware_Scenarios(t *testing.T) {
+	t.Run("Compresses response with body", func(t *testing.T) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":"hello compressed world"}`))
+		})
+		ts := GzipCompressionMiddleware(handler)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/data", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+
+		ts.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", rec.Code)
+		}
+		if enc := rec.Header().Get("Content-Encoding"); enc != "gzip" {
+			t.Errorf("expected Content-Encoding=gzip, got %q", enc)
+		}
+
+		gzReader, err := gzip.NewReader(rec.Body)
+		if err != nil {
+			t.Fatalf("failed to create gzip reader: %v", err)
+		}
+		defer gzReader.Close()
+		decompressed, err := io.ReadAll(gzReader)
+		if err != nil {
+			t.Fatalf("failed to read gzipped body: %v", err)
+		}
+		if string(decompressed) != `{"message":"hello compressed world"}` {
+			t.Errorf("unexpected decompressed body: %s", string(decompressed))
+		}
+	})
+
+	t.Run("Does not compress 204 No Content", func(t *testing.T) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+		ts := GzipCompressionMiddleware(handler)
+
+		req := httptest.NewRequest(http.MethodDelete, "/api/item/1", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+
+		ts.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected 204 No Content, got %d", rec.Code)
+		}
+		if enc := rec.Header().Get("Content-Encoding"); enc != "" {
+			t.Errorf("expected empty Content-Encoding for 204, got %q", enc)
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("expected 0-length body for 204, got %d bytes", rec.Body.Len())
+		}
+	})
+
+	t.Run("Does not compress 304 Not Modified", func(t *testing.T) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotModified)
+		})
+		ts := GzipCompressionMiddleware(handler)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/resource", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+
+		ts.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotModified {
+			t.Fatalf("expected 304 Not Modified, got %d", rec.Code)
+		}
+		if enc := rec.Header().Get("Content-Encoding"); enc != "" {
+			t.Errorf("expected empty Content-Encoding for 304, got %q", enc)
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("expected 0-length body for 304, got %d bytes", rec.Body.Len())
+		}
+	})
+
+	t.Run("Does not compress empty body with 200 OK", func(t *testing.T) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		ts := GzipCompressionMiddleware(handler)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/empty", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+
+		ts.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", rec.Code)
+		}
+		if enc := rec.Header().Get("Content-Encoding"); enc != "" {
+			t.Errorf("expected empty Content-Encoding for empty body 200, got %q", enc)
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("expected 0-length body, got %d bytes", rec.Body.Len())
+		}
+	})
+
+	t.Run("Does not compress zero-byte write", func(t *testing.T) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte{})
+		})
+		ts := GzipCompressionMiddleware(handler)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/zerobyte", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+
+		ts.ServeHTTP(rec, req)
+
+		if enc := rec.Header().Get("Content-Encoding"); enc != "" {
+			t.Errorf("expected empty Content-Encoding for zero-byte write, got %q", enc)
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("expected 0-length body, got %d bytes", rec.Body.Len())
+		}
+	})
 }
