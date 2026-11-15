@@ -115,3 +115,40 @@ func TestCrawlSite(t *testing.T) {
 		t.Errorf("Expected 3 crawled pages from cache, got %d", resCached.Total)
 	}
 }
+
+func TestCrawlSite_RelativeLinkResolution(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+
+		switch r.URL.Path {
+		case "/":
+			fmt.Fprint(w, `<html><body><h1>Home</h1><a href="/docs/intro">Docs</a></body></html>`)
+		case "/docs/intro":
+			// Relative link without leading slash should resolve against /docs/intro -> /docs/chapter1
+			fmt.Fprint(w, `<html><body><h1>Docs Intro</h1><a href="chapter1">Chapter 1</a></body></html>`)
+		case "/docs/chapter1":
+			fmt.Fprint(w, `<html><body><h1>Chapter 1</h1>Content here</body></html>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	res := CrawlSite(ts.URL, 5, 2, "markdown", nil)
+	if res.Error != "" {
+		t.Fatalf("CrawlSite failed: %s", res.Error)
+	}
+
+	foundChapter := false
+	for _, page := range res.Pages {
+		if strings.HasSuffix(page.URL, "/docs/chapter1") {
+			foundChapter = true
+			break
+		}
+	}
+	if !foundChapter {
+		t.Errorf("Expected crawler to resolve relative link 'chapter1' against parent '/docs/intro' to '/docs/chapter1'")
+	}
+}
+

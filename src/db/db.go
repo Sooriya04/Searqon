@@ -102,6 +102,7 @@ func initSQLite(dbPath string) {
 	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
 	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
 	_, _ = db.Exec("PRAGMA busy_timeout=5000;")
+	db.SetMaxOpenConns(1)
 
 	dbMu.Lock()
 	sqliteDB = db
