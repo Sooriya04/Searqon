@@ -248,6 +248,67 @@ func TestMCPUnknownMethod(t *testing.T) {
 	if resp.Error == nil || !strings.Contains(resp.Error.Message, "Method not found") {
 		t.Errorf("Expected method not found error, got: %+v", resp.Error)
 	}
+	if resp.Error.Code != -32601 {
+		t.Errorf("Expected RPC error code -32601, got %d", resp.Error.Code)
+	}
+}
+
+func TestMCPNotificationsProduceNoResponse(t *testing.T) {
+	server := NewServer()
+
+	notifications := []struct {
+		name string
+		json string
+	}{
+		{
+			name: "notifications/cancelled",
+			json: `{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}}`,
+		},
+		{
+			name: "notifications/initialized",
+			json: `{"jsonrpc":"2.0","method":"notifications/initialized"}`,
+		},
+		{
+			name: "$/cancelRequest",
+			json: `{"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":2}}`,
+		},
+		{
+			name: "arbitrary unknown notification",
+			json: `{"jsonrpc":"2.0","method":"custom/notify","params":{"foo":"bar"}}`,
+		},
+	}
+
+	for _, tt := range notifications {
+		t.Run(tt.name, func(t *testing.T) {
+			respBytes, err := server.HandleMessage([]byte(tt.json))
+			if err != nil {
+				t.Fatalf("HandleMessage returned unexpected error for notification: %v", err)
+			}
+			if len(respBytes) != 0 {
+				t.Errorf("JSON-RPC 2.0 violation: server replied to notification %s with %s", tt.name, string(respBytes))
+			}
+		})
+	}
+
+	// Verify request WITH ID produces Method not found (-32601)
+	reqWithID := `{"jsonrpc":"2.0","id":42,"method":"custom/unknownMethod"}`
+	respBytes, err := server.HandleMessage([]byte(reqWithID))
+	if err != nil {
+		t.Fatalf("HandleMessage failed: %v", err)
+	}
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if resp.Error == nil {
+		t.Fatalf("Expected error response for request with ID, got none")
+	}
+	if resp.Error.Code != -32601 {
+		t.Errorf("Expected error code -32601 (Method not found), got %d", resp.Error.Code)
+	}
+	if !strings.Contains(resp.Error.Message, "Method not found") {
+		t.Errorf("Expected 'Method not found' in message, got: %s", resp.Error.Message)
+	}
 }
 
 func TestMCPProgressNotifications(t *testing.T) {
