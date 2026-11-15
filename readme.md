@@ -2,7 +2,7 @@
 
 [![Docker Hub](https://img.shields.io/docker/v/sooriya04/searqon?label=Docker%20Hub&color=2496ed)](https://hub.docker.com/r/sooriya04/searqon)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fsooriya04%2Fsearqon-24292e?logo=github)](https://github.com/Sooriya04/Searqon/pkgs/container/searqon)
-[![Version](https://img.shields.io/badge/version-v1.2.0-blue)](https://github.com/Sooriya04/Searqon/releases)
+[![Version](https://img.shields.io/badge/version-v1.2.1-blue)](https://github.com/Sooriya04/Searqon/releases)
 [![UTCP Spec](https://img.shields.io/badge/UTCP-v1.0.1%2B-blueviolet)](https://github.com/universal-tool-calling-protocol)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -16,7 +16,7 @@ Think of it as a transparent alternative to services like Tavily or Firecrawl �
 
 ## 🤖 MCP (Model Context Protocol) — Use Searqon in Claude Desktop, Cursor & Windsurf
 
-Searqon `v1.2.0` ships with a **native Go MCP server**, making it the simplest way to give any AI agent access to real-time web search and sophisticated anti-bot scraping.
+Searqon `v1.2.1` ships with a **native Go MCP server**, making it the simplest way to give any AI agent access to real-time web search and sophisticated anti-bot scraping.
 
 ### Claude Desktop / Cursor Configuration
 ```json
@@ -99,7 +99,7 @@ Complete documentation is available in the [`docs/`](./docs/index.md) directory:
 
 ## ⚡ Key Features
 
-- **Native MCP Server (v1.2.0):** Run as `docker run -i ... mcp` for instant Claude Desktop / Cursor integration. Also exposes HTTP SSE at `/mcp` and `/mcp/sse`.
+- **Native MCP Server (v1.2.1):** Run as `docker run -i ... mcp` for instant Claude Desktop / Cursor integration. Also exposes HTTP SSE at `/mcp` and `/mcp/sse`.
 - **4-Tier Anti-Bot Escalation:** Fast HTTP → Spoofed Chrome/TLS Fingerprint → Camoufox/Lightpanda Headless → Rotating Residential Proxy. Bypasses Cloudflare, DataDome, and PerimeterX.
 - **SearXNG Meta-Search:** Aggregates SearXNG, DuckDuckGo, Arxiv, and Wikipedia with reciprocal rank fusion and deduplication.
 - **Context Window Protection:** Token budget (`max_tokens`) clamps scraped Markdown to safe sizes for LLMs.

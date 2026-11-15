@@ -298,7 +298,7 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 			},
 			"serverInfo": map[string]interface{}{
 				"name":    "searqon",
-				"version": "1.2.0",
+				"version": "1.2.1",
 			},
 		}
 

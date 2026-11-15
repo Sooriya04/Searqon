@@ -3,7 +3,7 @@
   "info": {
     "title": "Searqon API",
     "description": "Unified Search and Scrape Web Intelligence Engine",
-    "version": "1.2.0"
+    "version": "1.2.1"
   },
   "paths": {
     "/search": {

@@ -1,83 +1,145 @@
 # Searqon Codebase Audit Report
 
-**Date:** 2026-11-01  
+**Date:** 2026-11-13  
+**Auditor:** Barbara Vane (Barb)  
 **Project:** Searqon (`Searqon/src`)  
-**Scope:** Architecture, Anti-Bot Scraper, Crawler, Database & Caching, Concurrency, and MCP Endpoints  
-**Assumed Load:** Continuous production multi-user service handling concurrent agent requests, background crawl tasks, and high-volume SSE streaming.
+**Scope:** Full repository audit (HTTP middleware, Scraper pipeline, Crawler, Stream Markdown converter, MCP server, Search engine, Database/SQLite connection pooling)  
+**Assumed Load:** Multi-user production deployment serving simultaneous AI agent research tasks, concurrent recursive site crawling (dozens of pages at depth 2–3), and high-throughput anti-bot scraping over HTTP and SSE streams.
 
 ---
 
 ## Executive Summary
 
-Searqon is a web search aggregation and scraping engine built with Go, offering REST, SSE, and Model Context Protocol (MCP) APIs. The core architecture is modular and performs well in unit tests. However, an in-depth audit identified critical resource leaks (unbounded in-memory maps), a functional bug in cached content extraction, and hardcoded TLS verification bypass.
+Searqon is a self-hosted web intelligence and search engine built in Go. While core unit tests pass cleanly and the architecture is thoughtfully partitioned into modular packages, an in-depth code audit revealed critical production vulnerabilities:
+1. **Security:** Server-Side Request Forgery (SSRF) bypasses via unchecked HTTP redirects and unvalidated robots.txt fetches.
+2. **Concurrency:** A race condition between workers and coordinator causing site crawls to abort prematurely after only 1 page, and a data race on search results during scrape timeouts.
+3. **Resource Leakage:** An unbounded in-memory map storing multi-megabyte raw HTML strings with zero TTL or eviction.
+4. **Data Integrity:** Streaming Markdown converter dropping all hyperlinks inside HTML table cells, and slicing UTF-8 strings at byte boundaries corrupting runes in MCP responses.
 
 ---
 
-## Findings
+## Implementation Execution Strategy (Batched Fix & Push Protocol)
+
+To maintain a clean git history, keep diffs minimal and verified, and eliminate risk of regression, **do not attempt to fix all issues in a monolithic commit**. 
+
+Execute the fixes in strictly ordered batches: **2 bugs at a time with tests and pushes, ending with the final 3 bugs**:
+
+* **Batch 1 (Critical Security & Crawler Race):** Fix **Bug 1** & **Bug 2** -> Run `go test ./...` -> Commit & push.
+* **Batch 2 (Memory Leak & Search Data Race):** Fix **Bug 3** & **Bug 4** -> Run `go test ./...` -> Commit & push.
+* **Batch 3 (Data Loss & Byte Slicing):** Fix **Bug 5** & **Bug 6** -> Run `go test ./...` -> Commit & push.
+* **Batch 4 (Rate Limit Bypass & Cookie Contention):** Fix **Bug 7** & **Bug 8** -> Run `go test ./...` -> Commit & push.
+* **Batch 5 (SQLite Lock & Relative Path Resolution):** Fix **Bug 9** & **Bug 10** -> Run `go test ./...` -> Commit & push.
+* **Batch 6 (Last 3 Bugs: Tag Attributes, Gzip Header, MCP Protocol):** Fix **Bug 11**, **Bug 12** & **Bug 13** -> Run full test suite & race detector (`go test -race ./...`) -> Final commit & push.
+
+---
+
+## Detailed Audit Findings
 
 ### Must Fix
 
-#### 1. Unbounded Memory Leak in In-Memory Search & Scrape Caches
-- **Location:** `src/db/db.go` (L41–42), `src/db/db_scrape.go` (L139–142), `src/db/db_search.go` (L90–93)
-- **What this is:** `searchMemoryCache` and `scrapeMemoryCache` are global `sync.Map` instances storing scrape bodies and search results in memory alongside SQLite/PostgreSQL.
-- **Problem:** `StartCacheCleanupWorker` purges expired rows from SQLite/PostgreSQL, but it never deletes keys from `searchMemoryCache` or `scrapeMemoryCache`. Under continuous load or large web crawls, memory consumption grows monotonically until an Out-Of-Memory (OOM) crash occurs.
-- **Fix:** In `runCleanup()`, iterate over `searchMemoryCache` and `scrapeMemoryCache` and call `Delete()` for expired items, or replace with an LRU / TTL-bounded cache.
-- **If skipped:** Long-running server instances will run out of RAM and crash after heavy crawling sessions.
+#### 1. SSRF Bypass via HTTP Redirects and Unvalidated robots.txt Fetches
+- **Location:** `src/scraper/scraper_http.go:L48-53`, `src/scraper/escalation.go:L58-63`, `src/scraper/robots.go:L120-125`, `src/crawler/crawler.go:L43`
+- **What this is:** `ValidateScrapeURL` blocks private/loopback/cloud metadata IP ranges (`169.254.169.254`, `127.0.0.1`, `10.0.0.0/8`, etc.) before scraping.
+- **Problem:** When an external target returns an HTTP 301/302 redirect to an internal IP or metadata endpoint, `httpClient.CheckRedirect` follows it unconditionally without re-running SSRF validation. Furthermore, `fetchRobotsData` and `/crawl` / `/map` fetch `robots.txt` directly without any SSRF checks.
+- **Fix:** In `httpClient.CheckRedirect` and `fetchHTTPRaw`, call `ValidateScrapeURL(req.URL.String())` before following any redirect, and validate URLs inside `fetchRobotsData`.
+- **If skipped:** Any external site or agent query can pivot Searqon into an internal network scanner to steal AWS/GCP IAM credentials or attack unauthenticated intranet services.
 
-#### 2. Unbounded Memory Leak in IP & Domain Rate Limiters
-- **Location:** `src/utils/middleware.go` (L17–27), `src/scraper/antibot.go` (L15–25)
-- **What this is:** `clientLimiters` and `domainLimiters` track token-bucket rate limiters per remote client IP and per scraped domain using `sync.Map`.
-- **Problem:** Limiter entries are never evicted. Over days of indexing thousands of unique domains and receiving traffic from diverse client IPs, these maps retain every entry permanently.
-- **Fix:** Store a last-seen timestamp on each limiter entry and periodically purge limiters idle for more than 10–15 minutes.
-- **If skipped:** The process accumulates hundreds of thousands of dormant limiter objects over time, leaking memory.
+#### 2. Crawler Terminates Prematurely Due to Worker-Coordinator Race Condition
+- **Location:** `src/crawler/crawler.go:L216-224`, `src/crawler/crawler.go:L233-259`
+- **What this is:** `CrawlSiteWithContext` spawns 5 parallel workers to crawl a domain up to a requested page limit.
+- **Problem:** When a worker finishes task 0, it pushes discovered links to `discoveredLinksChan` and immediately decrements `pendingTasks` to 0. If the coordinator loop checks `for atomic.LoadInt32(&pendingTasks) > 0` before reading `discoveredLinksChan`, the loop exits immediately and cancels all remaining links after just 1 page.
+- **Fix:** Keep `pendingTasks` updated before pushing links or use a `sync.WaitGroup` to track inflight tasks rather than racing atomic counters against channel sends.
+- **If skipped:** Multi-page recursive site crawls randomly abort after scraping only the single root page.
 
-#### 3. `/extract` Endpoint Fails with HTTP 502 on Cache Hits
-- **Location:** `src/handlers/extract.go` (L46–50), `src/scraper/scraper.go` (L245–252)
-- **What this is:** The `/extract` HTTP endpoint takes a URL and CSS selectors, scrapes the page, and queries the raw HTML using GoQuery.
-- **Problem:** `scraper.ScrapeSingleURL` returns `(models.ScrapeResult, string)`. On a cache hit, `scraper.go` returns `(cached, "")` with an empty raw HTML string. In `ExtractHandler`, the check `if htmlContent == ""` triggers an immediate HTTP 502 Bad Gateway (`"Failed to retrieve page content"`). Any URL already cached cannot be extracted unless `bypass_cache: true` is explicitly passed.
-- **Fix:** In `ExtractHandler`, if `htmlContent == ""` but `result.Scraped` is true, fall back to parsing `result.Content` or reconstruct the HTML doc from the cached body.
-- **If skipped:** Repeated `/extract` calls on existing pages fail with false 502 errors.
+#### 3. Unbounded Raw HTML In-Memory Cache Causes Progressive OOM Leak
+- **Location:** `src/scraper/scraper.go:L32`, `src/scraper/scraper.go:L416`
+- **What this is:** `rawHTMLCache` is a global `sync.Map` intended to cache raw HTML strings for scraped URLs.
+- **Problem:** Every scraped page stores up to 5–8MB of raw HTML strings into `rawHTMLCache` without any TTL, size ceiling, eviction, or deletion logic anywhere in the repository.
+- **Fix:** Delete `rawHTMLCache` and rely on SQLite/Redis (which already have automated expiration workers), or wrap it in a fixed-size LRU cache.
+- **If skipped:** Any sustained crawling or batch scraping workload will leak memory until the process is OOM-killed by the kernel.
 
-#### 4. Insecure TLS Certificate Verification Hardcoded Across All Scraper Requests
-- **Location:** `src/scraper/antibot.go` (L116)
-- **What this is:** `browserTLSConfig()` configures client TLS handshakes for outbound scraper connections.
-- **Problem:** `InsecureSkipVerify: true` is hardcoded across all standard scraper transports. Any attacker on the local network, proxy path, or public Wi-Fi can spoof DNS/TLS certificates and perform Man-in-the-Middle (MitM) content injection against Searqon's crawler and search results.
-- **Fix:** Set `InsecureSkipVerify: false` by default, or only enable it when explicitly permitted by a configuration flag (`insecure_skip_verify: true`) in `config.yml`.
-- **If skipped:** Searqon can ingest altered web responses or credential exploits when routing through untrusted proxies.
+#### 4. Concurrent Data Race on Search Results During Scrape Timeout
+- **Location:** `src/search/search.go:L414-428`, `src/search/search.go:L467-482`
+- **What this is:** `RunSearchPipelineStream` runs concurrent scrapers on discovered search results with a 15-second timeout.
+- **Problem:** If the 15-second timeout fires, the `select` block breaks and the main routine immediately mutates and slices `results` via `DeduplicateResults` and `HybridRankResults`, while late background scraper goroutines are still actively writing to `results[idx]` without holding a shared mutex.
+- **Fix:** Clone the current results slice under `mu.Lock()` before deduplication/ranking, or cleanly cancel workers and wait on `wg.Wait()` before proceeding.
+- **If skipped:** High-latency queries under load trigger Go runtime data races and memory corruption on search result slices.
+
+#### 5. Streaming Markdown Converter Drops Hyperlinks Inside Table Cells
+- **Location:** `src/scraper/stream_markdown.go:L479-487`, `src/scraper/stream_markdown.go:L421-429`
+- **What this is:** The streaming HTML tokenizer converts table cells and markdown links into clean text.
+- **Problem:** When processing `<td><a href="...">text</a></td>`, `handleText` matches `sm.inCell` first and writes text straight into `currentCell`, leaving `sm.linkText` empty. When `</a>` closes, `sm.linkText` is empty, causing the entire link and URL to be discarded.
+- **Fix:** In `handleText`, check `if sm.inLink` before `if sm.inCell` so anchor text is captured and rendered as `[text](url)` inside the cell buffer.
+- **If skipped:** Scraped HTML tables (pricing sheets, documentation index tables, benchmarks) lose all hyperlinks and URLs.
+
+#### 6. Multi-Byte UTF-8 String Truncation Corrupts Characters in MCP Tool Responses
+- **Location:** `src/mcp/server.go:L559`, `src/mcp/server.go:L701`
+- **What this is:** `searqon_scrape` and `searqon_research` truncate long output to `maxTokens * 4` characters to protect LLM context windows.
+- **Problem:** The code slices Go strings at raw byte offsets (`content[:charLimit]`). If `charLimit` lands in the middle of a multi-byte UTF-8 rune (emojis, curly quotes, dashes, or non-Latin scripts), it produces malformed UTF-8 byte sequences.
+- **Fix:** Reuse `truncateUTF8Safe` from `stream_markdown.go` or step backwards to valid rune boundaries before slicing.
+- **If skipped:** LLMs receive corrupted replacement characters (`\ufffd`) or fail with JSON-RPC unmarshaling errors.
 
 ---
 
 ### Should Fix
 
-#### 5. Crawler Worker Goroutine Leak and Premature Completion Race
-- **Location:** `src/crawler/crawler.go` (L132–198)
-- **What this is:** `CrawlSite` spawns 5 worker goroutines reading from `jobs`, while the coordinator monitors `pendingTasks` and breaks when `pendingTasks <= 0`.
-- **Problem:** If a slow worker is actively fetching a page while no other pending jobs are enqueued, the coordinator loop times out after 20ms of channel inactivity, decrements `pendingTasks`, reaches 0, and calls `close(jobs)`. The active worker can attempt to write to `discoveredLinksChan` after `CrawlSite` exits, and the workers are never tracked with a `sync.WaitGroup`.
-- **Fix:** Use a `sync.WaitGroup` to coordinate worker lifecycles and ensure tasks are properly tracked before closing channels.
-- **If skipped:** Deep crawls terminate before processing all discovered pages, and orphaned crawler goroutines linger in the background.
+#### 7. Rate Limiting is Bypassed via Spoofed X-Forwarded-For Headers
+- **Location:** `src/utils/middleware.go:L66-74`
+- **What this is:** `InboundRateLimitMiddleware` limits client API requests to 2 req/sec with a burst of 30.
+- **Problem:** `GetClientIP` blindly trusts the first IP in `X-Forwarded-For` without verifying whether `r.RemoteAddr` is a trusted proxy. Anyone sending a randomized `X-Forwarded-For: <random-ip>` gets an isolated rate-limiter bucket on every request.
+- **Fix:** Default to `r.RemoteAddr`, and only read `X-Forwarded-For` if `r.RemoteAddr` matches a configured trusted proxy subnet.
+- **If skipped:** Attackers can bypass API rate limits completely with a single header line.
 
-#### 6. Robots.txt Cache in Memory Lacks TTL Expiration
-- **Location:** `src/scraper/robots.go` (L27–28)
-- **What this is:** `robotsCache` caches parsed `robots.txt` rules keyed by domain hostname.
-- **Problem:** The map has no eviction policy or TTL. Once a domain's rules are parsed, changes to the host's `robots.txt` are never refreshed until the server restarts, and every visited domain remains in memory indefinitely.
-- **Fix:** Add a TTL check (e.g. 24 hours) or store robots entries with an expiration timestamp and purge stale entries.
-- **If skipped:** Crawlers will follow stale permissions or permanently cache temporary crawl errors.
+#### 8. Synchronous Cookie Jar Database Writes Block All Concurrent Scrapers
+- **Location:** `src/utils/cookiejar.go:L40-58`
+- **What this is:** `PersistentCookieJar` persists session cookies to SQLite/PostgreSQL to maintain authenticated sessions across scrapes.
+- **Problem:** `SetCookies` acquires a global mutex `p.mu` and executes a synchronous database write (`db.SaveSessionCookies`) on every HTTP response with cookies, blocking any other goroutine calling `Cookies(u)`.
+- **Fix:** Dispatch `db.SaveSessionCookies` into a buffered background channel or worker pool, releasing `p.mu` immediately.
+- **If skipped:** High-concurrency scraping batches bottleneck behind database disk I/O.
+
+#### 9. SQLite Connection Pool Lacks MaxOpenConns Limit, Risky Lock Contention
+- **Location:** `src/db/db.go:L106-110`
+- **What this is:** Searqon initializes a local SQLite database for search, scrape, and session caching.
+- **Problem:** `sql.Open("sqlite", dbPath)` does not call `db.SetMaxOpenConns(1)`. Go's `database/sql` defaults to unlimited connections, causing concurrent write transactions to fail with `database is locked (5)` under load.
+- **Fix:** Add `sqliteDB.SetMaxOpenConns(1)` right after opening the SQLite handle.
+- **If skipped:** Parallel scraping workers will intermittently fail to cache pages when write collisions occur.
+
+#### 10. Relative Link Resolution in Crawler Resolves Against Root Instead of Parent Page
+- **Location:** `src/crawler/crawler.go:L177`
+- **What this is:** The recursive crawler parses `a[href]` links on crawled subpages to discover nested pages.
+- **Problem:** Relative URLs on deep pages are resolved against `parsedBase` (the original seed URL) rather than `task.url` (the actual page containing the link).
+- **Fix:** Parse and resolve relative links against `task.url`.
+- **If skipped:** Crawling subdirectories fails to discover child pages or generates broken paths (e.g., resolving `sub/page.html` against root instead of the current directory).
+
+#### 11. Single-Pass HTML Tokenizer Attribute Extraction Drops `alt` Attributes
+- **Location:** `src/scraper/stream_markdown.go:L326-332`, `src/scraper/stream_markdown.go:L549-563`
+- **What this is:** The streaming markdown generator reads `src` and `alt` attributes on `<img>` tags.
+- **Problem:** `extractAttr` consumes the streaming tokenizer's attributes in a single forward pass. If `alt` appears before `src` in the HTML (e.g. `<img alt="..." src="...">`), finding `src` advances past `alt`, causing the second lookup for `alt` to return empty.
+- **Fix:** Read all attributes into a map or slice in one pass during tag processing before querying keys.
+- **If skipped:** Any image where `alt` is written before `src` loses its alt text and renders as `![image](...)`.
 
 ---
 
 ### Nice to Have
 
-#### 7. Duplicated Browser User-Agent Collections
-- **Location:** `src/scraper/antibot.go` (L41–97), `src/scraper/robots.go` (L44–53)
-- **What this is:** Both `antibot.go` and `robots.go` maintain hardcoded lists of browser User-Agent strings.
-- **Problem:** Updating browser versions in one file leaves the other out of sync (e.g., Chrome 128 in `antibot.go` vs Chrome 122 in `robots.go`).
-- **Fix:** Unify all browser User-Agent strings in `antibot.go` and reuse `PickRandomPersona().UserAgent` inside `robots.go`.
-- **If skipped:** Inconsistent browser fingerprints are presented during robots inspection versus page scraping.
+#### 12. Gzip Middleware Sets Content-Encoding Before Knowing If Response Has a Body
+- **Location:** `src/utils/middleware.go:L148-150`
+- **What this is:** `GzipCompressionMiddleware` compresses HTTP response bodies when `Accept-Encoding: gzip` is present.
+- **Problem:** It writes `Content-Encoding: gzip` into response headers immediately before downstream handlers run. If a handler returns status 204 or 304, the gzip footer is still written, creating an invalid HTTP response.
+- **Fix:** Set `Content-Encoding: gzip` lazily inside `gzw.Write` only when bytes are actually written.
+- **If skipped:** Empty or cached responses (304 Not Modified) send invalid gzip headers and corrupted empty bodies.
+
+#### 13. MCP JSON-RPC Returns Error Replies for Client Notification Messages
+- **Location:** `src/mcp/server.go:L352-354`
+- **What this is:** The MCP server handles JSON-RPC requests and notifications from client IDEs and LLM harnesses.
+- **Problem:** Unhandled notifications (e.g. `notifications/cancelled`) hit the `default` switch case and return a JSON-RPC error response, violating JSON-RPC 2.0 specifications.
+- **Fix:** If `req.ID == nil` (notification), return `nil, nil` without producing any JSON-RPC response.
+- **If skipped:** Strict MCP clients like Claude Desktop may log protocol desynchronization warnings.
 
 ---
 
 ## Verdict & Recommendation
 
-- **Verdict:** Address items **1, 2, 3, and 4** first to eliminate memory leaks on high-volume runs, resolve the cache-hit bug in `/extract`, and enforce TLS integrity on outbound requests.
-- **Lean Potential:** ~40 lines reducible by consolidating duplicate user-agent collections and deduplicating robots rule parsing.
-- **Not checked:** External runtime binaries (live Camoufox Firefox processes, remote SearXNG instance queries, Ollama local inference endpoint).
+- **Verdict:** Follow the batched execution plan starting with **Batch 1 (SSRF redirect bypass + crawler premature exit race)** and **Batch 2 (rawHTMLCache OOM leak + search data race)**.
+- **Lean Potential:** -40 lines possible by dropping `rawHTMLCache` and pruning redundant middleware checks.
+- **Not checked:** External live browser daemons (Camoufox/Lightpanda headless runtime processes).
