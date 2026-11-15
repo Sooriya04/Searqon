@@ -183,11 +183,15 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 
 				var newLinks []crawlTask
 				if task.depth < depth && scraped.Error == "" {
+					taskBase, perr := url.Parse(task.url)
+					if perr != nil {
+						taskBase = parsedBase
+					}
 					addLink := func(href string) {
 						if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "javascript:") {
 							return
 						}
-						resolved, rerr := parsedBase.Parse(href)
+						resolved, rerr := taskBase.Parse(href)
 						if rerr != nil || resolved.Hostname() != baseDomain {
 							return
 						}

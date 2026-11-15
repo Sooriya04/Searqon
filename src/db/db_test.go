@@ -35,6 +35,9 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	if GetBackend() != "sqlite" {
 		t.Fatalf("expected backend 'sqlite', got '%s'", GetBackend())
 	}
+	if stats := sqliteDB.Stats(); stats.MaxOpenConnections != 1 {
+		t.Fatalf("expected MaxOpenConnections=1, got %d", stats.MaxOpenConnections)
+	}
 
 	// 1. Test Search Cache
 	testResults := []models.SearchResult{
