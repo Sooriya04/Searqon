@@ -302,7 +302,7 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 			},
 		}
 
-	case "notifications/initialized":
+	case "notifications/initialized", "notifications/cancelled":
 		return nil, nil
 
 	case "tools/list":
@@ -351,6 +351,9 @@ func (s *Server) HandleMessageContext(ctx context.Context, reqBytes []byte) ([]b
 		resp.Result = map[string]interface{}{}
 
 	default:
+		if req.ID == nil {
+			return nil, nil
+		}
 		resp.Error = &RPCError{Code: -32601, Message: fmt.Sprintf("Method not found: %s", req.Method)}
 	}
 
@@ -936,6 +939,10 @@ func (s *Server) SSEHandler() http.HandlerFunc {
 				return
 			}
 			resp, _ := s.HandleMessageContext(r.Context(), body)
+			if len(resp) == 0 {
+				w.WriteHeader(http.StatusAccepted)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(resp)
 			return
