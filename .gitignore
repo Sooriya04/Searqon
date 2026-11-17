@@ -30,3 +30,6 @@ docs/architecture.*.json
 
 # Design system workspace
 design-system/
+
+# Internal audits
+audits/
