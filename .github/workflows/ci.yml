@@ -106,32 +106,30 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Compute Target Image Tags
-        id: compute-tags
-        if: steps.check-version.outputs.has_version == 'true'
-        run: |
-          VER="${{ steps.check-version.outputs.version }}"
-          # GHCR tags are always included
-          TAGS="ghcr.io/sooriya04/searqon:${VER},ghcr.io/sooriya04/searqon:v${VER},ghcr.io/sooriya04/searqon:latest"
-
-          # Only include Docker Hub tags if Docker Hub login succeeded
-          if [ "${{ steps.dockerhub-login.outcome }}" = "success" ]; then
-            TAGS="${TAGS},sooriya04/searqon:${VER},sooriya04/searqon:v${VER},sooriya04/searqon:latest"
-            echo "✓ Docker Hub authentication succeeded. Pushing to both GHCR and Docker Hub."
-          else
-            echo "::warning::Docker Hub login failed or credentials expired. Pushing to GitHub Packages (GHCR) only."
-          fi
-
-          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
-
-      - name: Build & Push Release Image (scratch)
-        if: steps.check-version.outputs.has_version == 'true'
+      - name: Build & Push to Docker Hub
+        if: steps.check-version.outputs.has_version == 'true' && steps.dockerhub-login.outcome == 'success'
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.compute-tags.outputs.tags }}
+          tags: |
+            sooriya04/searqon:${{ steps.check-version.outputs.version }}
+            sooriya04/searqon:v${{ steps.check-version.outputs.version }}
+            sooriya04/searqon:latest
+
+      - name: Build & Push to GHCR
+        if: steps.check-version.outputs.has_version == 'true'
+        continue-on-error: true
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/sooriya04/searqon:${{ steps.check-version.outputs.version }}
+            ghcr.io/sooriya04/searqon:v${{ steps.check-version.outputs.version }}
+            ghcr.io/sooriya04/searqon:latest
 
       - name: Update Docker Hub Description via API
         if: steps.check-version.outputs.has_version == 'true' && steps.dockerhub-login.outcome == 'success'
