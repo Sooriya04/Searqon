@@ -14,6 +14,39 @@ Think of it as a transparent alternative to services like Tavily or Firecrawl �
 
 ---
 
+## ⚡ 1-Line Quick Install
+
+Install the standalone static binary (Linux & macOS, amd64 & arm64) in 2 seconds:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sooriya04/Searqon/main/install.sh | sh
+```
+
+Or spin up the ultra-lightweight **`~8.4 MB` scratch container**:
+```bash
+docker run -d -p 7493:7493 -v $(pwd)/data:/app/data sooriya04/searqon:latest
+```
+
+---
+
+## 📊 Performance & Architecture Benchmarks
+
+Searqon is engineered in pure Go (0 CGO) to eliminate the multi-gigabyte memory and CPU bloat of traditional headless scraper runtimes.
+
+| Metric | **Searqon v1.2.1** 🚀 | **Firecrawl** (Self-hosted) | **Raw Playwright / Puppeteer** | **Hosted APIs** *(Tavily/Perplexity)* |
+| :--- | :--- | :--- | :--- | :--- |
+| **Container Image** | **`8.42 MB`** *(scratch)* | `~1,450 MB` | `~1,800 MB` | N/A *(Hosted SaaS)* |
+| **Idle Memory (RAM)** | **`~14 MB`** | `~380 MB` *(Node + Redis worker)* | `~300 MB` *(Chromium daemon)* | N/A |
+| **Peak RAM (50 Concurr.)**| **`~48 MB`** | `~2,400 MB+` | `~3,500 MB+` | N/A |
+| **HTML → Markdown Speed** | **`0.013 ms`** *(13,041 ns)* | `~12.4 ms` *(Cheerio/turndown)* | `~18.2 ms` *(DOM serial.)* | `~150–400 ms` API trip |
+| **Throughput (1 Core)** | **`76,000+ pages/sec`** | `~80 pages/sec` | `~55 pages/sec` | Subject to API Rate Limits |
+| **Token Budgeting** | **Deterministic early exit** | Post-processing truncation | Post-processing truncation | Pay-per-credit |
+| **Self-Hosted Cost** | **`$0 / month`** | Requires large VPS | Requires large VPS | **`$20 – $100+ / mo`** |
+
+👉 Detailed micro-benchmarks and reproduction steps: [`benchmarks/README.md`](./benchmarks/README.md)
+
+---
+
 ## 🤖 MCP (Model Context Protocol) — Use Searqon in Claude Desktop, Cursor & Windsurf
 
 Searqon `v1.2.1` ships with a **native Go MCP server**, making it the simplest way to give any AI agent access to real-time web search and sophisticated anti-bot scraping.

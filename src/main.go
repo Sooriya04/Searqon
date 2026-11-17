@@ -17,6 +17,21 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version", "--version", "-v":
+			fmt.Println("Searqon v1.2.1")
+			return
+		case "help", "--help", "-h":
+			fmt.Println("Searqon - Self-hosted Web Intelligence Engine for AI Agents")
+			fmt.Println("\nUsage:")
+			fmt.Println("  searqon            Start HTTP REST, SSE & UTCP server")
+			fmt.Println("  searqon mcp        Start Model Context Protocol (MCP) JSON-RPC stdio server")
+			fmt.Println("  searqon version    Display current Searqon version")
+			return
+		}
+	}
+
 	// 1. Load configuration from settings.yml / config.yml
 	cfg := config.LoadConfig()
 
@@ -35,8 +50,8 @@ func main() {
 	}
 
 	// 2. Initialize core system modules
-	// If launched as 'searqon mcp', direct execution logs to stderr to preserve stdout for JSON-RPC
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		// Direct execution logs to stderr to preserve stdout for JSON-RPC
 		log.SetOutput(os.Stderr)
 		scraper.InitProxyPool()
 		db.InitDB()

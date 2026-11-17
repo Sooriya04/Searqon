@@ -1,6 +1,8 @@
 package scraper
 
 import (
+	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -369,9 +371,47 @@ func BenchmarkStreamMarkdown(b *testing.B) {
 		</div>
 	`
 
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
+	b.Run("StandardArticle", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(htmlInput), "", 0)
+		}
+	})
+
+	// Large 50KB payload with tables, nested anchors, and code blocks
+	var largeBuf bytes.Buffer
+	largeBuf.WriteString("<html><body><article>")
+	for i := 0; i < 50; i++ {
+		fmt.Fprintf(&largeBuf, `
+			<section>
+				<h2>Section %d</h2>
+				<p>Paragraph text explaining technical concept %d with <a href="https://example.com/%d">documentation link</a>.</p>
+				<pre><code class="language-go">func Benchmark%d() { return }</code></pre>
+				<table>
+					<thead><tr><th>Key</th><th>Value</th><th>Status</th></tr></thead>
+					<tbody>
+						<tr><td>Metric %d</td><td>Value %d</td><td>OK</td></tr>
+					</tbody>
+				</table>
+			</section>`, i, i, i, i, i, i)
 	}
+	largeBuf.WriteString("</article></body></html>")
+	largeHTML := largeBuf.String()
+
+	b.Run("LargeDoc_50KB_Unbounded", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(largeHTML), "", 0)
+		}
+	})
+
+	b.Run("LargeDoc_50KB_BoundedEarlyExit_4KB", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _, _ = ConvertHTMLToMarkdownStream(strings.NewReader(largeHTML), "", 4096)
+		}
+	})
 }
