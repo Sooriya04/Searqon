@@ -17,6 +17,8 @@ Welcome to the Searqon documentation. Searqon is an open-source, self-hosted **w
 | [Search Providers](./providers.md) | SearXNG vs DuckDuckGo — when to use what |
 | [Configuration](./configuration.md) | Ports, timeouts, limits, and tuning |
 | [Deployment](./deployment.md) | Docker, Docker Compose, and production setup |
+| [Model Context Protocol (MCP)](./MCP.md) | Agent integrations for Codex, Claude Code, Antigravity, OpenCode, Pi, and editors |
+| [Universal Tool Calling Protocol (UTCP)](./utcp.md) | Dynamic discovery manual, tool schemas, and Code-Mode batching |
 | [Embedded Python Engine](./embedded_engine_architecture.md) | Compiling Go core into zero-Docker embedded Python package |
 
 ---

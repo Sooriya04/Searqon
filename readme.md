@@ -79,7 +79,7 @@ Searqon `v1.2.1` ships with a **native Go MCP server**, making it the simplest w
 | `searqon_map` | Domain discovery & sitemap crawler: map internal URL trees, paths, and site hierarchies |
 | `searqon_extract` | Targeted CSS selector or structured JSON schema extraction for tables, prices, and metadata |
 
-Full MCP integration guide: [`MCP.md`](./MCP.md) | [`docs/MCP.md`](./docs/MCP.md)
+Full MCP integration guide: [**`docs/MCP.md`**](./docs/MCP.md)
 
 ---
 
@@ -119,7 +119,7 @@ Complete UTCP specification, tool schemas, and recipes: [**`docs/utcp.md`**](./d
 
 Complete documentation is available in the [`docs/`](./docs/index.md) directory:
 
-- [**MCP Integration Guide**](./MCP.md) — Claude Desktop, Cursor, Windsurf, and custom agents.
+- [**MCP Integration Guide**](./docs/MCP.md) — Codex, Claude Code, Antigravity, OpenCode, Pi, and editors.
 - [**UTCP & Code-Mode Guide**](./docs/utcp.md) — Dynamic discovery manual, tool schemas, and Code-Mode batching.
 - [**Docker Hub Guide**](./docs/docker.md) — Docker setup, compose, and environment variables.
 - [**Orchestration Workflow**](./docs/workflow/workflow.md) — High-level query pipeline, fallback chains, and lifecycle.

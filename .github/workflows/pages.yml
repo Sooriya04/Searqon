@@ -4,9 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      # Only deploy Pages when the landing page or docs are updated
-      - 'index.html'
-      - 'docs.html'
+      # Only deploy Pages when the documentation or landing pages in docs are updated
       - 'docs/**'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
@@ -39,7 +37,7 @@ jobs:
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: 'docs'
 
       - name: Deploy to GitHub Pages
         id: deployment

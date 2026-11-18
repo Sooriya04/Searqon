@@ -3,4 +3,4 @@
 *.html linguist-detectable=false
 *.html linguist-documentation=true
 docs/** linguist-documentation=true
-architecture.html linguist-vendored=true
+docs/architecture.html linguist-vendored=true
