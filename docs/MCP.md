@@ -13,9 +13,102 @@ Searqon provides a native **Model Context Protocol (MCP)** server built in Go. I
 
 ---
 
-## 🚀 Running via Docker (Recommended)
+## 🚀 Client & Agent Integrations
 
-### 1. Claude Desktop Integration (`stdio` Transport)
+### 1. OpenAI Codex CLI (`codex`)
+* **Via CLI:**
+  ```bash
+  codex mcp add searqon -- searqon mcp
+  # Or via Docker:
+  codex mcp add searqon -- docker run -i --rm -e CACHE_ENABLED=true -e SEARXNG_URL=http://host.docker.internal:8080 -v searqon-data:/app/data sooriya04/searqon:latest mcp
+  # Or via SSE:
+  codex mcp add searqon --url http://localhost:7493/mcp/sse
+  ```
+* **Via `~/.codex/config.toml`:**
+  ```toml
+  [mcp_servers.searqon]
+  command = "searqon"
+  args = ["mcp"]
+  ```
+
+---
+
+### 2. Claude Code CLI (`claude`)
+* **Via CLI:**
+  ```bash
+  claude mcp add searqon -- searqon mcp
+  # Or via Docker:
+  claude mcp add searqon -- docker run -i --rm -e CACHE_ENABLED=true -e SEARXNG_URL=http://host.docker.internal:8080 -v searqon-data:/app/data sooriya04/searqon:latest mcp
+  # Or via SSE:
+  claude mcp add --transport sse searqon http://localhost:7493/mcp/sse
+  ```
+* **Via `.mcp.json` (Project Scoped):**
+  ```json
+  {
+    "mcpServers": {
+      "searqon": {
+        "command": "searqon",
+        "args": ["mcp"]
+      }
+    }
+  }
+  ```
+
+---
+
+### 3. Google Antigravity CLI (`agy`)
+* **Via CLI:**
+  ```bash
+  agy mcp add searqon searqon mcp
+  # Or via Docker:
+  agy mcp add searqon -- docker run -i --rm -e CACHE_ENABLED=true -e SEARXNG_URL=http://host.docker.internal:8080 -v searqon-data:/app/data sooriya04/searqon:latest mcp
+  # Or via SSE:
+  agy mcp add searqon http://localhost:7493/mcp/sse
+  ```
+
+---
+
+### 4. OpenCode (`opencode`)
+* **Via `opencode.json` / `~/.config/opencode/opencode.jsonc`:**
+  ```json
+  {
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+      "searqon": {
+        "type": "local",
+        "command": ["searqon", "mcp"],
+        "enabled": true
+      }
+    }
+  }
+  ```
+
+---
+
+### 5. Pi Agent (`pi`)
+* **Via CLI:**
+  ```bash
+  pi mcp add searqon -- searqon mcp
+  # Project-scoped:
+  pi mcp add -l searqon -- searqon mcp
+  # Or via SSE:
+  pi mcp add searqon --url http://localhost:7493/mcp/sse
+  ```
+* **Via `~/.pi/agent/mcp.json`:**
+  ```json
+  {
+    "mcpServers": {
+      "searqon": {
+        "command": "searqon",
+        "args": ["mcp"]
+      }
+    }
+  }
+  ```
+
+---
+
+### 6. Claude Desktop Integration (`stdio` Transport)
 
 Add Searqon to your Claude Desktop configuration file:
 * **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -46,22 +139,21 @@ Add Searqon to your Claude Desktop configuration file:
 
 ---
 
-### 2. Cursor / Windsurf Integration
+### 7. Cursor / Windsurf Integration
 
 In Cursor or Windsurf MCP Settings, configure a new **Command** provider:
 
 * **Name:** `searqon`
-* **Command:** `docker`
-* **Args:**
-  ```text
-  run -i --rm -e CACHE_ENABLED=true -e SEARXNG_URL=http://host.docker.internal:8080 -v searqon-data:/app/data sooriya04/searqon:latest mcp
-  ```
+* **Command:** `searqon`
+* **Args:** `mcp`
+
+*(Or with `docker` as the command and `run -i --rm -e CACHE_ENABLED=true -e SEARXNG_URL=http://host.docker.internal:8080 -v searqon-data:/app/data sooriya04/searqon:latest mcp`)*
 
 ---
 
-### 3. Remote Agents / HTTP SSE Transport
+### 8. Remote Agents / HTTP SSE Transport
 
-When Searqon runs as an HTTP service (e.g. `docker run -p 7493:7493 sooriya04/searqon:latest`), remote agents can connect without spinning up a local container:
+When Searqon runs as an HTTP service (e.g. `docker run -p 7493:7493 sooriya04/searqon:latest` or `searqon`), remote agents can connect without spinning up a local container:
 
 * **SSE Streaming Endpoint:** `http://localhost:7493/mcp/sse`
 * **JSON-RPC Message Endpoint:** `http://localhost:7493/mcp`
