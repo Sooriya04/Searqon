@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -41,5 +42,27 @@ func TestSearchPipeline_ResultCloningUnderLock(t *testing.T) {
 	original[0].Content = "mutated content"
 	if cloned[0].Content == "mutated content" {
 		t.Fatalf("cloned slice was unexpectedly mutated through backing array")
+	}
+}
+
+func TestFallbackHTTPClientConfiguration(t *testing.T) {
+	if fallbackHTTPClient == nil {
+		t.Fatal("expected fallbackHTTPClient to be initialized")
+	}
+	if fallbackHTTPClient.Timeout != 2*time.Second {
+		t.Fatalf("expected 2s timeout, got %v", fallbackHTTPClient.Timeout)
+	}
+	transport, ok := fallbackHTTPClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected fallbackHTTPClient.Transport to be *http.Transport")
+	}
+	if transport.MaxIdleConns != 100 {
+		t.Errorf("expected MaxIdleConns=100, got %d", transport.MaxIdleConns)
+	}
+	if transport.MaxIdleConnsPerHost != 20 {
+		t.Errorf("expected MaxIdleConnsPerHost=20, got %d", transport.MaxIdleConnsPerHost)
+	}
+	if transport.IdleConnTimeout != 90*time.Second {
+		t.Errorf("expected IdleConnTimeout=90s, got %v", transport.IdleConnTimeout)
 	}
 }
