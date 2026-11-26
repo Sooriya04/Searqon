@@ -121,7 +121,10 @@ class Searqon:
             raise SearqonConnectionError(f"Request to {endpoint} timed out: {err}") from err
 
         _handle_response_error(resp)
-        return resp.json()
+        body = resp.json()
+        if isinstance(body, dict) and "data" in body and body.get("success") is True:
+            return body["data"]
+        return body
 
     def search(
         self,
@@ -349,7 +352,10 @@ class AsyncSearqon:
             raise SearqonConnectionError(f"Request to {endpoint} timed out: {err}") from err
 
         _handle_response_error(resp)
-        return resp.json()
+        body = resp.json()
+        if isinstance(body, dict) and "data" in body and body.get("success") is True:
+            return body["data"]
+        return body
 
     async def search(
         self,

@@ -190,3 +190,53 @@ async def test_async_client_search_and_context():
             assert isinstance(resp, SearchResponse)
             assert resp.query == "async query"
             assert resp.results[0].title == "Async Title"
+
+
+def test_sync_client_unwraps_response_envelope():
+    mock_inner_payload = {
+        "query": "wrapped query",
+        "total": 1,
+        "duration": 50,
+        "provider": "multi",
+        "results": [
+            {
+                "title": "Wrapped Title",
+                "url": "https://wrapped.org",
+                "snippet": "Wrapped Snippet",
+                "source": "searxng",
+                "scraped": False,
+            }
+        ],
+    }
+    wrapped_resp = httpx.Response(200, json={"success": True, "data": mock_inner_payload})
+
+    with patch.object(httpx.Client, "post", return_value=wrapped_resp):
+        client = Searqon()
+        resp = client.search("wrapped query")
+        assert isinstance(resp, SearchResponse)
+        assert resp.query == "wrapped query"
+        assert resp.results[0].title == "Wrapped Title"
+
+
+@pytest.mark.asyncio
+async def test_async_client_unwraps_response_envelope():
+    mock_inner_payload = {
+        "title": "Async Scrape",
+        "url": "https://async-wrapped.org",
+        "content": "Async wrapped text",
+        "markdown": "# Async wrapped",
+        "wordCount": 100,
+        "canonicalUrl": "https://async-wrapped.org",
+        "domain": "async-wrapped.org",
+        "scraped": True,
+        "render_method": "go",
+        "bot_detected": False,
+    }
+    wrapped_resp = httpx.Response(200, json={"success": True, "data": mock_inner_payload})
+
+    with patch.object(httpx.AsyncClient, "post", return_value=wrapped_resp):
+        async with AsyncSearqon() as client:
+            res = await client.scrape("https://async-wrapped.org")
+            assert isinstance(res, ScrapeResult)
+            assert res.title == "Async Scrape"
+            assert res.word_count == 100
