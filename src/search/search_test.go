@@ -2,9 +2,11 @@ package search
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
+	"src/config"
 	"src/models"
 )
 
@@ -41,5 +43,27 @@ func TestSearchPipeline_ResultCloningUnderLock(t *testing.T) {
 	original[0].Content = "mutated content"
 	if cloned[0].Content == "mutated content" {
 		t.Fatalf("cloned slice was unexpectedly mutated through backing array")
+	}
+}
+
+func TestGetSearXNGBase_DefaultFallback(t *testing.T) {
+	origEnv := os.Getenv("SEARXNG_URL")
+	os.Unsetenv("SEARXNG_URL")
+	defer func() {
+		if origEnv != "" {
+			os.Setenv("SEARXNG_URL", origEnv)
+		}
+	}()
+
+	cfg := config.Get()
+	origURL := cfg.SearXNG.URL
+	cfg.SearXNG.URL = ""
+	defer func() {
+		cfg.SearXNG.URL = origURL
+	}()
+
+	base := getSearXNGBase()
+	if base != "http://localhost:8080" {
+		t.Fatalf("expected fallback SearXNG base URL http://localhost:8080, got %s", base)
 	}
 }

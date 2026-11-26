@@ -257,7 +257,7 @@ func LoadConfig() *Config {
 	applyEnvOverrides(cfg)
 
 	// Ensure SearXNG URL sync with port
-	if cfg.SearXNG.Port > 0 && (cfg.SearXNG.URL == "" || cfg.SearXNG.URL == "http://localhost:4002") {
+	if cfg.SearXNG.Port > 0 && (cfg.SearXNG.URL == "" || cfg.SearXNG.URL == "http://localhost:8080") {
 		cfg.SearXNG.URL = fmt.Sprintf("http://localhost:%d", cfg.SearXNG.Port)
 	}
 

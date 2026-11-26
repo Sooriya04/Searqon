@@ -41,7 +41,7 @@ func getSearXNGBase() string {
 	if u := os.Getenv("SEARXNG_URL"); u != "" {
 		return u
 	}
-	return "http://localhost:4002"
+	return "http://localhost:8080"
 }
 
 func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
