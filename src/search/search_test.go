@@ -18,11 +18,22 @@ func TestSearchPipeline_TimeoutSafety(t *testing.T) {
 
 	// Run pipeline with scrape=true
 	// When timeout fires, the results slice should be safely cloned under mu.Lock() without panicking or racing
-	resp := RunSearchPipelineWithContext(ctx, "golang testing", 5, true, false, 0, false, "")
+	resp := RunSearchPipelineWithContext(ctx, "golang testing", 5, true, false, 0, 0, false, "")
 
 	// Result should return gracefully
 	if resp.Results == nil {
 		// Empty results or none provider is fine for cancelled/stubbed context
+		t.Logf("Search returned with provider=%s", resp.Provider)
+	}
+}
+
+func TestSearchPipeline_MaxTokensParameter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+	<-ctx.Done()
+
+	resp := RunSearchPipelineWithContext(ctx, "golang token limit forwarding", 3, true, false, 0, 150, false, "")
+	if resp.Results == nil {
 		t.Logf("Search returned with provider=%s", resp.Provider)
 	}
 }

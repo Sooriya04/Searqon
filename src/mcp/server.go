@@ -435,7 +435,7 @@ func (s *Server) handleSearchContext(ctx context.Context, args map[string]interf
 
 	var searchResp models.SearchResponse
 	if reporter != nil {
-		searchResp = search.RunSearchPipelineStream(ctx, query, limit, scrape, false, 0, false, "", func(evt search.SearchEvent) {
+		searchResp = search.RunSearchPipelineStream(ctx, query, limit, scrape, false, 0, 0, false, "", func(evt search.SearchEvent) {
 			switch evt.Type {
 			case "discovery":
 				reporter(1, 3, fmt.Sprintf("Discovered %d candidate results via %s", evt.Total, evt.Provider))
@@ -446,7 +446,7 @@ func (s *Server) handleSearchContext(ctx context.Context, args map[string]interf
 			}
 		})
 	} else {
-		searchResp = search.RunSearchPipelineWithContext(ctx, query, limit, scrape, false, 0, false, "")
+		searchResp = search.RunSearchPipelineWithContext(ctx, query, limit, scrape, false, 0, 0, false, "")
 	}
 
 	var sb strings.Builder
@@ -618,7 +618,7 @@ func (s *Server) handleResearchContext(ctx context.Context, args map[string]inte
 	}
 
 	// 1. Search across meta-engines
-	searchResp := search.RunSearchPipelineWithContext(ctx, query, maxSources+2, false, false, 0, false, "")
+	searchResp := search.RunSearchPipelineWithContext(ctx, query, maxSources+2, false, false, 0, 0, false, "")
 	if len(searchResp.Results) == 0 {
 		return CallToolResult{
 			Content: []ToolContent{

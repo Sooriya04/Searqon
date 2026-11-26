@@ -21,7 +21,7 @@ func SearchExplainHandler(w http.ResponseWriter, r *http.Request) {
 	intent := search.ClassifyIntent(query)
 	expanded := search.ExpandQuery(query)
 
-	res := search.RunSearchPipeline(query, 5, true, false, 0, false, "")
+	res := search.RunSearchPipeline(query, 5, true, false, 0, 0, false, "")
 
 	var explanation []map[string]interface{}
 	for idx, item := range res.Results {
