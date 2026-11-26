@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "searqon"
+version = "0.1.0"
+description = "Official Python SDK for Searqon - Self-hosted Web Intelligence Engine for AI Agents"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Searqon Team" }
+]
+keywords = ["search", "scraping", "rag", "agents", "llm", "web-intelligence", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "httpx>=0.24.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Searqon/Searqon"
+Documentation = "https://github.com/Searqon/Searqon/tree/main/docs"
+Repository = "https://github.com/Searqon/Searqon"

@@ -33,3 +33,12 @@ design-system/
 
 # Internal audits
 audits/
+
+# Python SDK artifacts
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
