@@ -61,7 +61,7 @@ make start     # build + run binary
 
 You should see:
 ```
-[Searqon] Starting on :4001
+[Searqon] Starting on :7493
 [Searqon] Endpoints: POST /search, POST /scrape, POST /scrape/batch ...
 ```
 
@@ -70,13 +70,13 @@ You should see:
 ## 4. Verify It Works
 
 ```bash
-curl http://localhost:4001/health
+curl http://localhost:7493/health
 # {"status":"ok","engine":"src",...}
 ```
 
 Run a real search:
 ```bash
-curl -X POST http://localhost:4001/search \
+curl -X POST http://localhost:7493/search \
   -H "Content-Type: application/json" \
   -d '{"query": "golang concurrency", "limit": 3, "scrape": false}'
 ```

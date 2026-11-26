@@ -7,7 +7,7 @@
 ```bash
 cd src
 go run .
-# Listening on :4001
+# Listening on :7493
 ```
 
 ---
@@ -35,7 +35,7 @@ docker build -t searqon .
 ```bash
 docker run -d \
   --name searqon \
-  -p 4001:4001 \
+  -p 7493:7493 \
   --restart unless-stopped \
   searqon
 ```
@@ -98,7 +98,7 @@ server {
     server_name searqon.yourdomain.com;
 
     location / {
-        proxy_pass http://127.0.0.1:4001;
+        proxy_pass http://127.0.0.1:7493;
         proxy_set_header Host $host;
         proxy_read_timeout 120s;
     }

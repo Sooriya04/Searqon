@@ -98,7 +98,7 @@ Alternatively, place proxy lists into `residential_proxies.txt` or `proxies.txt`
 By default, all calls to `POST /scrape`, `POST /scrape/batch`, and `POST /search` execute the full 4-tier escalation ladder automatically:
 
 ```bash
-curl -X POST http://localhost:4001/scrape \
+curl -X POST http://localhost:7493/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/protected-page"}'
 ```
@@ -108,22 +108,22 @@ You can pin a specific tier using the `stealth_level` parameter:
 
 ```bash
 # Force fast native HTTP only (skips escalation)
-curl -X POST http://localhost:4001/scrape \
+curl -X POST http://localhost:7493/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://en.wikipedia.org/wiki/Go", "stealth_level": "fast_http"}'
 
 # Jump directly to Anti-Bot Spoofed Headers
-curl -X POST http://localhost:4001/scrape \
+curl -X POST http://localhost:7493/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "stealth_level": "spoofed_headers"}'
 
 # Force Headless Browser execution directly
-curl -X POST http://localhost:4001/scrape \
+curl -X POST http://localhost:7493/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://app.spa-website.com", "stealth_level": "headless"}'
 
 # Route immediately through Residential Proxy
-curl -X POST http://localhost:4001/scrape \
+curl -X POST http://localhost:7493/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://rate-limited-domain.com", "stealth_level": "proxy"}'
 ```

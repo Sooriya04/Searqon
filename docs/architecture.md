@@ -105,7 +105,7 @@ Below is a configuration guide for tuning the engine parameters:
 
 | Variable | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `PORT` | Integer | `4001` | Port Searqon listens on. |
+| `PORT` | Integer | `7493` | Port Searqon listens on. |
 | `SEARXNG_URL` | URL | `http://localhost:8080` | Endpoint of the SearXNG search aggregator instance. |
 | `DATABASE_URL` | Connection String | *None* | Connection URL for PostgreSQL cache. If empty, database caching is disabled. |
 | `SEARCH_CACHE_TTL_HOURS` | Integer | `24` | Cache retention lifetime for search query results in hours. |
