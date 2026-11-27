@@ -332,6 +332,7 @@ func runCleanup() {
 	if backend == "sqlite" && sDB != nil {
 		_, _ = sDB.Exec("DELETE FROM search_cache WHERE created_at < DATETIME('now', '-' || ? || ' seconds')", int(searchCacheTTL.Seconds()))
 		_, _ = sDB.Exec("DELETE FROM scrape_cache WHERE expires_at < CURRENT_TIMESTAMP")
+		_, _ = sDB.Exec("DELETE FROM scrape_cache_fts WHERE url NOT IN (SELECT url FROM scrape_cache)")
 	} else if backend == "postgres" && pPool != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

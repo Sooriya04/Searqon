@@ -138,54 +138,7 @@ func fetchRobotsData(baseURL *url.URL) *RobotsData {
 			if resp.StatusCode == 200 {
 				body, berr := io.ReadAll(resp.Body)
 				if berr == nil {
-					lines := strings.Split(string(body), "\n")
-					
-					var activeAgents []string
-					lastWasAgent := false
-
-					for _, line := range lines {
-						line = strings.TrimSpace(line)
-						if line == "" || strings.HasPrefix(line, "#") {
-							continue
-						}
-						parts := strings.SplitN(line, ":", 2)
-						if len(parts) < 2 {
-							continue
-						}
-						key := strings.ToLower(strings.TrimSpace(parts[0]))
-						val := strings.TrimSpace(parts[1])
-
-						if key == "user-agent" {
-							if !lastWasAgent {
-								activeAgents = []string{}
-							}
-							agent := strings.ToLower(val)
-							activeAgents = append(activeAgents, agent)
-							if _, exists := data.Rules[agent]; !exists {
-								data.Rules[agent] = &AgentRules{}
-							}
-							lastWasAgent = true
-						} else {
-							lastWasAgent = false
-							for _, agent := range activeAgents {
-								rules := data.Rules[agent]
-								if key == "disallow" {
-									if val != "" {
-										rules.DisallowedPaths = append(rules.DisallowedPaths, val)
-									}
-								} else if key == "allow" {
-									if val != "" {
-										rules.AllowedPaths = append(rules.AllowedPaths, val)
-									}
-								} else if key == "crawl-delay" {
-									var delaySec float64
-									if _, derr := fmt.Sscanf(val, "%f", &delaySec); derr == nil {
-										rules.CrawlDelay = time.Duration(delaySec * float64(time.Second))
-									}
-								}
-							}
-						}
-					}
+					data = parseRobotsTxt(string(body))
 				}
 			}
 		}
@@ -197,6 +150,64 @@ func fetchRobotsData(baseURL *url.URL) *RobotsData {
 		timestamp: time.Now(),
 	}
 	robotsMu.Unlock()
+	return data
+}
+
+func parseRobotsTxt(content string) *RobotsData {
+	data := &RobotsData{
+		Rules: make(map[string]*AgentRules),
+	}
+	lines := strings.Split(content, "\n")
+	var activeAgents []string
+	lastWasAgent := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		val := strings.TrimSpace(parts[1])
+
+		if key == "user-agent" {
+			if !lastWasAgent {
+				activeAgents = []string{}
+			}
+			agent := strings.ToLower(val)
+			activeAgents = append(activeAgents, agent)
+			if _, exists := data.Rules[agent]; !exists {
+				data.Rules[agent] = &AgentRules{}
+			}
+			lastWasAgent = true
+		} else {
+			lastWasAgent = false
+			for _, agent := range activeAgents {
+				rules := data.Rules[agent]
+				if key == "disallow" {
+					if val != "" {
+						rules.DisallowedPaths = append(rules.DisallowedPaths, val)
+					}
+				} else if key == "allow" {
+					if val != "" {
+						rules.AllowedPaths = append(rules.AllowedPaths, val)
+					}
+				} else if key == "crawl-delay" {
+					var delaySec float64
+					if _, derr := fmt.Sscanf(val, "%f", &delaySec); derr == nil {
+						d := time.Duration(delaySec * float64(time.Second))
+						if d > 3*time.Second {
+							d = 3 * time.Second
+						}
+						rules.CrawlDelay = d
+					}
+				}
+			}
+		}
+	}
 	return data
 }
 

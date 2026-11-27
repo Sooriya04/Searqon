@@ -167,7 +167,7 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 					task = t
 				}
 
-				scraped, htmlContent := scraper.ScrapeSingleURLNative(task.url, format, false)
+				scraped, htmlContent := scraper.ScrapeSingleURLNativeContext(crawlCtx, task.url, format, false)
 
 				mu.Lock()
 				pages = append(pages, scraped)

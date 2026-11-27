@@ -32,7 +32,7 @@ func JinaReaderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bypassCache := r.URL.Query().Get("bypass_cache") == "true"
-	scraped, _ := scraper.ScrapeSingleURL(targetURL, "markdown", bypassCache)
+	scraped, _ := scraper.ScrapeSingleURLContext(r.Context(), targetURL, "markdown", bypassCache)
 
 	statusCode := http.StatusOK
 	if scraped.Error != "" {

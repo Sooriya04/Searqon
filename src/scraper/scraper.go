@@ -28,6 +28,7 @@ type ScrapeOptions struct {
 	ExtractSchema string
 	StealthLevel  string // "auto", "fast_http", "spoofed_headers", "headless", "proxy"
 	MaxTokens     int
+	MaxWords      int
 }
 
 const maxRawHTMLCacheEntries = 256
@@ -294,6 +295,17 @@ func finalizeScrapeResult(result *models.ScrapeResult, startTime time.Time, opts
 		}
 	}
 
+	if opts.MaxWords > 0 {
+		if result.Content != "" {
+			result.Content = utils.TruncateTextByWords(result.Content, opts.MaxWords)
+		}
+		if result.Markdown != "" {
+			result.Markdown = utils.TruncateTextByWords(result.Markdown, opts.MaxWords)
+		}
+		result.WordCount = len(strings.Fields(result.Content))
+		result.IsTruncated = true
+	}
+
 	if opts.ExtractSchema != "" {
 		if structured, err := extractStructuredData(opts.ExtractSchema, *result); err == nil {
 			result.StructuredData = structured
@@ -349,7 +361,12 @@ func ScrapeSingleURLWithOptionsContext(ctx context.Context, targetURL string, op
 
 // ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
 func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternalContext(context.Background(), targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
+	return ScrapeSingleURLNativeContext(context.Background(), targetURL, format, bypassCache)
+}
+
+// ScrapeSingleURLNativeContext forces native HTTP scraping with context cancellation.
+func ScrapeSingleURLNativeContext(ctx context.Context, targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
+	res, raw := scrapeSingleURLInternalContext(ctx, targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			res.RenderMethod = "go"
@@ -406,6 +423,16 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 			if val, ok := rawHTMLCache.Load(targetURL); ok {
 				cachedRaw = val
 			}
+			if opts.MaxWords > 0 {
+				if cached.Content != "" {
+					cached.Content = utils.TruncateTextByWords(cached.Content, opts.MaxWords)
+				}
+				if cached.Markdown != "" {
+					cached.Markdown = utils.TruncateTextByWords(cached.Markdown, opts.MaxWords)
+				}
+				cached.WordCount = len(strings.Fields(cached.Content))
+				cached.IsTruncated = true
+			}
 			return cached, cachedRaw
 		}
 		utils.RecordScrapeCacheMiss()
@@ -443,7 +470,17 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 			return result, ""
 		}
 		if delay > 0 {
-			time.Sleep(delay)
+			maxDelay := 3 * time.Second
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+			select {
+			case <-ctx.Done():
+				result.Error = "scrape aborted: context cancelled during crawl delay"
+				result.EndTime = time.Now().UTC().Format(time.RFC3339)
+				return result, ""
+			case <-time.After(delay):
+			}
 		}
 	}
 
@@ -489,6 +526,18 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 	}
 
 	db.SaveScrapeCache(scraped)
+
+	if opts.MaxWords > 0 {
+		if scraped.Content != "" {
+			scraped.Content = utils.TruncateTextByWords(scraped.Content, opts.MaxWords)
+		}
+		if scraped.Markdown != "" {
+			scraped.Markdown = utils.TruncateTextByWords(scraped.Markdown, opts.MaxWords)
+		}
+		scraped.WordCount = len(strings.Fields(scraped.Content))
+		scraped.IsTruncated = true
+	}
+
 	return scraped, rawOut
 }
 

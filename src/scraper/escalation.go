@@ -55,6 +55,7 @@ func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.T
 	client := &http.Client{
 		Timeout:   timeout,
 		Transport: transport,
+		Jar:       sharedCookieJar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return fmt.Errorf("too many redirects")

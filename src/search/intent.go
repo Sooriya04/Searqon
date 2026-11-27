@@ -56,7 +56,7 @@ func ClassifyIntent(query string) SearchIntent {
 
 // AdjustParamsByIntent modifies limit and scraping parameters based on user intent.
 func AdjustParamsByIntent(intent SearchIntent, limit int, scrape bool) (int, bool) {
-	if intent == IntentNavigational {
+	if intent == IntentNavigational && limit <= 1 {
 		return 1, scrape
 	}
 	if intent == IntentInformational && scrape {

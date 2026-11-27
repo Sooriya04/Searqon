@@ -226,9 +226,65 @@ func discoverSearchResultsWithIntent(query string, limit int, intent SearchInten
 	return out, "multi"
 }
 
+func cleanUnbalancedParens(s string) string {
+	openCount := strings.Count(s, "(")
+	closeCount := strings.Count(s, ")")
+	if openCount == closeCount {
+		return s
+	}
+	if openCount > closeCount {
+		s = strings.ReplaceAll(s, "(", "")
+	} else {
+		s = strings.ReplaceAll(s, ")", "")
+	}
+	return strings.TrimSpace(s)
+}
+
+func splitIgnoringParens(s, sep string) []string {
+	sepLower := strings.ToLower(sep)
+	sLower := strings.ToLower(s)
+	var parts []string
+	start := 0
+	parenDepth := 0
+	inQuote := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '"' {
+			inQuote = !inQuote
+		} else if !inQuote {
+			if c == '(' {
+				parenDepth++
+			} else if c == ')' && parenDepth > 0 {
+				parenDepth--
+			}
+		}
+
+		if parenDepth == 0 && !inQuote && i+len(sep) <= len(s) {
+			if sLower[i:i+len(sep)] == sepLower {
+				part := strings.TrimSpace(s[start:i])
+				if part != "" {
+					parts = append(parts, part)
+				}
+				start = i + len(sep)
+				i += len(sep) - 1
+			}
+		}
+	}
+
+	if start < len(s) {
+		part := strings.TrimSpace(s[start:])
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return parts
+}
+
 func decomposeQueries(query string) []string {
 	seen := map[string]bool{}
 	add := func(q string, out *[]string) {
+		q = cleanUnbalancedParens(q)
 		q = strings.TrimSpace(q)
 		q = strings.Trim(q, ",;|")
 		if q == "" || seen[strings.ToLower(q)] {
@@ -256,8 +312,8 @@ func splitQueryParts(query string) []string {
 	separators := []string{" and ", " or ", " | ", ",", ";"}
 	var current []string
 	for _, sep := range separators {
-		if strings.Contains(strings.ToLower(query), sep) {
-			parts := strings.Split(query, sep)
+		if strings.Contains(strings.ToLower(query), strings.ToLower(sep)) {
+			parts := splitIgnoringParens(query, sep)
 			for _, part := range parts {
 				part = strings.TrimSpace(part)
 				if part != "" {

@@ -38,10 +38,14 @@ func PreResolveDNS(rawURLs []string) {
 	wg.Wait()
 }
 
-var httpClient *http.Client
+var (
+	httpClient      *http.Client
+	sharedCookieJar http.CookieJar
+)
 
 func init() {
 	jar, _ := utils.NewPersistentCookieJar()
+	sharedCookieJar = jar
 	httpClient = &http.Client{
 		Timeout: 8 * time.Second,
 		Jar:     jar,

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,3 +136,68 @@ func TestSearchSearXNGWithURL_CustomEndpoint(t *testing.T) {
 		t.Fatalf("expected source 'searxng', got %s", results[0].Source)
 	}
 }
+
+func TestParseDDGHTML(t *testing.T) {
+	htmlData := `
+	<div class="result">
+		<h2 class="result__title">
+			<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fgolang%2Fgo&rut=123">Go Programming Language</a>
+		</h2>
+		<a class="result__url" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fgolang%2Fgo">
+			github.com &rsaquo; golang &rsaquo; go
+		</a>
+		<div class="result__snippet">The Go programming language source repository.</div>
+	</div>
+	<div class="result">
+		<h2 class="result__title">
+			<a class="result__a" href="https://example.com/direct">Direct Link Title</a>
+		</h2>
+		<div class="result__snippet">Direct link description.</div>
+	</div>
+	<div class="result">
+		<h2 class="result__title">
+			<a class="result__a" href="/bad/internal">Internal Link Only</a>
+		</h2>
+		<div class="result__snippet">Should be skipped because it stays on duckduckgo.com domain.</div>
+	</div>
+	`
+
+	results, err := parseDDGHTML(strings.NewReader(htmlData), 5)
+	if err != nil {
+		t.Fatalf("parseDDGHTML failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 parsed results, got %d", len(results))
+	}
+
+	if results[0].URL != "https://github.com/golang/go" {
+		t.Errorf("expected unwrapped target URL https://github.com/golang/go, got %s", results[0].URL)
+	}
+	if results[0].Title != "Go Programming Language" {
+		t.Errorf("expected Go Programming Language, got %s", results[0].Title)
+	}
+
+	if results[1].URL != "https://example.com/direct" {
+		t.Errorf("expected https://example.com/direct, got %s", results[1].URL)
+	}
+}
+
+func TestDecomposeQueries_NoBrokenParentheses(t *testing.T) {
+	// Simulated expanded query with parentheses containing OR
+	expanded := "docker and kubernetes (container OR k8s)"
+	queries := decomposeQueries(expanded)
+
+	for _, q := range queries {
+		open := strings.Count(q, "(")
+		close := strings.Count(q, ")")
+		if open != close {
+			t.Fatalf("decomposed query has unbalanced parentheses: %q (open=%d close=%d)", q, open, close)
+		}
+		if strings.Contains(q, "(container") && !strings.Contains(q, ")") {
+			t.Fatalf("broken parenthesis fragment detected: %q", q)
+		}
+	}
+}
+
+

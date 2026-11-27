@@ -392,6 +392,57 @@ func TestBatchScrapeHandler_MaxURLLimit(t *testing.T) {
 	}
 }
 
+func TestBatchScrapeHandler_MaxWordsForwarding(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>Batch Test Page</title></head><body>
+			<article>
+				<p>Word one word two word three word four word five word six word seven word eight word nine word ten.</p>
+			</article>
+		</body></html>`)
+	}))
+	defer ts.Close()
+
+	payload, err := json.Marshal(models.BatchScrapeRequest{
+		URLs:        []string{ts.URL},
+		Format:      "markdown",
+		BypassCache: true,
+		MaxWords:    5,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/scrape/batch", bytes.NewBuffer(payload))
+	rr := httptest.NewRecorder()
+	BatchScrapeHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Success bool                  `json:"success"`
+		Data    []models.ScrapeResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(resp.Data) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(resp.Data))
+	}
+	if !resp.Data[0].IsTruncated {
+		t.Errorf("Expected IsTruncated = true")
+	}
+	if !strings.Contains(resp.Data[0].Content, "[Content truncated]") {
+		t.Errorf("Expected [Content truncated] marker in content, got: %s", resp.Data[0].Content)
+	}
+	if !strings.HasPrefix(resp.Data[0].Content, "Word one word two word") {
+		t.Errorf("Expected content to start with first 5 words, got: %s", resp.Data[0].Content)
+	}
+}
+
 func TestSearchHandler_TokenLimitForwarding(t *testing.T) {
 	scrapeFalse := false
 	payload, err := json.Marshal(models.SearchRequest{
