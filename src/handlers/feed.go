@@ -44,7 +44,7 @@ func FeedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, _ := scraper.ScrapeSingleURL(targetURL, "text", false)
+	result, _ := scraper.ScrapeSingleURLContext(r.Context(), targetURL, "text", false)
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, result.Error)
 		return

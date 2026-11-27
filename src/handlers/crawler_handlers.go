@@ -29,7 +29,7 @@ func MapHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := crawler.MapSiteURLs(req.URL, req.Limit)
+	result := crawler.MapSiteURLsWithContext(r.Context(), req.URL, req.Limit)
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, result.Error)
 		return
@@ -94,14 +94,14 @@ func CrawlHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		crawler.CrawlSite(req.URL, req.Limit, req.Depth, req.Format, onPageScraped)
+		crawler.CrawlSiteWithContext(r.Context(), req.URL, req.Limit, req.Depth, req.Format, onPageScraped)
 
 		streamMu.Lock()
 		fmt.Fprintf(w, "event: done\ndata: {}\n\n")
 		flusher.Flush()
 		streamMu.Unlock()
 	} else {
-		result := crawler.CrawlSite(req.URL, req.Limit, req.Depth, req.Format, nil)
+		result := crawler.CrawlSiteWithContext(r.Context(), req.URL, req.Limit, req.Depth, req.Format, nil)
 		if result.Error != "" {
 			utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, result.Error)
 			return

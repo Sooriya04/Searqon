@@ -64,7 +64,7 @@ func BatchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			scraped, _ := scraper.ScrapeSingleURLWithOptions(targetURL, scraper.ScrapeOptions{
+			scraped, _ := scraper.ScrapeSingleURLWithOptionsContext(r.Context(), targetURL, scraper.ScrapeOptions{
 				Format:       req.Format,
 				BypassCache:  req.BypassCache,
 				StealthLevel: req.StealthLevel,

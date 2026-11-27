@@ -90,7 +90,7 @@ func PipelineHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer func() { <-sem }()
 
-			scraped, _ := scraper.ScrapeSingleURL(res.URL, "markdown", req.BypassCache)
+			scraped, _ := scraper.ScrapeSingleURLContext(scrapeCtx, res.URL, "markdown", req.BypassCache)
 
 			if scraped.Error != "" || !scraped.Scraped {
 				return

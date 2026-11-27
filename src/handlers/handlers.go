@@ -97,7 +97,7 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		maxTokens = req.TokenLimit
 	}
 
-	result, _ := scraper.ScrapeSingleURLWithOptions(req.URL, scraper.ScrapeOptions{
+	result, _ := scraper.ScrapeSingleURLWithOptionsContext(r.Context(), req.URL, scraper.ScrapeOptions{
 		Format:        req.Format,
 		BypassCache:   req.BypassCache,
 		ExtractSchema: req.ExtractSchema,

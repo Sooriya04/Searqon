@@ -62,10 +62,10 @@ func ExtractHandler(w http.ResponseWriter, r *http.Request) {
 		MaxTokens:     maxTokens,
 	}
 
-	res, rawHTML := scraper.ScrapeSingleURLWithOptions(req.URL, opts)
+	res, rawHTML := scraper.ScrapeSingleURLWithOptionsContext(r.Context(), req.URL, opts)
 	if len(req.Selectors) > 0 && strings.TrimSpace(rawHTML) == "" {
 		opts.BypassCache = true
-		res, rawHTML = scraper.ScrapeSingleURLWithOptions(req.URL, opts)
+		res, rawHTML = scraper.ScrapeSingleURLWithOptionsContext(r.Context(), req.URL, opts)
 	}
 	if !res.Scraped && rawHTML == "" {
 		if res.Content != "" {

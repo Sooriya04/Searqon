@@ -349,7 +349,12 @@ func ScrapeSingleURLWithOptionsContext(ctx context.Context, targetURL string, op
 
 // ScrapeSingleURLNative forces the use of Go's native HTTP scraper.
 func ScrapeSingleURLNative(targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
-	res, raw := scrapeSingleURLInternalContext(context.Background(), targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
+	return ScrapeSingleURLNativeContext(context.Background(), targetURL, format, bypassCache)
+}
+
+// ScrapeSingleURLNativeContext forces native HTTP scraping with context cancellation.
+func ScrapeSingleURLNativeContext(ctx context.Context, targetURL string, format string, bypassCache bool) (models.ScrapeResult, string) {
+	res, raw := scrapeSingleURLInternalContext(ctx, targetURL, ScrapeOptions{Format: format, BypassCache: bypassCache, ForceNative: true})
 	if res.Scraped {
 		if res.RenderMethod == "" {
 			res.RenderMethod = "go"

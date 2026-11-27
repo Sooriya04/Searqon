@@ -37,7 +37,7 @@ func SummarizeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, _ := scraper.ScrapeSingleURL(req.URL, "text", req.BypassCache)
+	result, _ := scraper.ScrapeSingleURLContext(r.Context(), req.URL, "text", req.BypassCache)
 	if result.Error != "" {
 		utils.WriteError(w, http.StatusBadGateway, utils.ErrCodeScrapeFailed, result.Error)
 		return
