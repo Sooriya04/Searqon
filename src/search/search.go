@@ -456,15 +456,17 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 				if scraped.Error == "" && scraped.WordCount > 50 {
 					// Apply truncation control
 					content := scraped.Content
+					markdown := scraped.Markdown
 					if maxWords > 0 {
 						content = utils.TruncateTextByWords(content, maxWords)
+						markdown = utils.TruncateTextByWords(markdown, maxWords)
 					}
 
 					var itemCopy models.SearchResult
 					mu.Lock()
 					if idx < len(scrapeResults) {
 						scrapeResults[idx].Content = content
-						scrapeResults[idx].Markdown = scraped.Markdown
+						scrapeResults[idx].Markdown = markdown
 						scrapeResults[idx].Metadata = scraped.Metadata
 						scrapeResults[idx].Scraped = true
 						scrapeResults[idx].ContentHash = scraped.ContentHash
