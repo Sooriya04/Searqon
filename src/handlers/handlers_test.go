@@ -413,3 +413,57 @@ func TestSearchHandler_TokenLimitForwarding(t *testing.T) {
 		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestSearchHandler_SearXNGURLForwarding(t *testing.T) {
+	scrapeFalse := false
+	payload, err := json.Marshal(models.SearchRequest{
+		Query:       "test searxng forwarding",
+		Limit:       2,
+		Scrape:      &scrapeFalse,
+		SearXNGURL:  "http://custom-searxng.internal:8080",
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBuffer(payload))
+	req.Header.Set("X-Searxng-URL", "http://custom-searxng.internal:8080")
+	rr := httptest.NewRecorder()
+	SearchHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPipelineHandler_SearXNGURLForwarding(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>Handler Pipeline Test</title></head><body><article><h1>Scraped Content</h1><p>Testing Searqon HTTP handler end-to-end markdown extraction pipeline with full paragraphs and detailed explanations.</p></article></body></html>`)
+	}))
+	defer ts.Close()
+
+	query := "test pipeline cached query"
+	db.SaveSearchCache(query, []models.SearchResult{
+		{URL: ts.URL, Title: "Handler Pipeline Test"},
+	}, "searxng")
+
+	payload, err := json.Marshal(models.PipelineRequest{
+		Query:       query,
+		MaxSources:  1,
+		SearXNGURL:  "http://custom-searxng.internal:8080",
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/pipeline", bytes.NewBuffer(payload))
+	req.Header.Set("X-Searxng-URL", "http://custom-searxng.internal:8080")
+	rr := httptest.NewRecorder()
+	PipelineHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+}

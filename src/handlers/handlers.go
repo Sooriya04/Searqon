@@ -61,7 +61,15 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		maxTokens = req.TokenLimit
 	}
 
-	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, maxTokens, req.Summarize, req.ExtractSchema)
+	searxngURL := req.SearXNGURL
+	if searxngURL == "" {
+		searxngURL = r.Header.Get("X-Searxng-URL")
+	}
+	if searxngURL == "" && r.URL != nil {
+		searxngURL = r.URL.Query().Get("searxng_url")
+	}
+
+	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, maxTokens, req.Summarize, req.ExtractSchema, searxngURL)
 	utils.WriteSuccess(w, result)
 }
 

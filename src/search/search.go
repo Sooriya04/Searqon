@@ -54,11 +54,18 @@ func getSearXNGBase() string {
 }
 
 func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
+	return searchSearXNGWithURL(query, limit, "")
+}
+
+func searchSearXNGWithURL(query string, limit int, customURL string) ([]models.SearchResult, error) {
 	cfg := config.Get()
-	if !cfg.SearXNG.Enabled {
-		return nil, nil
+	base := strings.TrimRight(strings.TrimSpace(customURL), "/")
+	if base == "" {
+		if !cfg.SearXNG.Enabled {
+			return nil, nil
+		}
+		base = getSearXNGBase()
 	}
-	base := getSearXNGBase()
 	params := url.Values{}
 	params.Set("q", query)
 	params.Set("format", "json")
@@ -186,19 +193,24 @@ type SearchEvent struct {
 type SearchEventHandler func(SearchEvent)
 
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
-func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema)
+func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, searxngURL ...string) models.SearchResponse {
+	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema, searxngURL...)
 }
 
-func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema, nil)
+func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, searxngURL ...string) models.SearchResponse {
+	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema, nil, searxngURL...)
 }
 
 // RunSearchPipelineStream executes the search pipeline and invokes onEvent for incremental streaming updates.
-func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
+func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, onEvent SearchEventHandler, searxngURL ...string) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
+	}
+
+	var targetSearXNG string
+	if len(searxngURL) > 0 {
+		targetSearXNG = strings.TrimSpace(searxngURL[0])
 	}
 
 	response := models.SearchResponse{Query: query}
@@ -309,7 +321,7 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 	limit, scrape = AdjustParamsByIntent(intent, limit, scrape)
 
 	// 3. Web Discovery
-	results, provider := discoverSearchResultsWithIntent(expandedQuery, limit, intent)
+	results, provider := discoverSearchResultsWithIntent(expandedQuery, limit, intent, targetSearXNG)
 	response.Provider = provider
 	if len(results) == 0 {
 		response.Duration = time.Since(start).Milliseconds()

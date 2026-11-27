@@ -83,16 +83,20 @@ class Searqon:
         self,
         base_url: str = "http://localhost:7493",
         api_key: Optional[str] = None,
+        searxng_url: Optional[str] = None,
         timeout: float = 30.0,
         client: Optional[httpx.Client] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.searxng_url = searxng_url.rstrip("/") if searxng_url else None
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Searqon-Python-SDK/0.1.0",
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        if self.searxng_url:
+            headers["X-Searxng-URL"] = self.searxng_url
 
         self._client = client or httpx.Client(
             base_url=self.base_url,
@@ -112,9 +116,14 @@ class Searqon:
         if self._owns_client:
             self._client.close()
 
-    def _post(self, endpoint: str, json_data: Dict[str, Any]) -> Any:
+    def _post(
+        self,
+        endpoint: str,
+        json_data: Dict[str, Any],
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Any:
         try:
-            resp = self._client.post(endpoint, json=json_data)
+            resp = self._client.post(endpoint, json=json_data, headers=headers)
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as err:
             raise SearqonConnectionError(f"Failed to connect to Searqon at {self.base_url}: {err}") from err
         except httpx.TimeoutException as err:
@@ -136,6 +145,7 @@ class Searqon:
         max_tokens: int = 0,
         summarize: bool = False,
         extract_schema: Optional[str] = None,
+        searxng_url: Optional[str] = None,
     ) -> SearchResponse:
         """
         Execute multi-source search query with optional inline scraping.
@@ -149,6 +159,7 @@ class Searqon:
             max_tokens: Truncate content to token budget.
             summarize: If True, generate an AI summary across ranked results.
             extract_schema: Optional structured schema prompt.
+            searxng_url: Optional custom SearXNG instance URL to query.
         """
         payload: Dict[str, Any] = {
             "query": query,
@@ -162,7 +173,13 @@ class Searqon:
         if extract_schema:
             payload["extract_schema"] = extract_schema
 
-        data = self._post("/search", payload)
+        target_searxng = searxng_url or self.searxng_url
+        req_headers = None
+        if target_searxng:
+            payload["searxng_url"] = target_searxng
+            req_headers = {"X-Searxng-URL": target_searxng}
+
+        data = self._post("/search", payload, headers=req_headers)
         return SearchResponse.model_validate(data)
 
     def scrape(
@@ -229,6 +246,7 @@ class Searqon:
         query: str,
         max_sources: int = 5,
         bypass_cache: bool = False,
+        searxng_url: Optional[str] = None,
     ) -> PipelineResponse:
         """
         Execute one-shot RAG pipeline: Search -> Scrape -> BM25 Chunking.
@@ -237,13 +255,20 @@ class Searqon:
             query: User search query or question.
             max_sources: Max sources to discover and scrape (1-10).
             bypass_cache: If True, bypass cache.
+            searxng_url: Optional custom SearXNG instance URL to query.
         """
-        payload = {
+        payload: Dict[str, Any] = {
             "query": query,
             "max_sources": max_sources,
             "bypass_cache": bypass_cache,
         }
-        data = self._post("/pipeline", payload)
+        target_searxng = searxng_url or self.searxng_url
+        req_headers = None
+        if target_searxng:
+            payload["searxng_url"] = target_searxng
+            req_headers = {"X-Searxng-URL": target_searxng}
+
+        data = self._post("/pipeline", payload, headers=req_headers)
         return PipelineResponse.model_validate(data)
 
     def map(self, url: str, limit: int = 50) -> MapResult:
@@ -314,16 +339,20 @@ class AsyncSearqon:
         self,
         base_url: str = "http://localhost:7493",
         api_key: Optional[str] = None,
+        searxng_url: Optional[str] = None,
         timeout: float = 30.0,
         client: Optional[httpx.AsyncClient] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.searxng_url = searxng_url.rstrip("/") if searxng_url else None
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Searqon-Python-SDK/0.1.0",
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        if self.searxng_url:
+            headers["X-Searxng-URL"] = self.searxng_url
 
         self._client = client or httpx.AsyncClient(
             base_url=self.base_url,
@@ -343,9 +372,14 @@ class AsyncSearqon:
         if self._owns_client:
             await self._client.aclose()
 
-    async def _post(self, endpoint: str, json_data: Dict[str, Any]) -> Any:
+    async def _post(
+        self,
+        endpoint: str,
+        json_data: Dict[str, Any],
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Any:
         try:
-            resp = await self._client.post(endpoint, json=json_data)
+            resp = await self._client.post(endpoint, json=json_data, headers=headers)
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError) as err:
             raise SearqonConnectionError(f"Failed to connect to Searqon at {self.base_url}: {err}") from err
         except httpx.TimeoutException as err:
@@ -367,6 +401,7 @@ class AsyncSearqon:
         max_tokens: int = 0,
         summarize: bool = False,
         extract_schema: Optional[str] = None,
+        searxng_url: Optional[str] = None,
     ) -> SearchResponse:
         """Execute async search query with optional inline scraping."""
         payload: Dict[str, Any] = {
@@ -381,7 +416,13 @@ class AsyncSearqon:
         if extract_schema:
             payload["extract_schema"] = extract_schema
 
-        data = await self._post("/search", payload)
+        target_searxng = searxng_url or self.searxng_url
+        req_headers = None
+        if target_searxng:
+            payload["searxng_url"] = target_searxng
+            req_headers = {"X-Searxng-URL": target_searxng}
+
+        data = await self._post("/search", payload, headers=req_headers)
         return SearchResponse.model_validate(data)
 
     async def scrape(
@@ -436,14 +477,21 @@ class AsyncSearqon:
         query: str,
         max_sources: int = 5,
         bypass_cache: bool = False,
+        searxng_url: Optional[str] = None,
     ) -> PipelineResponse:
         """Execute async one-shot RAG pipeline."""
-        payload = {
+        payload: Dict[str, Any] = {
             "query": query,
             "max_sources": max_sources,
             "bypass_cache": bypass_cache,
         }
-        data = await self._post("/pipeline", payload)
+        target_searxng = searxng_url or self.searxng_url
+        req_headers = None
+        if target_searxng:
+            payload["searxng_url"] = target_searxng
+            req_headers = {"X-Searxng-URL": target_searxng}
+
+        data = await self._post("/pipeline", payload, headers=req_headers)
         return PipelineResponse.model_validate(data)
 
     async def map(self, url: str, limit: int = 50) -> MapResult:

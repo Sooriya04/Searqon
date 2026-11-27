@@ -54,8 +54,16 @@ func PipelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Now()
 
+	searxngURL := req.SearXNGURL
+	if searxngURL == "" {
+		searxngURL = r.Header.Get("X-Searxng-URL")
+	}
+	if searxngURL == "" && r.URL != nil {
+		searxngURL = r.URL.Query().Get("searxng_url")
+	}
+
 	// 1. Discover top URLs using the search pipeline (without scraping inside search phase)
-	searchResp := search.RunSearchPipeline(req.Query, req.MaxSources, false, req.BypassCache, 0, 0, false, "")
+	searchResp := search.RunSearchPipeline(req.Query, req.MaxSources, false, req.BypassCache, 0, 0, false, "", searxngURL)
 
 	// 2. Scrape discovered URLs in parallel (with concurrency limit of 3)
 	var wg sync.WaitGroup

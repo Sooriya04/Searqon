@@ -30,6 +30,7 @@ from searqon import Searqon, AsyncSearqon
 client = Searqon(
     base_url="http://localhost:7493",
     api_key=None,
+    searxng_url=None,
     timeout=30.0,
     client=None
 )
@@ -41,6 +42,7 @@ client = Searqon(
 |---|---|---|---|
 | `base_url` | `str` | `"http://localhost:7493"` | URL where your Searqon instance is hosted. |
 | `api_key` | `Optional[str]` | `None` | Optional Bearer token if Searqon authentication is configured. |
+| `searxng_url` | `Optional[str]` | `None` | Custom SearXNG instance URL to query (e.g. `"http://localhost:8080"`). Sets default for `search()` and `pipeline()`. |
 | `timeout` | `float` | `30.0` | Request timeout in seconds. |
 | `client` | `Optional[httpx.Client]` | `None` | Pass a custom pre-configured `httpx.Client` instance if desired. |
 
@@ -75,6 +77,7 @@ resp = client.search(
 - **`max_tokens`** (`int`, default `0`): Maximum token budget for scraped text.
 - **`summarize`** (`bool`, default `False`): When `True`, returns an LLM-synthesized summary across results.
 - **`extract_schema`** (`Optional[str]`, default `None`): Optional schema for structured data extraction.
+- **`searxng_url`** (`Optional[str]`, default `None`): Custom SearXNG instance URL to query for this search, overriding the client default.
 
 #### Returns
 `SearchResponse` object.
@@ -148,6 +151,7 @@ rag = client.pipeline(
 - **`query`** (`str`, required): Question or topic to research.
 - **`max_sources`** (`int`, default `5`): Maximum URLs to discover and scrape (1-10).
 - **`bypass_cache`** (`bool`, default `False`): Force fresh search and scrape.
+- **`searxng_url`** (`Optional[str]`, default `None`): Custom SearXNG instance URL to query during discovery, overriding the client default.
 
 #### Returns
 `PipelineResponse` object with ranked `.sources` and `.chunks`.

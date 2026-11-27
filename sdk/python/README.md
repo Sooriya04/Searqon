@@ -52,14 +52,17 @@ Download the precompiled binary from Releases and run:
 ```python
 from searqon import Searqon
 
-client = Searqon("http://localhost:7493")
+# Connect to Searqon; optionally point to a custom or standalone SearXNG instance:
+client = Searqon("http://localhost:7493", searxng_url="http://localhost:8080")
 
 # Search across search engines and scrape top matches in one request
 resp = client.search(
     query="latest connectome transformer research",
     limit=5,
     scrape=True,
-    max_words=500
+    max_words=500,
+    # Or override searxng_url per-query:
+    # searxng_url="http://custom-searxng:8080"
 )
 
 print(f"Total results: {resp.total}")

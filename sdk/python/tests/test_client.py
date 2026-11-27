@@ -240,3 +240,69 @@ async def test_async_client_unwraps_response_envelope():
             assert isinstance(res, ScrapeResult)
             assert res.title == "Async Scrape"
             assert res.word_count == 100
+
+
+def test_searxng_url_client_level():
+    mock_payload = {
+        "query": "searxng client test",
+        "total": 1,
+        "results": [{"title": "R1", "url": "https://example.com", "source": "searxng"}],
+    }
+    mock_resp = httpx.Response(200, json={"success": True, "data": mock_payload})
+    with patch.object(httpx.Client, "post", return_value=mock_resp) as mock_post:
+        client = Searqon("http://localhost:7493", searxng_url="http://custom-searxng:8080")
+        assert client.searxng_url == "http://custom-searxng:8080"
+
+        client.search("searxng client test")
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["json"]["searxng_url"] == "http://custom-searxng:8080"
+        assert call_kwargs["headers"]["X-Searxng-URL"] == "http://custom-searxng:8080"
+
+
+def test_searxng_url_method_override():
+    mock_payload = {
+        "query": "searxng override test",
+        "total": 1,
+        "results": [{"title": "R1", "url": "https://example.com", "source": "searxng"}],
+    }
+    mock_resp = httpx.Response(200, json={"success": True, "data": mock_payload})
+    with patch.object(httpx.Client, "post", return_value=mock_resp) as mock_post:
+        client = Searqon("http://localhost:7493", searxng_url="http://default-searxng:8080")
+        client.search("searxng override test", searxng_url="http://override-searxng:9090")
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["json"]["searxng_url"] == "http://override-searxng:9090"
+        assert call_kwargs["headers"]["X-Searxng-URL"] == "http://override-searxng:9090"
+
+
+def test_pipeline_searxng_url():
+    mock_payload = {
+        "query": "pipeline searxng test",
+        "sources": [],
+        "chunks": [],
+        "totalSources": 0,
+        "totalChunks": 0,
+        "duration": 50,
+    }
+    mock_resp = httpx.Response(200, json={"success": True, "data": mock_payload})
+    with patch.object(httpx.Client, "post", return_value=mock_resp) as mock_post:
+        client = Searqon("http://localhost:7493")
+        client.pipeline("pipeline searxng test", searxng_url="http://pipe-searxng:8080")
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["json"]["searxng_url"] == "http://pipe-searxng:8080"
+        assert call_kwargs["headers"]["X-Searxng-URL"] == "http://pipe-searxng:8080"
+
+
+@pytest.mark.asyncio
+async def test_async_searxng_url():
+    mock_payload = {
+        "query": "async searxng test",
+        "total": 1,
+        "results": [{"title": "R1", "url": "https://example.com", "source": "searxng"}],
+    }
+    mock_resp = httpx.Response(200, json={"success": True, "data": mock_payload})
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=mock_resp) as mock_post:
+        client = AsyncSearqon(searxng_url="http://async-searxng:8080")
+        await client.search("async searxng test")
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["json"]["searxng_url"] == "http://async-searxng:8080"
+        assert call_kwargs["headers"]["X-Searxng-URL"] == "http://async-searxng:8080"

@@ -46,6 +46,11 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	searxngURL := strings.TrimSpace(r.URL.Query().Get("searxng_url"))
+	if searxngURL == "" {
+		searxngURL = r.Header.Get("X-Searxng-URL")
+	}
+
 	search.RunSearchPipelineStream(r.Context(), query, 5, true, false, 0, 0, true, "", func(evt search.SearchEvent) {
 		switch evt.Type {
 		case "discovery":
@@ -82,5 +87,5 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 			doneBytes, _ := json.Marshal(evt.Data)
 			safeWrite("done", doneBytes)
 		}
-	})
+	}, searxngURL)
 }

@@ -155,6 +155,7 @@ type SearchRequest struct {
 	TokenLimit    int    `json:"token_limit"`
 	Summarize     bool   `json:"summarize"`
 	ExtractSchema string `json:"extract_schema,omitempty"`
+	SearXNGURL    string `json:"searxng_url,omitempty"`
 }
 
 type ScrapeRequest struct {
@@ -214,6 +215,7 @@ type PipelineRequest struct {
 	Query       string `json:"query"`
 	MaxSources  int    `json:"max_sources"`
 	BypassCache bool   `json:"bypass_cache"`
+	SearXNGURL  string `json:"searxng_url,omitempty"`
 }
 
 // PipelineSource represents a scraped source returned in pipeline response.

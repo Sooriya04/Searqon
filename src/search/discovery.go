@@ -86,11 +86,11 @@ type aggregatedResult struct {
 	sourceHits map[string]bool
 }
 
-func discoverSearchResults(query string, limit int) ([]models.SearchResult, string) {
-	return discoverSearchResultsWithIntent(query, limit, IntentGeneric)
+func discoverSearchResults(query string, limit int, searxngURL ...string) ([]models.SearchResult, string) {
+	return discoverSearchResultsWithIntent(query, limit, IntentGeneric, searxngURL...)
 }
 
-func discoverSearchResultsWithIntent(query string, limit int, intent SearchIntent) ([]models.SearchResult, string) {
+func discoverSearchResultsWithIntent(query string, limit int, intent SearchIntent, searxngURL ...string) ([]models.SearchResult, string) {
 	queries := decomposeQueries(query)
 	if len(queries) == 0 {
 		queries = []string{query}
@@ -99,18 +99,28 @@ func discoverSearchResultsWithIntent(query string, limit int, intent SearchInten
 		queries = queries[:3]
 	}
 
+	var customSearXNG string
+	if len(searxngURL) > 0 {
+		customSearXNG = strings.TrimSpace(searxngURL[0])
+	}
+
 	cfg := config.Get()
+	searxngEnabled := cfg.SearXNG.Enabled || customSearXNG != ""
+	searxngFn := func(q string, lim int) ([]models.SearchResult, error) {
+		return searchSearXNGWithURL(q, lim, customSearXNG)
+	}
+
 	var engines []discoveryEngine
 	if intent == IntentAcademic {
 		engines = append(engines, discoveryEngine{name: "arxiv", fn: searchArxiv})
 		engines = append(engines, discoveryEngine{name: "wikipedia", fn: searchWikipedia})
-		if cfg.SearXNG.Enabled {
-			engines = append(engines, discoveryEngine{name: "searxng", fn: searchSearXNG})
+		if searxngEnabled {
+			engines = append(engines, discoveryEngine{name: "searxng", fn: searxngFn})
 		}
 		engines = append(engines, discoveryEngine{name: "duckduckgo", fn: searchDDGFallback})
 	} else {
-		if cfg.SearXNG.Enabled {
-			engines = append(engines, discoveryEngine{name: "searxng", fn: searchSearXNG})
+		if searxngEnabled {
+			engines = append(engines, discoveryEngine{name: "searxng", fn: searxngFn})
 		}
 		engines = append(engines, discoveryEngine{name: "wikipedia", fn: searchWikipedia})
 		engines = append(engines, discoveryEngine{name: "arxiv", fn: searchArxiv})

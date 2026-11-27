@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -99,5 +100,38 @@ func TestFallbackHTTPClientConfiguration(t *testing.T) {
 	}
 	if transport.IdleConnTimeout != 90*time.Second {
 		t.Errorf("expected IdleConnTimeout=90s, got %v", transport.IdleConnTimeout)
+	}
+}
+
+func TestSearchSearXNGWithURL_CustomEndpoint(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("q") != "custom endpoint test" {
+			http.Error(w, "bad query", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"results":[{"url":"https://example.com/custom","title":"Custom SearXNG Result","content":"Custom content snippet"}]}`))
+	}))
+	defer ts.Close()
+
+	results, err := searchSearXNGWithURL("custom endpoint test", 5, ts.URL)
+	if err != nil {
+		t.Fatalf("unexpected error querying custom searxng: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].URL != "https://example.com/custom" {
+		t.Fatalf("expected custom URL, got %s", results[0].URL)
+	}
+	if results[0].Title != "Custom SearXNG Result" {
+		t.Fatalf("expected custom title, got %s", results[0].Title)
+	}
+	if results[0].Source != "searxng" {
+		t.Fatalf("expected source 'searxng', got %s", results[0].Source)
 	}
 }
