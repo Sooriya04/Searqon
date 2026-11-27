@@ -1,7 +1,6 @@
 package search
 
 import (
-	"hash/fnv"
 	"math/bits"
 
 	"src/models"
@@ -25,13 +24,14 @@ func SimHash(text string) uint64 {
 	vector := make([]int, 64)
 
 	for _, f := range features {
-		h := fnv.New64a()
-		h.Write([]byte(f))
-		hashVal := h.Sum64()
+		var hashVal uint64 = 14695981039346656037
+		for j := 0; j < len(f); j++ {
+			hashVal ^= uint64(f[j])
+			hashVal *= 1099511628211
+		}
 
 		for i := 0; i < 64; i++ {
-			bit := (hashVal >> i) & 1
-			if bit == 1 {
+			if (hashVal>>i)&1 == 1 {
 				vector[i]++
 			} else {
 				vector[i]--

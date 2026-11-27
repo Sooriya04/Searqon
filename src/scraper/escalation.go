@@ -28,10 +28,10 @@ const (
 )
 
 // fetchHTTPRaw performs a single HTTP request with custom transport, headers, and decompression.
-func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.Transport, timeout time.Duration) (string, int, string, *url.URL, error) {
+func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.Transport, timeout time.Duration) ([]byte, int, string, *url.URL, error) {
 	parsedURL, err := ValidateScrapeURL(targetURL)
 	if err != nil {
-		return "", 0, "", nil, err
+		return nil, 0, "", nil, err
 	}
 
 	if transport == nil {
@@ -45,7 +45,7 @@ func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.T
 
 	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
 	if err != nil {
-		return "", 0, "", nil, fmt.Errorf("request build failed: %w", err)
+		return nil, 0, "", nil, fmt.Errorf("request build failed: %w", err)
 	}
 
 	for k, v := range headers {
@@ -68,7 +68,7 @@ func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.T
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", 0, "", nil, err
+		return nil, 0, "", nil, err
 	}
 	defer resp.Body.Close()
 
@@ -91,10 +91,10 @@ func fetchHTTPRaw(targetURL string, headers map[string]string, transport *http.T
 
 	bodyBytes, err := io.ReadAll(io.LimitReader(reader, 8*1024*1024))
 	if err != nil && len(bodyBytes) == 0 {
-		return "", statusCode, contentType, finalURL, fmt.Errorf("read body failed: %w", err)
+		return nil, statusCode, contentType, finalURL, fmt.Errorf("read body failed: %w", err)
 	}
 
-	return string(bodyBytes), statusCode, contentType, finalURL, nil
+	return bodyBytes, statusCode, contentType, finalURL, nil
 }
 
 // ExecuteSmartEscalationScrape executes the multi-tier anti-bot escalation ladder:
@@ -122,7 +122,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 		}
 
 		directTransport := NewDirectTransport()
-		body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 2500*time.Millisecond)
+		bodyBytes, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 2500*time.Millisecond)
 
 		if err == nil {
 			finalURLStr := targetURL
@@ -132,14 +132,15 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 			// Directly handle PDF documents to bypass HTML readability & anti-bot escalation storms
 			if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
-				pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+				pdfRes, pdfErr := ScrapePDFContent(bodyBytes, targetURL, finalURLStr, startTime, opts)
 				if pdfErr == nil && pdfRes.WordCount > 0 {
 					log.Printf("[Escalation] Tier 1 (Fast HTTP PDF) succeeded in %dms for %s", time.Since(t1Start).Milliseconds(), targetURL)
 					pdfRes.StatusCode = statusCode
-					return pdfRes, body, nil
+					return pdfRes, string(bodyBytes), nil
 				}
 			}
 
+			body := string(bodyBytes)
 			block := DetectBotChallenge(statusCode, body, contentType)
 			if !block.IsBlocked && statusCode < 400 {
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
@@ -184,7 +185,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 		headers := GetStealthSpoofedHeaders(targetURL, &persona)
 
 		directTransport := NewDirectTransport()
-		body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 4000*time.Millisecond)
+		bodyBytes, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, directTransport, 4000*time.Millisecond)
 
 		if err == nil {
 			finalURLStr := targetURL
@@ -194,15 +195,16 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 
 			// Directly handle PDF documents to bypass HTML readability & anti-bot escalation storms
 			if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
-				pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+				pdfRes, pdfErr := ScrapePDFContent(bodyBytes, targetURL, finalURLStr, startTime, opts)
 				if pdfErr == nil && pdfRes.WordCount > 0 {
 					log.Printf("[Escalation] Tier 2 (Spoofed Headers PDF) succeeded in %dms for %s", time.Since(t2Start).Milliseconds(), targetURL)
 					pdfRes.StatusCode = statusCode
 					pdfRes.EscalationTier = string(TierSpoofedHeaders)
-					return pdfRes, body, nil
+					return pdfRes, string(bodyBytes), nil
 				}
 			}
 
+			body := string(bodyBytes)
 			block := DetectBotChallenge(statusCode, body, contentType)
 			if !block.IsBlocked && statusCode < 400 {
 				parsed := ScrapeHTMLContentWithSchema(body, targetURL, finalURLStr, opts.Format, startTime, opts.ExtractSchema)
@@ -341,7 +343,7 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 				headers := GetStealthSpoofedHeaders(targetURL, &persona)
 				proxyTransport := NewProxyTransport(proxyURL)
 
-				body, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, proxyTransport, 6000*time.Millisecond)
+				bodyBytes, statusCode, contentType, finalURL, err := fetchHTTPRaw(targetURL, headers, proxyTransport, 6000*time.Millisecond)
 				if err == nil {
 					finalURLStr := targetURL
 					if finalURL != nil {
@@ -349,16 +351,17 @@ func ExecuteSmartEscalationScrape(targetURL string, userAgent string, opts Scrap
 					}
 
 					if statusCode < 400 && IsPDFResponse(targetURL, contentType) {
-						pdfRes, pdfErr := ScrapePDFContent(body, targetURL, finalURLStr, startTime, opts)
+						pdfRes, pdfErr := ScrapePDFContent(bodyBytes, targetURL, finalURLStr, startTime, opts)
 						if pdfErr == nil && pdfRes.WordCount > 0 {
 							log.Printf("[Escalation] Tier 4 (Proxy PDF) succeeded in %dms for %s", time.Since(t4Start).Milliseconds(), targetURL)
 							pdfRes.StatusCode = statusCode
 							pdfRes.EscalationTier = string(TierResidentialProxy)
 							pdfRes.BotDetected = true
-							return pdfRes, body, nil
+							return pdfRes, string(bodyBytes), nil
 						}
 					}
 
+					body := string(bodyBytes)
 					block := DetectBotChallenge(statusCode, body, contentType)
 					if !block.IsBlocked && statusCode < 400 && utils.CountWords(body) >= 20 {
 						log.Printf("[Escalation] Tier 4 (Residential Proxy HTTP) succeeded in %dms for %s", time.Since(t4Start).Milliseconds(), targetURL)

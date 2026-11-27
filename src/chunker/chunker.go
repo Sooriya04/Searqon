@@ -94,7 +94,7 @@ func ChunkMarkdown(content string, url string, title string, scrapedAt string) [
 	if len(currentSentences) > 0 {
 		chunkText := strings.Join(currentSentences, " ")
 		wordCount := len(strings.Fields(chunkText))
-		if wordCount >= MinChunkWords {
+		if wordCount > 0 {
 			chunks = append(chunks, models.Chunk{
 				Index:      chunkIndex,
 				Text:       chunkText,

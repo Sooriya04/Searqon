@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/url"
 	"strings"
@@ -13,11 +14,10 @@ import (
 	"src/utils"
 )
 
-// ExtractPDFText extracts text from a PDF document stream.
-func ExtractPDFText(body io.Reader) (string, error) {
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return "", err
+// ExtractPDFBytes extracts text directly from a raw PDF byte slice without extra buffering.
+func ExtractPDFBytes(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", errors.New("empty PDF data")
 	}
 
 	readerAt := bytes.NewReader(data)
@@ -52,6 +52,15 @@ func ExtractPDFText(body io.Reader) (string, error) {
 	return buf.String(), nil
 }
 
+// ExtractPDFText extracts text from a PDF document stream.
+func ExtractPDFText(body io.Reader) (string, error) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return "", err
+	}
+	return ExtractPDFBytes(data)
+}
+
 // IsPDFResponse determines if the request target or response indicates a PDF document.
 func IsPDFResponse(targetURL string, contentType string) bool {
 	if strings.Contains(strings.ToLower(contentType), "application/pdf") {
@@ -69,8 +78,8 @@ func IsPDFResponse(targetURL string, contentType string) bool {
 }
 
 // ScrapePDFContent extracts text and builds a models.ScrapeResult from a PDF stream or byte slice.
-func ScrapePDFContent(rawBody string, targetURL string, finalURL string, startTime time.Time, opts ScrapeOptions) (models.ScrapeResult, error) {
-	text, err := ExtractPDFText(strings.NewReader(rawBody))
+func ScrapePDFContent(rawBody []byte, targetURL string, finalURL string, startTime time.Time, opts ScrapeOptions) (models.ScrapeResult, error) {
+	text, err := ExtractPDFBytes(rawBody)
 	if err != nil {
 		return models.ScrapeResult{}, err
 	}
