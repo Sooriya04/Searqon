@@ -103,6 +103,7 @@ func ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		ExtractSchema: req.ExtractSchema,
 		StealthLevel:  req.StealthLevel,
 		MaxTokens:     maxTokens,
+		MaxWords:      req.MaxWords,
 	})
 	if result.Error != "" || result.StructuredError != nil {
 		se := result.StructuredError

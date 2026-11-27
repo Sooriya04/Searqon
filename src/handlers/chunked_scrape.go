@@ -31,6 +31,7 @@ func ChunkedScrapeHandler(w http.ResponseWriter, r *http.Request) {
 		Format:        req.Format,
 		BypassCache:   req.BypassCache,
 		ExtractSchema: req.ExtractSchema,
+		MaxWords:      req.MaxWords,
 	})
 	if result.Error != "" || result.StructuredError != nil {
 		se := result.StructuredError

@@ -68,6 +68,7 @@ func BatchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 				Format:       req.Format,
 				BypassCache:  req.BypassCache,
 				StealthLevel: req.StealthLevel,
+				MaxWords:     req.MaxWords,
 			})
 			results[index] = scraped
 		}(i, u)
