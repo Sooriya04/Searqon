@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestBoundedRawHTMLCache_BasicAndEviction(t *testing.T) {
@@ -77,3 +78,20 @@ func TestBoundedRawHTMLCache_Concurrency(t *testing.T) {
 		t.Fatalf("cache exceeded capacity 16: got %d", c.Len())
 	}
 }
+
+func TestRobotsCrawlDelay_Clamped(t *testing.T) {
+	// Verify that robots crawl-delay is parsed with a 3-second ceiling
+	body := "User-agent: *\nCrawl-delay: 120\n"
+	parsed := parseRobotsTxt(body)
+	if parsed == nil {
+		t.Fatal("expected non-nil robots data")
+	}
+	allowed, delay := isAgentAllowed("https://example.com/test", "*", parsed)
+	if !allowed {
+		t.Errorf("expected allowed=true")
+	}
+	if delay > 3*time.Second {
+		t.Errorf("expected delay clamped to <= 3s, got %v", delay)
+	}
+}
+

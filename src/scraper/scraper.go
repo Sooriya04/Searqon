@@ -448,7 +448,17 @@ func scrapeSingleURLInternalContext(ctx context.Context, targetURL string, opts 
 			return result, ""
 		}
 		if delay > 0 {
-			time.Sleep(delay)
+			maxDelay := 3 * time.Second
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+			select {
+			case <-ctx.Done():
+				result.Error = "scrape aborted: context cancelled during crawl delay"
+				result.EndTime = time.Now().UTC().Format(time.RFC3339)
+				return result, ""
+			case <-time.After(delay):
+			}
 		}
 	}
 
