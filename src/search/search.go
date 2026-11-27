@@ -143,7 +143,11 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 		return nil, fmt.Errorf("DDG returned HTTP %d", resp.StatusCode)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	return parseDDGHTML(resp.Body, limit)
+}
+
+func parseDDGHTML(r io.Reader, limit int) ([]models.SearchResult, error) {
+	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		return nil, err
 	}
@@ -155,14 +159,39 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 		}
 
 		title := strings.TrimSpace(s.Find(".result__title").Text())
-		rawURL := strings.TrimSpace(s.Find(".result__url").Text())
 		snippet := strings.TrimSpace(s.Find(".result__snippet").Text())
 
-		if rawURL != "" && !strings.HasPrefix(rawURL, "http") {
-			rawURL = "https://" + rawURL
+		rawURL := ""
+		if href, exists := s.Find(".result__a").Attr("href"); exists && href != "" {
+			rawURL = href
+		} else if href, exists := s.Find("a.result__url").Attr("href"); exists && href != "" {
+			rawURL = href
+		} else if href, exists := s.Find(".result__url").Attr("href"); exists && href != "" {
+			rawURL = href
 		}
 
-		if rawURL == "" || strings.Contains(rawURL, "duckduckgo.com") {
+		rawURL = strings.TrimSpace(rawURL)
+		if rawURL == "" {
+			return
+		}
+
+		if strings.HasPrefix(rawURL, "//") {
+			rawURL = "https:" + rawURL
+		} else if strings.HasPrefix(rawURL, "/") {
+			rawURL = "https://duckduckgo.com" + rawURL
+		}
+
+		if u, err := url.Parse(rawURL); err == nil {
+			if target := u.Query().Get("uddg"); target != "" {
+				rawURL = target
+			}
+		}
+
+		if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+			return
+		}
+
+		if strings.Contains(rawURL, "duckduckgo.com") || strings.Contains(rawURL, " ") {
 			return
 		}
 
