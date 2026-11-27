@@ -391,3 +391,25 @@ func TestBatchScrapeHandler_MaxURLLimit(t *testing.T) {
 		t.Errorf("Expected error message to mention maximum limit, got: %s", rr.Body.String())
 	}
 }
+
+func TestSearchHandler_TokenLimitForwarding(t *testing.T) {
+	scrapeFalse := false
+	payload, err := json.Marshal(models.SearchRequest{
+		Query:      "test token forwarding",
+		Limit:      3,
+		Scrape:     &scrapeFalse,
+		MaxTokens:  100,
+		TokenLimit: 100,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBuffer(payload))
+	rr := httptest.NewRecorder()
+	SearchHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+}

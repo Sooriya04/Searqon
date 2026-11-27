@@ -56,7 +56,12 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	IncSearchRequests()
 
-	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, req.Summarize, req.ExtractSchema)
+	maxTokens := req.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = req.TokenLimit
+	}
+
+	result := search.RunSearchPipeline(req.Query, req.Limit, defaultScrape, req.BypassCache, req.MaxWords, maxTokens, req.Summarize, req.ExtractSchema)
 	utils.WriteSuccess(w, result)
 }
 

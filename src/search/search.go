@@ -179,16 +179,16 @@ type SearchEvent struct {
 type SearchEventHandler func(SearchEvent)
 
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
-func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, summarize, extractSchema)
+func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema)
 }
 
-func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, summarize, extractSchema, nil)
+func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema, nil)
 }
 
 // RunSearchPipelineStream executes the search pipeline and invokes onEvent for incremental streaming updates.
-func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
+func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
@@ -395,6 +395,7 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 					Format:        "markdown",
 					BypassCache:   bypassCache,
 					ExtractSchema: extractSchema,
+					MaxTokens:     maxTokens,
 				})
 
 				select {
