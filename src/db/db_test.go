@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,8 +36,8 @@ func TestSQLiteDatabaseOperations(t *testing.T) {
 	if GetBackend() != "sqlite" {
 		t.Fatalf("expected backend 'sqlite', got '%s'", GetBackend())
 	}
-	if stats := sqliteDB.Stats(); stats.MaxOpenConnections != 1 {
-		t.Fatalf("expected MaxOpenConnections=1, got %d", stats.MaxOpenConnections)
+	if stats := sqliteDB.Stats(); stats.MaxOpenConnections != 4 {
+		t.Fatalf("expected MaxOpenConnections=4, got %d", stats.MaxOpenConnections)
 	}
 
 	// 1. Test Search Cache
@@ -243,5 +244,50 @@ func TestSQLiteSchemaMigrationPreExistingDB(t *testing.T) {
 	}
 	if got.ContentHash != "hash-legacy-12345" {
 		t.Errorf("expected ContentHash 'hash-legacy-12345', got '%s'", got.ContentHash)
+	}
+}
+
+func TestSQLiteConcurrentReaders(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "searqon_wal_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "test_wal.db")
+	initSQLite(dbPath)
+	defer CloseDB()
+
+	stats := sqliteDB.Stats()
+	if stats.MaxOpenConnections != 4 {
+		t.Fatalf("expected MaxOpenConnections=4, got %d", stats.MaxOpenConnections)
+	}
+
+	// Save an item to read concurrently
+	res := models.ScrapeResult{
+		URL:     "https://concurrent.local/test",
+		Title:   "Concurrent Read Test",
+		Content: "Concurrent read content",
+	}
+	SaveScrapeCache(res)
+
+	// Launch concurrent readers
+	const numReaders = 8
+	errChan := make(chan error, numReaders)
+	for i := 0; i < numReaders; i++ {
+		go func() {
+			_, found := GetScrapeCache("https://concurrent.local/test")
+			if !found {
+				errChan <- fmt.Errorf("failed to find cache entry in concurrent reader")
+				return
+			}
+			errChan <- nil
+		}()
+	}
+
+	for i := 0; i < numReaders; i++ {
+		if err := <-errChan; err != nil {
+			t.Fatal(err)
+		}
 	}
 }
