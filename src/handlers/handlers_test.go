@@ -365,3 +365,29 @@ func TestCrawlHandler_ParameterParity(t *testing.T) {
 		t.Fatalf("expected 200 OK for crawl with max_depth, got %d: %s", rr2.Code, rr2.Body.String())
 	}
 }
+
+func TestBatchScrapeHandler_MaxURLLimit(t *testing.T) {
+	urls := make([]string, MaxBatchURLs+1)
+	for i := 0; i < len(urls); i++ {
+		urls[i] = fmt.Sprintf("https://example.com/%d", i)
+	}
+
+	payload, err := json.Marshal(models.BatchScrapeRequest{
+		URLs: urls,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/scrape/batch", bytes.NewBuffer(payload))
+	rr := httptest.NewRecorder()
+	BatchScrapeHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request for batch scrape exceeding max URL limit, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !strings.Contains(rr.Body.String(), "exceeds maximum limit of 50 URLs") {
+		t.Errorf("Expected error message to mention maximum limit, got: %s", rr.Body.String())
+	}
+}
