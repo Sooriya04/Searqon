@@ -56,11 +56,17 @@ func WriteError(w http.ResponseWriter, status int, code, msg string) {
 	})
 }
 
-// WriteSearqonError writes a deterministic structured SearqonError response with the appropriate status code.
+// WriteSearqonError writes a deterministic structured SearqonError response wrapped in the standard APIResponse envelope.
 func WriteSearqonError(w http.ResponseWriter, se *models.SearqonError) {
 	status := se.StatusCode
 	if status == 0 {
 		status = http.StatusBadGateway
 	}
-	writeJSON(w, status, se)
+	writeJSON(w, status, APIResponse{
+		Success: false,
+		Error: &APIError{
+			Code:    string(se.ErrorType),
+			Message: se.Message,
+		},
+	})
 }
