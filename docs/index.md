@@ -32,7 +32,7 @@ cd searqon/src
 go run .
 
 # Test it
-curl -X POST http://localhost:4001/search \
+curl -X POST http://localhost:7493/search \
   -H "Content-Type: application/json" \
   -d '{"query": "what is ycombinator", "limit": 5, "scrape": true}'
 ```

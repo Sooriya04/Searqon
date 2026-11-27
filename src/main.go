@@ -40,7 +40,7 @@ func main() {
 
 	port := fmt.Sprintf("%d", cfg.Server.Port)
 	if port == "0" {
-		port = "4001"
+		port = "7493"
 	}
 
 	readTimeout := time.Duration(cfg.Server.ReadTimeoutSeconds) * time.Second
