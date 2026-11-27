@@ -107,6 +107,7 @@ func main() {
 	mux.HandleFunc("/map", handlers.MapHandler)
 
 	// Utility, Logs and Telemetry
+	mux.HandleFunc("/pdf", handlers.PDFHandler)
 	mux.HandleFunc("/screenshot", handlers.ScreenshotHandler)
 	mux.HandleFunc("/summarize", handlers.SummarizeHandler)
 	mux.HandleFunc("/extract", handlers.ExtractHandler)
