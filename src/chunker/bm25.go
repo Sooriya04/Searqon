@@ -34,12 +34,25 @@ func ScoreChunks(chunks []models.Chunk, query string) []models.Chunk {
 		avgdl = 1.0
 	}
 
+	type chunkTF struct {
+		tf map[string]int
+	}
+	chunkTFs := make([]chunkTF, len(chunks))
+	for i, chunk := range chunks {
+		words := strings.Fields(strings.ToLower(chunk.Text))
+		tf := make(map[string]int, len(words))
+		for _, w := range words {
+			tf[cleanWord(w)]++
+		}
+		chunkTFs[i] = chunkTF{tf: tf}
+	}
+
 	dfMap := make(map[string]float64)
 	for _, term := range queryTerms {
+		cleanTerm := cleanWord(term)
 		var df float64
-		for _, chunk := range chunks {
-			doc := strings.ToLower(chunk.Text)
-			if strings.Contains(doc, term) {
+		for _, ctf := range chunkTFs {
+			if ctf.tf[cleanTerm] > 0 {
 				df++
 			}
 		}
@@ -47,15 +60,7 @@ func ScoreChunks(chunks []models.Chunk, query string) []models.Chunk {
 	}
 
 	for i, chunk := range chunks {
-		doc := strings.ToLower(chunk.Text)
-		words := strings.Fields(doc)
-		
-		tf := make(map[string]int)
-		for _, w := range words {
-			wClean := cleanWord(w)
-			tf[wClean]++
-		}
-
+		tf := chunkTFs[i].tf
 		var score float64
 		for _, term := range queryTerms {
 			df := dfMap[term]

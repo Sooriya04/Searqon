@@ -129,3 +129,26 @@ func TestScoreChunks_BM25(t *testing.T) {
 		t.Errorf("expected 2 chunks for empty query")
 	}
 }
+
+func TestScoreChunks_BM25_SubstringNotCountedAsExactWord(t *testing.T) {
+	c1 := models.Chunk{
+		Index:     0,
+		Text:      "We need an algorithm for categorizing documents ongoingly",
+		WordCount: 7,
+	}
+	c2 := models.Chunk{
+		Index:     1,
+		Text:      "Go is a statically typed compiled programming language",
+		WordCount: 8,
+	}
+
+	chunks := []models.Chunk{c1, c2}
+	scored := ScoreChunks(chunks, "go")
+
+	if scored[0].BM25Score != 0 {
+		t.Errorf("expected chunk 1 with only substring 'go' (in algorithm/categorizing) to score 0, got %f", scored[0].BM25Score)
+	}
+	if scored[1].BM25Score <= 0 {
+		t.Errorf("expected chunk 2 with exact word 'Go' to score > 0, got %f", scored[1].BM25Score)
+	}
+}
