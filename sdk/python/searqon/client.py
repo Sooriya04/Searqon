@@ -318,7 +318,10 @@ class Searqon:
         except Exception as err:
             raise SearqonConnectionError(f"Health check failed: {err}") from err
         _handle_response_error(resp)
-        return resp.json()
+        body = resp.json()
+        if isinstance(body, dict):
+            return body.get("data", body)
+        return body
 
 
 class AsyncSearqon:
@@ -541,4 +544,7 @@ class AsyncSearqon:
         except Exception as err:
             raise SearqonConnectionError(f"Health check failed: {err}") from err
         _handle_response_error(resp)
-        return resp.json()
+        body = resp.json()
+        if isinstance(body, dict):
+            return body.get("data", body)
+        return body

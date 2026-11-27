@@ -306,3 +306,40 @@ async def test_async_searxng_url():
         call_kwargs = mock_post.call_args[1]
         assert call_kwargs["json"]["searxng_url"] == "http://async-searxng:8080"
         assert call_kwargs["headers"]["X-Searxng-URL"] == "http://async-searxng:8080"
+
+
+def test_health_unwraps_data_envelope():
+    mock_payload = {
+        "success": True,
+        "data": {
+            "status": "ok",
+            "engine": "searqon",
+            "endpoints": ["/search", "/scrape", "/pdf", "/health"],
+        },
+    }
+    mock_resp = httpx.Response(200, json=mock_payload)
+    with patch.object(httpx.Client, "get", return_value=mock_resp):
+        client = Searqon()
+        health = client.health()
+        assert health["status"] == "ok"
+        assert "success" not in health
+        assert "/pdf" in health["endpoints"]
+
+
+@pytest.mark.asyncio
+async def test_async_health_unwraps_data_envelope():
+    mock_payload = {
+        "success": True,
+        "data": {
+            "status": "ok",
+            "engine": "searqon",
+            "endpoints": ["/search", "/scrape", "/pdf", "/health"],
+        },
+    }
+    mock_resp = httpx.Response(200, json=mock_payload)
+    with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock, return_value=mock_resp):
+        client = AsyncSearqon()
+        health = await client.health()
+        assert health["status"] == "ok"
+        assert "success" not in health
+        assert "/pdf" in health["endpoints"]

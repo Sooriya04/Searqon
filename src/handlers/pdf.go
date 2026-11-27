@@ -12,19 +12,22 @@ import (
 	"src/utils"
 )
 
-type ScreenshotRequest struct {
+type PDFRequest struct {
 	URL    string `json:"url"`
 	Format string `json:"format"`
 }
 
-// ScreenshotHandler renders a target page as a structured PDF document.
-func ScreenshotHandler(w http.ResponseWriter, r *http.Request) {
+// ScreenshotRequest is a backward-compatible type alias for PDFRequest.
+type ScreenshotRequest = PDFRequest
+
+// PDFHandler renders a target page as a structured PDF document.
+func PDFHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		utils.WriteError(w, http.StatusMethodNotAllowed, utils.ErrCodeMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	var req ScreenshotRequest
+	var req PDFRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeInvalidJSON, "Invalid JSON request body")
 		return
@@ -38,7 +41,7 @@ func ScreenshotHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Format != "pdf" {
-		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "Only 'pdf' format is supported for rendering screenshots/documents")
+		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "Only 'pdf' format is supported for rendering documents")
 		return
 	}
 
@@ -64,7 +67,7 @@ func ScreenshotHandler(w http.ResponseWriter, r *http.Request) {
 
 	pdf.SetFont("Arial", "", 11)
 	pdf.SetTextColor(30, 30, 30)
-	
+
 	paragraphs := splitIntoParagraphs(result.Content)
 	for _, p := range paragraphs {
 		pdf.MultiCell(0, 6, p, "", "L", false)
@@ -78,6 +81,9 @@ func ScreenshotHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, utils.ErrCodeInternalError, "Failed to render PDF: "+err.Error())
 	}
 }
+
+// ScreenshotHandler is maintained as a backward-compatible alias to PDFHandler.
+var ScreenshotHandler = PDFHandler
 
 func splitIntoParagraphs(text string) []string {
 	var paras []string

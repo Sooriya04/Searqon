@@ -467,3 +467,40 @@ func TestPipelineHandler_SearXNGURLForwarding(t *testing.T) {
 		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestPDFHandler_Validation(t *testing.T) {
+	// Method not allowed
+	req := httptest.NewRequest(http.MethodGet, "/pdf", nil)
+	rr := httptest.NewRecorder()
+	PDFHandler(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected 405 Method Not Allowed, got %d", rr.Code)
+	}
+
+	// Missing URL
+	payload := bytes.NewBufferString(`{"format": "pdf"}`)
+	req = httptest.NewRequest(http.MethodPost, "/pdf", payload)
+	rr = httptest.NewRecorder()
+	PDFHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request for missing URL, got %d", rr.Code)
+	}
+
+	// Unsupported format
+	payload = bytes.NewBufferString(`{"url": "https://example.com", "format": "png"}`)
+	req = httptest.NewRequest(http.MethodPost, "/pdf", payload)
+	rr = httptest.NewRecorder()
+	PDFHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request for unsupported format, got %d", rr.Code)
+	}
+
+	// Verify ScreenshotHandler alias points to same logic
+	payload = bytes.NewBufferString(`{"format": "pdf"}`)
+	req = httptest.NewRequest(http.MethodPost, "/screenshot", payload)
+	rr = httptest.NewRecorder()
+	ScreenshotHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request from ScreenshotHandler alias, got %d", rr.Code)
+	}
+}

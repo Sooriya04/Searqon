@@ -134,6 +134,6 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, map[string]interface{}{
 		"status":    "ok",
 		"engine":    "src",
-		"endpoints": []string{"/search", "/scrape", "/scrape/chunked", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline"},
+		"endpoints": []string{"/search", "/scrape", "/scrape/chunked", "/scrape/batch", "/map", "/crawl", "/health", "/r/", "/pipeline", "/pdf"},
 	})
 }
