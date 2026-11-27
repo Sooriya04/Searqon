@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"src/models"
 	"src/utils"
@@ -65,7 +66,11 @@ func semanticRankResults(results []models.SearchResult, query string) []models.S
 func truncateEmbeddingText(text string) string {
 	text = strings.TrimSpace(text)
 	if len(text) > 1800 {
-		return text[:1800]
+		end := 1800
+		for end > 0 && !utf8.RuneStart(text[end]) {
+			end--
+		}
+		return text[:end]
 	}
 	return text
 }

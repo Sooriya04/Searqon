@@ -151,20 +151,24 @@ func GetScrapeCache(targetURL string) (models.ScrapeResult, bool) {
 
 // SaveScrapeCache stores page extraction content in Redis, SQLite, PostgreSQL, and memory.
 func SaveScrapeCache(r models.ScrapeResult) {
-	// 1. Save in memory
-	scrapeMemoryCache.Store(r.URL, inMemoryScrapeEntry{
-		result:    r,
-		expiresAt: time.Now().Add(scrapeCacheTTL),
-	})
-
-	// 2. Save in Redis
-	RedisSaveScrapeCache(r, scrapeCacheTTL)
-
 	dbMu.RLock()
 	backend := dbBackend
 	sDB := sqliteDB
 	pPool := pgPool
 	dbMu.RUnlock()
+
+	hasPersistentDB := backend != "none" && (sDB != nil || pPool != nil)
+
+	// 1. Save in memory only when persistent SQL database storage is disabled
+	if !hasPersistentDB {
+		scrapeMemoryCache.Store(r.URL, inMemoryScrapeEntry{
+			result:    r,
+			expiresAt: time.Now().Add(scrapeCacheTTL),
+		})
+	}
+
+	// 2. Save in Redis
+	RedisSaveScrapeCache(r, scrapeCacheTTL)
 
 	outboundLinksJSON, err := json.Marshal(r.OutboundLinks)
 	if err != nil {
