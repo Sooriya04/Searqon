@@ -291,3 +291,41 @@ func TestSQLiteConcurrentReaders(t *testing.T) {
 		}
 	}
 }
+
+func TestRunCleanup_PrunesExpiredFTS5(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "searqon_db_cleanup_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "test_cleanup.db")
+	initSQLite(dbPath)
+	defer CloseDB()
+
+	expiredURL := "https://expired.local/test"
+	_, err = sqliteDB.Exec(`
+		INSERT INTO scrape_cache (url, title, content, expires_at)
+		VALUES (?, ?, ?, DATETIME('now', '-10 seconds'))
+	`, expiredURL, "Expired Title", "Expired content search query")
+	if err != nil {
+		t.Fatalf("failed to insert expired record: %v", err)
+	}
+
+	IndexScrapeInFTS(expiredURL, "Expired Title", "Expired Description", "Expired content search query")
+
+	results, err := SearchLocalIndex("Expired", 5)
+	if err != nil || len(results) == 0 {
+		t.Fatalf("expected FTS entry to exist before cleanup, err: %v", err)
+	}
+
+	runCleanup()
+
+	resultsAfter, err := SearchLocalIndex("Expired", 5)
+	if err != nil {
+		t.Fatalf("unexpected error searching FTS after cleanup: %v", err)
+	}
+	if len(resultsAfter) != 0 {
+		t.Fatalf("expected 0 FTS results after cleanup, got %d", len(resultsAfter))
+	}
+}
