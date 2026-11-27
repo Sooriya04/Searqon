@@ -190,3 +190,43 @@ func TestEscalationChainTier1ToTier2(t *testing.T) {
 		t.Errorf("Expected non-empty raw HTML")
 	}
 }
+
+func TestEscalationHTTP_CookieJarPersistence(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/set-cookie" {
+			http.SetCookie(w, &http.Cookie{
+				Name:  "session_token",
+				Value: "searqon_secret_123",
+				Path:  "/",
+			})
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<html><body>Cookie set successfully with enough content for length check.</body></html>`))
+			return
+		}
+		if r.URL.Path == "/check-cookie" {
+			c, err := r.Cookie("session_token")
+			if err != nil || c.Value != "searqon_secret_123" {
+				http.Error(w, "missing cookie", http.StatusUnauthorized)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<html><body>Authenticated content with valid session cookie.</body></html>`))
+			return
+		}
+	}))
+	defer ts.Close()
+
+	headers := map[string]string{}
+	// First request sets cookie
+	_, code1, _, _, err := fetchHTTPRaw(ts.URL+"/set-cookie", headers, nil, 5*time.Second)
+	if err != nil || code1 != http.StatusOK {
+		t.Fatalf("first request failed: code=%d err=%v", code1, err)
+	}
+
+	// Second request should send the cookie
+	_, code2, _, _, err := fetchHTTPRaw(ts.URL+"/check-cookie", headers, nil, 5*time.Second)
+	if err != nil || code2 != http.StatusOK {
+		t.Fatalf("second request failed to send persistent cookie: code=%d err=%v", code2, err)
+	}
+}
+
