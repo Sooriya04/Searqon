@@ -152,3 +152,44 @@ func TestCrawlSite_RelativeLinkResolution(t *testing.T) {
 	}
 }
 
+func TestCrawlSite_ConcurrentNoPanic(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+
+		path := r.URL.Path
+		switch {
+		case path == "/":
+			fmt.Fprint(w, `<html><body>
+				<a href="/p1">P1</a>
+				<a href="/p2">P2</a>
+				<a href="/p3">P3</a>
+				<a href="/p4">P4</a>
+				<a href="/p5">P5</a>
+			</body></html>`)
+		case strings.HasPrefix(path, "/p"):
+			num := strings.TrimPrefix(path, "/p")
+			fmt.Fprintf(w, `<html><body>
+				<h1>Page %s</h1>
+				<a href="/sub%s_1">Sub 1</a>
+				<a href="/sub%s_2">Sub 2</a>
+				<a href="/">Home</a>
+			</body></html>`, num, num, num)
+		default:
+			fmt.Fprintf(w, `<html><body>Leaf node %s</body></html>`, path)
+		}
+	}))
+	defer ts.Close()
+
+	// Run multiple iterations of concurrent crawl to ensure no race or closed channel panic occurs
+	for i := 0; i < 5; i++ {
+		res := CrawlSite(ts.URL, 20, 2, "markdown", nil)
+		if res.Error != "" {
+			t.Fatalf("CrawlSite run %d failed: %s", i, res.Error)
+		}
+		if res.Total < 6 {
+			t.Errorf("Expected at least 6 crawled pages in run %d, got %d", i, res.Total)
+		}
+	}
+}
+
