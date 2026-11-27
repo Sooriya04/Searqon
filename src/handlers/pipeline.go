@@ -55,7 +55,7 @@ func PipelineHandler(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
 	// 1. Discover top URLs using the search pipeline (without scraping inside search phase)
-	searchResp := search.RunSearchPipeline(req.Query, req.MaxSources, false, req.BypassCache, 0, false, "")
+	searchResp := search.RunSearchPipeline(req.Query, req.MaxSources, false, req.BypassCache, 0, 0, false, "")
 
 	// 2. Scrape discovered URLs in parallel (with concurrency limit of 3)
 	var wg sync.WaitGroup

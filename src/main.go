@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"src/config"
@@ -37,7 +40,7 @@ func main() {
 
 	port := fmt.Sprintf("%d", cfg.Server.Port)
 	if port == "0" {
-		port = "4001"
+		port = "7493"
 	}
 
 	readTimeout := time.Duration(cfg.Server.ReadTimeoutSeconds) * time.Second
@@ -130,10 +133,30 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("[Searqon] Server starting on %s:%s (SearXNG: enabled=%v, DB: %s, Redis: enabled=%v, Logs: %s)",
-		cfg.Server.Host, port, cfg.SearXNG.Enabled, db.GetBackend(), db.IsRedisEnabled(), cfg.Logs.Storage)
+	serverErrors := make(chan error, 1)
+	go func() {
+		log.Printf("[Searqon] Server starting on %s:%s (SearXNG: enabled=%v, DB: %s, Redis: enabled=%v, Logs: %s)",
+			cfg.Server.Host, port, cfg.SearXNG.Enabled, db.GetBackend(), db.IsRedisEnabled(), cfg.Logs.Storage)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErrors <- err
+		}
+	}()
 
-	if err := server.ListenAndServe(); err != nil {
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
 		log.Fatalf("[Searqon] Server failed to start: %v", err)
+	case sig := <-shutdown:
+		log.Printf("[Searqon] Received signal %v, initiating graceful shutdown...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("[Searqon] Graceful shutdown error: %v", err)
+			server.Close()
+		}
+		log.Println("[Searqon] Server stopped cleanly")
 	}
 }

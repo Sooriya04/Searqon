@@ -33,6 +33,15 @@ type searxngResponse struct {
 	Results []searxngResult `json:"results"`
 }
 
+var fallbackHTTPClient = &http.Client{
+	Timeout: 2 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 func getSearXNGBase() string {
 	cfg := config.Get()
 	if cfg.SearXNG.URL != "" {
@@ -41,7 +50,7 @@ func getSearXNGBase() string {
 	if u := os.Getenv("SEARXNG_URL"); u != "" {
 		return u
 	}
-	return "http://localhost:4002"
+	return "http://localhost:8080"
 }
 
 func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
@@ -65,8 +74,7 @@ func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
 	req.Header.Set("User-Agent", "Searqon/2.0")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := fallbackHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +126,7 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := fallbackHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -179,16 +186,16 @@ type SearchEvent struct {
 type SearchEventHandler func(SearchEvent)
 
 // RunSearchPipeline coordinates query expansion, intent classification, web discovery, parallel scraping, and ranking.
-func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, summarize, extractSchema)
+func RunSearchPipeline(query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineWithContext(context.Background(), query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema)
 }
 
-func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string) models.SearchResponse {
-	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, summarize, extractSchema, nil)
+func RunSearchPipelineWithContext(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string) models.SearchResponse {
+	return RunSearchPipelineStream(ctx, query, limit, scrape, bypassCache, maxWords, maxTokens, summarize, extractSchema, nil)
 }
 
 // RunSearchPipelineStream executes the search pipeline and invokes onEvent for incremental streaming updates.
-func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
+func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrape bool, bypassCache bool, maxWords int, maxTokens int, summarize bool, extractSchema string, onEvent SearchEventHandler) models.SearchResponse {
 	start := time.Now()
 	if limit <= 0 || limit > 10 {
 		limit = 5
@@ -395,6 +402,7 @@ func RunSearchPipelineStream(ctx context.Context, query string, limit int, scrap
 					Format:        "markdown",
 					BypassCache:   bypassCache,
 					ExtractSchema: extractSchema,
+					MaxTokens:     maxTokens,
 				})
 
 				select {

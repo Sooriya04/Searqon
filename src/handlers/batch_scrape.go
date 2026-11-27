@@ -12,6 +12,9 @@ import (
 	"src/utils"
 )
 
+// MaxBatchURLs defines the maximum number of URLs allowed in a single batch scrape request.
+const MaxBatchURLs = 50
+
 // BatchScrapeHandler processes multiple URLs concurrently.
 func BatchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -26,6 +29,10 @@ func BatchScrapeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.URLs) == 0 {
 		utils.WriteError(w, http.StatusBadRequest, utils.ErrCodeMissingParam, "URLs array is required")
+		return
+	}
+	if len(req.URLs) > MaxBatchURLs {
+		utils.WriteError(w, http.StatusBadRequest, "INVALID_PARAM", fmt.Sprintf("Batch scrape exceeds maximum limit of %d URLs per request", MaxBatchURLs))
 		return
 	}
 

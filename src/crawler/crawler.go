@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -145,9 +144,8 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 	var pages []models.ScrapeResult
 	visited := map[string]bool{targetURL: true}
 
-	var activeWorkers int32
-	var pendingTasks int32 = 1
 	var wg sync.WaitGroup
+	var taskWg sync.WaitGroup
 
 	crawlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -168,8 +166,6 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 					}
 					task = t
 				}
-
-				atomic.AddInt32(&activeWorkers, 1)
 
 				scraped, htmlContent := scraper.ScrapeSingleURLNative(task.url, format, false)
 
@@ -241,27 +237,29 @@ func CrawlSiteWithContext(ctx context.Context, targetURL string, limit, depth in
 					mu.Unlock()
 
 					if len(toSchedule) > 0 {
-						atomic.AddInt32(&pendingTasks, int32(len(toSchedule)))
+						taskWg.Add(len(toSchedule))
 						for _, item := range toSchedule {
 							select {
 							case jobs <- item:
 							case <-crawlCtx.Done():
-								atomic.AddInt32(&pendingTasks, -1)
+								taskWg.Done()
 							}
 						}
 					}
 				}
 
-				atomic.AddInt32(&activeWorkers, -1)
-				if atomic.AddInt32(&pendingTasks, -1) == 0 {
-					// All pending tasks finished and no more tasks remain
-					close(jobs)
-				}
+				taskWg.Done()
 			}
 		}()
 	}
 
+	taskWg.Add(1)
 	jobs <- crawlTask{url: targetURL, depth: 0}
+
+	go func() {
+		taskWg.Wait()
+		cancel()
+	}()
 
 	wg.Wait()
 

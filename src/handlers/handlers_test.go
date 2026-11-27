@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"src/db"
 	"src/models"
 )
 
@@ -196,6 +197,45 @@ func TestExtractHandler(t *testing.T) {
 	if cachedResp.Data.Data["cost"] != "$0.00 Open Source" {
 		t.Errorf("Expected cached cost '$0.00 Open Source', got '%s'", cachedResp.Data.Data["cost"])
 	}
+
+	// 5. Test extraction with CSS selectors when URL was cached without raw HTML in memory
+	cachedWithoutHTML := ts.URL + "/cached-only-markdown"
+	db.SaveScrapeCache(models.ScrapeResult{
+		URL:      cachedWithoutHTML,
+		Title:    "Old Title",
+		Markdown: "# Old Title\n\nOnly markdown content without HTML tags.",
+		Content:  "Only markdown content without HTML tags.",
+		Scraped:  true,
+	})
+
+	cachedWithoutHTMLPayload, _ := json.Marshal(ExtractRequest{
+		URL: cachedWithoutHTML,
+		Selectors: map[string]string{
+			"title": ".headline",
+		},
+		BypassCache: false,
+	})
+	req5 := httptest.NewRequest(http.MethodPost, "/extract", bytes.NewBuffer(cachedWithoutHTMLPayload))
+	rr5 := httptest.NewRecorder()
+	ExtractHandler(rr5, req5)
+
+	if rr5.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for cached extraction without raw HTML, got %d: %s", rr5.Code, rr5.Body.String())
+	}
+
+	var cachedWithoutHTMLResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Data map[string]string `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rr5.Body).Decode(&cachedWithoutHTMLResp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if cachedWithoutHTMLResp.Data.Data["title"] != "Searqon Engine v2" {
+		t.Errorf("Expected title 'Searqon Engine v2' after cache bypass for missing raw HTML, got '%s'", cachedWithoutHTMLResp.Data.Data["title"])
+	}
 }
 
 func TestScrapeHandler_Validation(t *testing.T) {
@@ -323,5 +363,53 @@ func TestCrawlHandler_ParameterParity(t *testing.T) {
 	CrawlHandler(rr2, req2)
 	if rr2.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK for crawl with max_depth, got %d: %s", rr2.Code, rr2.Body.String())
+	}
+}
+
+func TestBatchScrapeHandler_MaxURLLimit(t *testing.T) {
+	urls := make([]string, MaxBatchURLs+1)
+	for i := 0; i < len(urls); i++ {
+		urls[i] = fmt.Sprintf("https://example.com/%d", i)
+	}
+
+	payload, err := json.Marshal(models.BatchScrapeRequest{
+		URLs: urls,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/scrape/batch", bytes.NewBuffer(payload))
+	rr := httptest.NewRecorder()
+	BatchScrapeHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request for batch scrape exceeding max URL limit, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !strings.Contains(rr.Body.String(), "exceeds maximum limit of 50 URLs") {
+		t.Errorf("Expected error message to mention maximum limit, got: %s", rr.Body.String())
+	}
+}
+
+func TestSearchHandler_TokenLimitForwarding(t *testing.T) {
+	scrapeFalse := false
+	payload, err := json.Marshal(models.SearchRequest{
+		Query:      "test token forwarding",
+		Limit:      3,
+		Scrape:     &scrapeFalse,
+		MaxTokens:  100,
+		TokenLimit: 100,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBuffer(payload))
+	rr := httptest.NewRecorder()
+	SearchHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
 	}
 }

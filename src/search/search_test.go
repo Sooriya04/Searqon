@@ -2,9 +2,12 @@ package search
 
 import (
 	"context"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 
+	"src/config"
 	"src/models"
 )
 
@@ -18,11 +21,22 @@ func TestSearchPipeline_TimeoutSafety(t *testing.T) {
 
 	// Run pipeline with scrape=true
 	// When timeout fires, the results slice should be safely cloned under mu.Lock() without panicking or racing
-	resp := RunSearchPipelineWithContext(ctx, "golang testing", 5, true, false, 0, false, "")
+	resp := RunSearchPipelineWithContext(ctx, "golang testing", 5, true, false, 0, 0, false, "")
 
 	// Result should return gracefully
 	if resp.Results == nil {
 		// Empty results or none provider is fine for cancelled/stubbed context
+		t.Logf("Search returned with provider=%s", resp.Provider)
+	}
+}
+
+func TestSearchPipeline_MaxTokensParameter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+	<-ctx.Done()
+
+	resp := RunSearchPipelineWithContext(ctx, "golang token limit forwarding", 3, true, false, 0, 150, false, "")
+	if resp.Results == nil {
 		t.Logf("Search returned with provider=%s", resp.Provider)
 	}
 }
@@ -41,5 +55,49 @@ func TestSearchPipeline_ResultCloningUnderLock(t *testing.T) {
 	original[0].Content = "mutated content"
 	if cloned[0].Content == "mutated content" {
 		t.Fatalf("cloned slice was unexpectedly mutated through backing array")
+	}
+}
+
+func TestGetSearXNGBase_DefaultFallback(t *testing.T) {
+	origEnv := os.Getenv("SEARXNG_URL")
+	os.Unsetenv("SEARXNG_URL")
+	defer func() {
+		if origEnv != "" {
+			os.Setenv("SEARXNG_URL", origEnv)
+		}
+	}()
+
+	cfg := config.Get()
+	origURL := cfg.SearXNG.URL
+	cfg.SearXNG.URL = ""
+	defer func() {
+		cfg.SearXNG.URL = origURL
+	}()
+
+	base := getSearXNGBase()
+	if base != "http://localhost:8080" {
+		t.Fatalf("expected fallback SearXNG base URL http://localhost:8080, got %s", base)
+	}
+}
+
+func TestFallbackHTTPClientConfiguration(t *testing.T) {
+	if fallbackHTTPClient == nil {
+		t.Fatal("expected fallbackHTTPClient to be initialized")
+	}
+	if fallbackHTTPClient.Timeout != 2*time.Second {
+		t.Fatalf("expected 2s timeout, got %v", fallbackHTTPClient.Timeout)
+	}
+	transport, ok := fallbackHTTPClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected fallbackHTTPClient.Transport to be *http.Transport")
+	}
+	if transport.MaxIdleConns != 100 {
+		t.Errorf("expected MaxIdleConns=100, got %d", transport.MaxIdleConns)
+	}
+	if transport.MaxIdleConnsPerHost != 20 {
+		t.Errorf("expected MaxIdleConnsPerHost=20, got %d", transport.MaxIdleConnsPerHost)
+	}
+	if transport.IdleConnTimeout != 90*time.Second {
+		t.Errorf("expected IdleConnTimeout=90s, got %v", transport.IdleConnTimeout)
 	}
 }

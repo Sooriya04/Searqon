@@ -46,7 +46,7 @@ func SearchStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	search.RunSearchPipelineStream(r.Context(), query, 5, true, false, 0, true, "", func(evt search.SearchEvent) {
+	search.RunSearchPipelineStream(r.Context(), query, 5, true, false, 0, 0, true, "", func(evt search.SearchEvent) {
 		switch evt.Type {
 		case "discovery":
 			discBytes, _ := json.Marshal(map[string]interface{}{

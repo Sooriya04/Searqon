@@ -1,6 +1,6 @@
 # API Reference
 
-Base URL: `http://localhost:4001`
+Base URL: `http://localhost:7493`
 
 All request bodies are JSON. All successful responses are JSON unless noted otherwise.
 
@@ -87,7 +87,7 @@ Multi-engine search pipeline. Expands the query, merges results across providers
 ### GET variant
 
 ```bash
-curl "http://localhost:4001/search?q=golang+channels&scrape=false"
+curl "http://localhost:7493/search?q=golang+channels&scrape=false"
 ```
 
 ---
@@ -300,13 +300,13 @@ Jina Reader compatibility endpoint. Scrapes the given URL and returns raw Markdo
 
 ```bash
 # Raw markdown
-curl http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
+curl http://localhost:7493/r/https://en.wikipedia.org/wiki/Y_Combinator
 
 # Query parameter form
-curl "http://localhost:4001/r?url=https://en.wikipedia.org/wiki/Y_Combinator"
+curl "http://localhost:7493/r?url=https://en.wikipedia.org/wiki/Y_Combinator"
 
 # JSON
-curl -H "Accept: application/json" http://localhost:4001/r/https://en.wikipedia.org/wiki/Y_Combinator
+curl -H "Accept: application/json" http://localhost:7493/r/https://en.wikipedia.org/wiki/Y_Combinator
 ```
 
 ### Query Parameters
