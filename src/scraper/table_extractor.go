@@ -68,16 +68,3 @@ func ConvertTablesInDocument(doc *goquery.Document) {
 	})
 }
 
-// ConvertTablesToMarkdown converts HTML tables to Github-Flavored Markdown.
-func ConvertTablesToMarkdown(htmlContent string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil || doc == nil {
-		return htmlContent
-	}
-	ConvertTablesInDocument(doc)
-	html, err := doc.Html()
-	if err != nil || html == "" {
-		return htmlContent
-	}
-	return html
-}
