@@ -33,6 +33,15 @@ type searxngResponse struct {
 	Results []searxngResult `json:"results"`
 }
 
+var fallbackHTTPClient = &http.Client{
+	Timeout: 2 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 func getSearXNGBase() string {
 	cfg := config.Get()
 	if cfg.SearXNG.URL != "" {
@@ -65,8 +74,7 @@ func searchSearXNG(query string, limit int) ([]models.SearchResult, error) {
 	req.Header.Set("User-Agent", "Searqon/2.0")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := fallbackHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +126,7 @@ func searchDDGFallback(query string, limit int) ([]models.SearchResult, error) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := fallbackHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
