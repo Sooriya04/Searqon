@@ -183,3 +183,21 @@ func TestParseDDGHTML(t *testing.T) {
 	}
 }
 
+func TestDecomposeQueries_NoBrokenParentheses(t *testing.T) {
+	// Simulated expanded query with parentheses containing OR
+	expanded := "docker and kubernetes (container OR k8s)"
+	queries := decomposeQueries(expanded)
+
+	for _, q := range queries {
+		open := strings.Count(q, "(")
+		close := strings.Count(q, ")")
+		if open != close {
+			t.Fatalf("decomposed query has unbalanced parentheses: %q (open=%d close=%d)", q, open, close)
+		}
+		if strings.Contains(q, "(container") && !strings.Contains(q, ")") {
+			t.Fatalf("broken parenthesis fragment detected: %q", q)
+		}
+	}
+}
+
+
